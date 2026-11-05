@@ -1,0 +1,20 @@
+# Normalize line endings: LF in the repo and in the working tree, also on Windows.
+# Keeps gofmt, shell scripts in containers and the CI "generated code drift" check stable.
+* text=auto eol=lf
+
+*.ps1 text eol=crlf
+*.psm1 text eol=crlf
+
+# Binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.zip binary
+*.pb binary
+
+# Generated code: collapse in GitHub diffs
+/backend/gen/** linguist-generated=true
