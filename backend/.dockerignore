@@ -1,0 +1,13 @@
+# Keep the build context small: only Go sources are needed.
+bin/
+data/
+tmp/
+testdata/
+coverage*
+*.test
+*.out
+*.exe
+.env
+.env.*
+Dockerfile
+.dockerignore

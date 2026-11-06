@@ -1,0 +1,59 @@
+# LiveStop dev stack: PostgreSQL + PostGIS and the Go backend.
+#   docker compose up -d --build
+# Settings come from .env (copy .env.example). Without .env the defaults below apply.
+
+name: livestop
+
+services:
+  db:
+    image: postgis/postgis:18-3.7
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${LIVESTOP_DB_USER:-livestop}
+      POSTGRES_PASSWORD: ${LIVESTOP_DB_PASSWORD:-livestop}
+      POSTGRES_DB: ${LIVESTOP_DB_NAME:-livestop}
+    ports:
+      # Localhost only: for psql / DB tools on the PC, not reachable from the LAN.
+      - "127.0.0.1:${LIVESTOP_DB_HOST_PORT:-5432}:5432"
+    volumes:
+      # Postgres 18+ images keep data in /var/lib/postgresql/<major>/docker,
+      # so the volume is mounted one level up.
+      - pgdata:/var/lib/postgresql
+    # Docker's default 64 MB /dev/shm is too small for parallel queries and
+    # index builds during the GTFS import.
+    shm_size: 512mb
+    healthcheck:
+      # -h 127.0.0.1: during first-time init Postgres only listens on the Unix
+      # socket, so a TCP check does not report "ready" too early.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 60s
+      start_interval: 1s
+
+  backend:
+    build: ./backend
+    image: livestop-backend:dev
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    # Container-specific values; these override the same keys from .env
+    # (which are meant for running the backend directly on the host).
+    environment:
+      LIVESTOP_HTTP_ADDR: ":8080"
+      LIVESTOP_METRICS_ADDR: ":9090"
+      LIVESTOP_DATABASE_URL: "postgres://${LIVESTOP_DB_USER:-livestop}:${LIVESTOP_DB_PASSWORD:-livestop}@db:5432/${LIVESTOP_DB_NAME:-livestop}?sslmode=disable"
+    ports:
+      # All interfaces: the phone reaches the API via the PC's LAN IP (task 0.8).
+      - "8080:8080"
+      # Metrics stay private (ARCHITECTURE §3.6).
+      - "127.0.0.1:9090:9090"
+    # Healthcheck is defined in backend/Dockerfile (`/livestop healthcheck`).
+
+volumes:
+  pgdata:

@@ -43,7 +43,20 @@ Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/DATA_MODEL.md`](
 
 Requirements: Docker Desktop (WSL2 on Windows), Go, Node.js, Expo Go on your phone.
 
-Run instructions are added during Phase 0 (tasks 0.2–0.8) and kept in sync with [`CLAUDE.md` §5](CLAUDE.md#5-commands).
+**Backend + database** (PowerShell, from the repo root):
+
+```powershell
+Copy-Item .env.example .env        # optional; defaults work for local dev
+docker compose up -d --build --wait
+curl.exe http://localhost:8080/v1/health
+```
+
+- API: `http://localhost:8080` (reachable from the LAN for the phone)
+- Metrics: `127.0.0.1:9090`, Postgres: `127.0.0.1:5432` (localhost only)
+- All settings: [`.env.example`](.env.example)
+- Stop: `docker compose down` (data stays in the `livestop_pgdata` volume; `down -v` deletes it)
+
+The mobile app and the remaining run instructions follow during Phase 0 (tasks 0.7–0.8) and are kept in sync with [`CLAUDE.md` §5](CLAUDE.md#5-commands).
 
 ## Data & licence
 
