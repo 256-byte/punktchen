@@ -1,0 +1,11 @@
+# oapi-codegen config for the server side of api/openapi.yaml.
+# Run: cd backend; go generate ./...
+package: openapi
+output: ../../gen/openapi/openapi.gen.go
+generate:
+  models: true
+  std-http-server: true
+  strict-server: true
+compatibility:
+  # StatusOk, ModeBus, ... instead of bare Ok, Bus.
+  always-prefix-enum-values: true

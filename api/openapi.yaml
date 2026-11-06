@@ -1,0 +1,493 @@
+openapi: 3.1.0
+
+info:
+  title: LiveStop API
+  version: 0.1.0
+  summary: Live departures on the map around a point (Berlin).
+  description: |
+    Contract between the LiveStop backend and its clients. This file is the
+    source of truth (ADR-0003): Go server code and TypeScript client types are
+    generated from it.
+
+    Conventions:
+    - All times are absolute ISO-8601 timestamps with offset, Europe/Berlin
+      (e.g. `2026-11-05T14:32:00+01:00`). Clients compute countdowns (ADR-0007).
+    - Errors use the `Error` schema with a matching HTTP status.
+    - `/v1/nearby` and `/v1/stations/{stationId}` send an `ETag`; send it back
+      in `If-None-Match` to get `304 Not Modified` when nothing changed.
+  license:
+    name: MIT
+    identifier: MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: system
+  - name: layers
+  - name: transit
+
+paths:
+  /v1/health:
+    get:
+      operationId: getHealth
+      tags: [system]
+      summary: Service status and freshness
+      description: |
+        Always answers 200 while the process runs; the body tells how usable
+        the data is. `down` means no data can be served.
+      responses:
+        "200":
+          description: Current status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/layers:
+    get:
+      operationId: listLayers
+      tags: [layers]
+      summary: Available map layers
+      responses:
+        "200":
+          description: All layers the server can serve.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LayersResponse"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/nearby:
+    get:
+      operationId: getNearby
+      tags: [layers]
+      summary: Features of the requested layers around a point
+      description: |
+        The server snaps the point to a cache cell (ADR-0006), so the result may
+        include features slightly beyond `radius` from the exact point.
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+            minimum: -90
+            maximum: 90
+          example: 52.5427
+        - name: lng
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+            minimum: -180
+            maximum: 180
+          example: 13.366
+        - name: radius
+          in: query
+          description: Search radius in meters.
+          schema:
+            type: integer
+            format: int32
+            minimum: 100
+            maximum: 1000
+            default: 500
+        - name: layers
+          in: query
+          description: Comma-separated layer ids. Unknown ids are rejected with 400.
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/LayerId"
+            minItems: 1
+            uniqueItems: true
+            default: [transit]
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: Features grouped by layer. Only requested layers are present.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NearbyResponse"
+        "304":
+          $ref: "#/components/responses/NotModified"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/stations/{stationId}:
+    get:
+      operationId: getStation
+      tags: [transit]
+      summary: One transit station with all poles and more departures
+      parameters:
+        - name: stationId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+          example: "de:11000:900009104"
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: The station.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+            Cache-Control:
+              $ref: "#/components/headers/CacheControl"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StationResponse"
+        "304":
+          $ref: "#/components/responses/NotModified"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Error"
+
+components:
+  parameters:
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      description: ETag of a previous response.
+      schema:
+        type: string
+
+  headers:
+    ETag:
+      description: Opaque version of this response.
+      schema:
+        type: string
+    CacheControl:
+      description: "Always `no-cache`: clients must revalidate (cheap with ETag)."
+      schema:
+        type: string
+
+  responses:
+    NotModified:
+      description: The cached response is still current. Empty body.
+      headers:
+        ETag:
+          $ref: "#/components/headers/ETag"
+    BadRequest:
+      description: Invalid parameters.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: No such resource.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Error:
+      description: Any other error (e.g. 500, 501, 503).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    # ---------------------------------------------------------------- common
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: |
+                Machine-readable code. Known values: `invalid_argument`,
+                `not_found`, `not_implemented`, `internal`, `unavailable`.
+              examples: [invalid_argument]
+            message:
+              type: string
+              description: Human-readable explanation (English).
+              examples: ["radius must be between 100 and 1000"]
+
+    Timestamp:
+      type: string
+      format: date-time
+      description: ISO-8601 with offset, Europe/Berlin.
+      examples: ["2026-11-05T14:32:00+01:00"]
+
+    LatLng:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+
+    Status:
+      type: string
+      description: |
+        `ok`: data is fresh. `degraded`: data is served but stale (e.g.
+        realtime feed older than 2 min). `down`: no data can be served.
+      enum: [ok, degraded, down]
+
+    # ---------------------------------------------------------------- system
+    Health:
+      type: object
+      required: [status, version, time]
+      properties:
+        status:
+          $ref: "#/components/schemas/Status"
+        version:
+          type: string
+          description: Server build version.
+          examples: ["dev"]
+        time:
+          $ref: "#/components/schemas/Timestamp"
+          description: Server time. Clients may use it to detect clock skew.
+
+    # ---------------------------------------------------------------- layers
+    LayerId:
+      type: string
+      description: Identifier of a map layer. More values are added with new layers.
+      enum: [transit]
+
+    LayerInfo:
+      type: object
+      required: [id, name, attribution]
+      properties:
+        id:
+          $ref: "#/components/schemas/LayerId"
+        name:
+          type: string
+          description: Display name.
+          examples: ["Public transport"]
+        attribution:
+          type: array
+          description: Texts that must be shown when this layer is visible.
+          items:
+            type: string
+          examples: [["Data: VBB (CC BY 4.0)"]]
+
+    LayersResponse:
+      type: object
+      required: [layers]
+      properties:
+        layers:
+          type: array
+          items:
+            $ref: "#/components/schemas/LayerInfo"
+
+    LayerMeta:
+      type: object
+      description: Freshness of one layer in this response.
+      required: [version, status]
+      properties:
+        version:
+          type: integer
+          format: int64
+          description: Data version of the layer; changes whenever its data changes.
+        status:
+          $ref: "#/components/schemas/Status"
+        realtimeAgeSeconds:
+          type: [integer, "null"]
+          format: int32
+          description: Age of the realtime data. Only for live layers; null if no realtime data yet.
+
+    ResponseMeta:
+      type: object
+      required: [generatedAt, attribution, layers]
+      properties:
+        generatedAt:
+          $ref: "#/components/schemas/Timestamp"
+        cell:
+          type: string
+          description: Cache cell (geohash) the request was snapped to. Only on /v1/nearby.
+          examples: ["u33dc9f"]
+        attribution:
+          type: array
+          description: Texts that must be shown with this data.
+          items:
+            type: string
+          examples: [["Data: VBB (CC BY 4.0)"]]
+        layers:
+          type: object
+          description: Per-layer freshness, keyed by layer id.
+          additionalProperties:
+            $ref: "#/components/schemas/LayerMeta"
+
+    NearbyResponse:
+      type: object
+      required: [meta, layers]
+      properties:
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+        layers:
+          $ref: "#/components/schemas/NearbyLayers"
+
+    NearbyLayers:
+      type: object
+      description: |
+        One typed payload per requested layer (ADR-0008). Each payload carries
+        its id in `layer`. New layers are added as new optional properties.
+      properties:
+        transit:
+          $ref: "#/components/schemas/TransitLayer"
+
+    # --------------------------------------------------------------- transit
+    TransitLayer:
+      type: object
+      required: [layer, features]
+      properties:
+        layer:
+          type: string
+          enum: [transit]
+        features:
+          type: array
+          items:
+            $ref: "#/components/schemas/Station"
+
+    StationResponse:
+      type: object
+      required: [meta, station]
+      properties:
+        meta:
+          $ref: "#/components/schemas/ResponseMeta"
+        station:
+          $ref: "#/components/schemas/Station"
+
+    Mode:
+      type: string
+      description: Transport mode, mapped from GTFS route_type (DATA_MODEL §6).
+      enum: [sbahn, ubahn, tram, bus, ferry, regional, other]
+
+    Station:
+      type: object
+      description: A parent stop with its poles. A pole without parent is its own station.
+      required: [id, kind, name, location, modes, poles]
+      properties:
+        id:
+          type: string
+          examples: ["de:11000:900009104"]
+        kind:
+          type: string
+          enum: [station]
+        name:
+          type: string
+          examples: ["U Wedding"]
+        location:
+          $ref: "#/components/schemas/LatLng"
+        distanceMeters:
+          type: integer
+          format: int32
+          description: Distance from the query point. Only on /v1/nearby.
+        modes:
+          type: array
+          description: Modes served at this station, sorted by importance.
+          items:
+            $ref: "#/components/schemas/Mode"
+        poles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Pole"
+
+    Pole:
+      type: object
+      description: A physical stop point / platform (GTFS location_type 0).
+      required: [id, location, platform, directions]
+      properties:
+        id:
+          type: string
+          examples: ["de:11000:900009104::1"]
+        location:
+          $ref: "#/components/schemas/LatLng"
+        platform:
+          type: [string, "null"]
+          description: GTFS platform_code, if any.
+          examples: ["1"]
+        directions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Direction"
+
+    Direction:
+      type: object
+      description: One line + headsign leaving from a pole.
+      required: [line, mode, color, headsign, isTerminal, isRing, departures]
+      properties:
+        line:
+          type: string
+          examples: ["U6"]
+        mode:
+          $ref: "#/components/schemas/Mode"
+        color:
+          type: [string, "null"]
+          description: Line colour as `#RRGGBB`, if the feed has one.
+          pattern: "^#[0-9A-Fa-f]{6}$"
+          examples: ["#8C6DAB"]
+        headsign:
+          type: string
+          examples: ["Alt-Mariendorf"]
+        isTerminal:
+          type: boolean
+          description: This pole is the last stop of this direction (DATA_MODEL §3.2).
+        isRing:
+          type: boolean
+          description: Ring line (e.g. S41/S42); the headsign is a direction of travel, not a destination.
+        departures:
+          type: array
+          description: Next departures, sorted by effective time. Max 3 on /v1/nearby, 10 on /v1/stations.
+          items:
+            $ref: "#/components/schemas/Departure"
+
+    Departure:
+      type: object
+      required: [tripId, serviceDate, scheduled, predicted, delaySeconds, source, cancelled]
+      properties:
+        tripId:
+          type: string
+          examples: ["123456"]
+        serviceDate:
+          type: string
+          format: date
+          description: Service day of the trip (may be the previous calendar day after midnight).
+          examples: ["2026-11-05"]
+        scheduled:
+          $ref: "#/components/schemas/Timestamp"
+        predicted:
+          type: [string, "null"]
+          format: date-time
+          description: Realtime prediction (ISO-8601 with offset). Null when `source` is `scheduled`.
+          examples: ["2026-11-05T14:33:00+01:00"]
+        delaySeconds:
+          type: [integer, "null"]
+          format: int32
+          description: predicted − scheduled. Null when `source` is `scheduled`.
+          examples: [60]
+        source:
+          type: string
+          enum: [realtime, scheduled]
+        cancelled:
+          type: boolean

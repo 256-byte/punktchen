@@ -117,6 +117,8 @@ type Provider interface {
 - Logs: `log/slog` JSON, one line per request, plus component logs with `component=` attribute.
 - Metrics (Prometheus): `livestop_gtfsrt_feed_age_seconds`, `livestop_gtfsrt_poll_total{result}`, `livestop_rt_match_ratio`, `livestop_snapshot_build_seconds`, `livestop_snapshot_version`, `livestop_import_duration_seconds`, `livestop_import_last_success_timestamp`, `livestop_http_request_duration_seconds{route,status}`, `livestop_cache_hits_total{result}`.
 - `/v1/health`: `ok` | `degraded` (RT feed older than 2 min, or schedule older than 3 days) | `down` (no schedule data).
+  - Always HTTP 200 while the process runs; the body carries the status. The Docker healthcheck (`livestop healthcheck`) is therefore a pure liveness check and does not restart the container during e.g. a long first import.
+  - Phase 0: `down` if the database is unreachable, else `ok`. Freshness rules are added with the importer (Phase 1) and the realtime poller (Phase 4).
 
 ## 4. Mobile architecture
 

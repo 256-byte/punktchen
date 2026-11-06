@@ -14,7 +14,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -25,6 +24,7 @@ import (
 	"time"
 
 	"github.com/256-byte/punktchen/backend/db"
+	"github.com/256-byte/punktchen/backend/internal/api"
 	"github.com/256-byte/punktchen/backend/internal/config"
 	"github.com/256-byte/punktchen/backend/internal/platform"
 )
@@ -84,30 +84,22 @@ func serve(ctx context.Context, log *slog.Logger, cfg config.Config) error {
 
 	metrics := platform.NewMetricsRegistry()
 
-	api, err := platform.Listen("api", cfg.HTTPAddr, apiHandler())
+	apiHandler := api.NewHandler(api.NewServer(version, pool, log.With("component", "api")))
+	apiSrv, err := platform.Listen("api", cfg.HTTPAddr, apiHandler)
 	if err != nil {
 		return err
 	}
 	metricsSrv, err := platform.Listen("metrics", cfg.MetricsAddr, platform.MetricsHandler(metrics))
 	if err != nil {
-		return errors.Join(err, api.Close())
+		return errors.Join(err, apiSrv.Close())
 	}
 
-	return platform.Serve(ctx, log, shutdownTimeout, api, metricsSrv)
-}
-
-// apiHandler is temporary: task 0.5 replaces it with the handlers generated
-// from api/openapi.yaml (internal/api).
-func apiHandler() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET "+healthPath, func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"status":"ok"}`)
-	})
-	return mux
+	return platform.Serve(ctx, log, shutdownTimeout, apiSrv, metricsSrv)
 }
 
 // healthcheck calls the local health endpoint and fails on any non-200 answer.
+// It is a liveness check: /v1/health answers 200 even when the data is
+// "down", so a container is not restarted during e.g. a long first import.
 // The distroless runtime image has no shell, curl or wget, so the binary
 // checks itself. It reads only LIVESTOP_HTTP_ADDR, not the full config.
 func healthcheck() error {
