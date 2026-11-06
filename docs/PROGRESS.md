@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 0 — Skeleton & tooling
-- **Next task:** 0.4
+- **Next task:** 0.5
 - **Blocked by:** nothing
 
 ## Task status
@@ -15,7 +15,7 @@
 | 0 | 0.1 Repo layout | done | Empty dirs kept via `.gitkeep`; remove each once the dir has real files. Added `.gitattributes` (LF) |
 | 0 | 0.2 Docker Compose | done | |
 | 0 | 0.3 Go skeleton | done | `/v1/health` still a hand-written stub until 0.5 |
-| 0 | 0.4 Migrations | todo | |
+| 0 | 0.4 Migrations | done | |
 | 0 | 0.5 OpenAPI v0 + health | todo | |
 | 0 | 0.6 sqlc | todo | |
 | 0 | 0.7 Expo app | todo | |
@@ -56,6 +56,19 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-06 — task 0.4
+- Done:
+  - `backend/db/migrations/0001_meta.{up,down}.sql`: `CREATE EXTENSION IF NOT EXISTS postgis`, schema `meta`, table `meta.feed_imports` with CHECK constraints (status values, `finished_at` ⇔ not running, `error` only on failure, sha256 hex) + index `(source, started_at DESC)`. Down drops only the table (schema `meta` holds the migration table; postgis may be used by gtfs data).
+  - `backend/db` package embeds the migrations (`//go:embed`), so the binary/image needs no extra files.
+  - `platform.Migrate`: golang-migrate on top of the app's pgx pool (`stdlib.OpenDBFromPool`, pgx5 driver, iofs source). Version table in `meta.schema_migrations` (creates schema `meta` first, the driver does not). `ErrNoChange` → "up to date". Dirty DB → startup fails with a clear message. Stops between migrations on SIGTERM. golang-migrate logs go through slog (`component=migrate`).
+  - `cmd/server`: runs migrations after connecting, before opening ports (so "healthy" implies a migrated schema).
+  - DATA_MODEL §3.3: status values and constraints of `feed_imports` documented.
+- Tests: `go test ./...` green, `go vet` / `gofmt` / `golangci-lint` clean. Unit: migration file conventions (names, versions 1..n without gaps, every up has a down). Integration (testcontainers): apply twice → no error, version 1 not dirty, table in `meta` not `public`, postgis installed; `feed_imports` constraints (4 valid, 5 invalid rows); down then up; a broken migration is fully rolled back (verifies the implicit-transaction claim) and the next run fails with "dirty".
+- Manual check (acceptance): existing dev volume → first start logs `1/u meta` and `from_version 0 → to_version 1`; `docker compose restart backend` → `database schema up to date, version 1`; container healthy.
+- New deps (+ why): `github.com/golang-migrate/migrate/v4` v4.20.1 (in stack; pgx v5 driver + iofs source).
+- Findings: Postgres runs a multi-statement query as one implicit transaction → migration files must not contain statements that cannot run in a transaction (e.g. `CREATE INDEX CONCURRENTLY`); noted in `db/db.go`. Each DB integration test starts its own container (~4–5 s each, platform package now ~40 s). If this grows, switch `pgtest` to one shared container with a fresh database per test.
+- Next: 0.5 OpenAPI v0 + health.
 
 ### 2026-11-06 — task 0.3
 - Done:

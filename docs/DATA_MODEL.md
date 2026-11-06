@@ -72,8 +72,11 @@ Terminal rule for the UI: at a terminal pole, arrivals that end there are **not*
 
 ### 3.3 `meta` schema (not swapped)
 
-- `meta.feed_imports(id, source, url, etag, last_modified, sha256, started_at, finished_at, status, row_counts jsonb, error)`
-- `meta.schema_migrations` (golang-migrate)
+- `meta.feed_imports(id, source, url, etag, last_modified, sha256, started_at, finished_at, status, row_counts jsonb, error)` — migration `0001_meta`
+  - `status`: `running` | `succeeded` | `failed` | `skipped` (unchanged upstream).
+  - `finished_at` is NULL exactly while `running`; `error` only on `failed`; `sha256` is lowercase hex or NULL (nothing downloaded).
+  - `etag` / `last_modified` are stored as raw header text, to send back unchanged in conditional GETs.
+- `meta.schema_migrations` (golang-migrate, version + dirty flag). Migrations are embedded in the binary (`backend/db/migrations`) and run on every startup.
 
 ## 4. Scope
 

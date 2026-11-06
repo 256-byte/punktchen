@@ -1,7 +1,7 @@
 // Command server is the LiveStop backend: one binary that will run the GTFS
 // importer, the realtime poller and the HTTP API (ADR-0002).
 //
-// Startup order: config → logger → database → listeners → serve.
+// Startup order: config → logger → database → migrations → listeners → serve.
 // Each step fails fast; SIGINT/SIGTERM triggers a graceful shutdown.
 //
 // Usage:
@@ -24,6 +24,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/256-byte/punktchen/backend/db"
 	"github.com/256-byte/punktchen/backend/internal/config"
 	"github.com/256-byte/punktchen/backend/internal/platform"
 )
@@ -76,6 +77,10 @@ func serve(ctx context.Context, log *slog.Logger, cfg config.Config) error {
 	}
 	defer pool.Close()
 	log.Info("database connected")
+
+	if err := platform.Migrate(ctx, pool, db.Migrations, db.MigrationsDir, log.With("component", "migrate")); err != nil {
+		return err
+	}
 
 	metrics := platform.NewMetricsRegistry()
 
