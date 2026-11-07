@@ -1,5 +1,7 @@
 // Package db holds the SQL that defines and queries the database:
-// migrations (embedded into the binary) and, later, sqlc queries.
+// migrations (embedded into the binary) and the sqlc query files under
+// "queries". sqlc reads both (config: ../sqlc.yaml) and generates typed Go
+// code into ../gen/queries; see generate.go.
 package db
 
 import "embed"

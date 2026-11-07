@@ -1,0 +1,35 @@
+# sqlc config. Run through `go generate ./...` (see db/generate.go), which
+# uses the pinned sqlc Docker image. Do not edit backend/gen/queries by hand.
+version: "2"
+sql:
+  - engine: postgresql
+    # golang-migrate files: sqlc applies *.up.sql in order and ignores *.down.sql.
+    schema: db/migrations
+    queries: db/queries
+    strict_function_checks: true
+    gen:
+      go:
+        package: queries
+        out: gen/queries
+        sql_package: pgx/v5
+        # Nullable columns become *T instead of pgtype.T.
+        emit_pointers_for_null_types: true
+        # :many returns [] instead of nil when nothing matches.
+        emit_empty_slices: true
+        # Go initialisms for column names sqlc would spell Url / Sha256.
+        rename:
+          url: URL
+          sha256: SHA256
+        overrides:
+          - db_type: timestamptz
+            go_type: time.Time
+          - db_type: timestamptz
+            nullable: true
+            go_type:
+              type: time.Time
+              pointer: true
+          - db_type: jsonb
+            go_type: encoding/json.RawMessage
+          - db_type: jsonb
+            nullable: true
+            go_type: encoding/json.RawMessage
