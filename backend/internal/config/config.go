@@ -36,7 +36,7 @@ const (
 const (
 	DefaultHTTPAddr           = ":8080"
 	DefaultMetricsAddr        = ":9090"
-	DefaultGTFSURL            = "https://unternehmen.vbb.de/fileadmin/user_upload/VBB/Dokumente/API-Datensaetze/gtfs-mastscharf/GTFS.zip"
+	DefaultGTFSURL            = "https://www.vbb.de/gtfs" // current feed, matches GTFS-RT trip ids; no ETag (DATA_MODEL §7 #15)
 	DefaultGTFSImportTime     = "03:30"
 	DefaultScopeBBox          = "13.088,52.338,13.761,52.675"
 	DefaultGTFSRTURL          = "https://production.gtfsrt.vbb.de/data"
@@ -44,9 +44,9 @@ const (
 )
 
 // MinGTFSRTPollInterval is the lowest accepted poll interval.
-// VBB allows at most 60 requests/minute (one per second); 5 s keeps a wide
-// safety margin so a config typo can never get us close to the limit.
-const MinGTFSRTPollInterval = 5 * time.Second
+// VBB allows at most 7 requests/minute since 2026-11-02 (DATA_MODEL §7 #20).
+// 10 s means at most 6/min, so a config typo can never exceed the limit.
+const MinGTFSRTPollInterval = 10 * time.Second
 
 // Config is the validated backend configuration.
 type Config struct {
