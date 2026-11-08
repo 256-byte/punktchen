@@ -1,12 +1,15 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-// Placeholder start screen. The map replaces it in Phase 3; task 0.8 adds
-// the backend health check.
+import { apiBaseUrl, apiClient } from '@/lib/api';
+import { BackendStatus } from '@/ui/BackendStatus';
+
+// Placeholder start screen. The map replaces it in Phase 3.
 export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>LiveStop</Text>
       <Text style={styles.subtitle}>Live departures around you</Text>
+      <BackendStatus baseUrl={apiBaseUrl} client={apiClient} />
     </View>
   );
 }

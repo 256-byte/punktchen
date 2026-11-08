@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 0 — Skeleton & tooling
-- **Next task:** 0.8
+- **Next task:** 0.9
 - **Blocked by:** nothing
 
 ## Task status
@@ -19,7 +19,7 @@
 | 0 | 0.5 OpenAPI v0 + health | done | layers/nearby/stations return 501 until 2.5 |
 | 0 | 0.6 sqlc | done | sqlc runs in Docker (pinned image); `go generate ./...` needs Docker |
 | 0 | 0.7 Expo app | done | Expo Go needs a signed-in Expo account on PC and phone (see session log) |
-| 0 | 0.8 Phone → backend networking | todo | |
+| 0 | 0.8 Phone → backend networking | done | Restart Expo with `--clear` after installing packages |
 | 0 | 0.9 CI | todo | |
 | 0 | 0.10 Real commands in CLAUDE.md | todo | |
 
@@ -56,6 +56,23 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-08 — task 0.8
+- Done:
+  - `EXPO_PUBLIC_API_URL` from `mobile/.env` (template `mobile/.env.example`; `.env` is git-ignored). Read once in `src/lib/api.ts` as a literal `process.env.EXPO_PUBLIC_API_URL` (Expo inlines it at bundle time) and validated by `src/core/apiBaseUrl.ts` (pure: http(s) only, no query/fragment/credentials, port 1–65535, trailing slashes removed; regex instead of `new URL()` because RN's URL polyfill is incomplete).
+  - `src/api/client.ts`: openapi-fetch client typed by the generated `paths`; 5 s timeout via AbortController (an unreachable LAN IP otherwise hangs ~1 min on iOS) that also honours the caller's abort signal; errors become `ApiError`. `fetchHealth()`.
+  - `src/api/health.ts`: `useHealth()` (TanStack Query, no retry). `app/_layout.tsx` provides a `QueryClient` (persistence comes with Phase 3/5).
+  - `src/ui/BackendStatus.tsx` on the start screen: "Backend: ok/degraded/down" + version + server time + URL; "Backend unreachable" with the error and a network hint; "Backend not configured" when the env var is missing/invalid; "Check again" button.
+  - README "Run the app on your phone": LAN IP via `ipconfig`, `mobile/.env`, Android emulator `10.0.2.2`, same Wi-Fi (no guest network), firewall (Docker Desktop's inbound rule; fallback `New-NetFirewallRule` for 8080 on the Private profile), Expo account + Windows login workarounds, `expo start --clear` after env changes.
+- Findings:
+  - Docker Desktop already has an inbound allow rule for `com.docker.backend.exe` (Public profile), which is what accepts the published port 8080 → no extra firewall rule was needed on this PC. The Wi-Fi is classified as "Public" by Windows; the README recommends "Private".
+  - `npm audit`: 31 moderate/low advisories, all in transitive build/test tooling (e.g. `minimatch`, `glob`, `deepmerge` via Expo CLI / Jest). `npm audit fix --force` would break the SDK-pinned versions; left as is, revisit on the next Expo SDK upgrade.
+  - Typecheck does not depend on the git-ignored `expo-env.d.ts` / `.expo/` (checked with a tsconfig that excludes them), so CI can run it on a fresh clone.
+- Tests: Vitest 33 (20 new for `parseApiBaseUrl`: valid/normalized URLs, missing value, 8 invalid forms, port range). Jest 7 (6 new for `BackendStatus` with a fake fetch: ok + requested URL, down, unreachable + hint, timeout, "Check again" refetch, missing config without network). `typecheck`, `lint` green. `expo export --platform ios` with `.env` → bundle contains the configured URL.
+- New deps (+ why): `openapi-fetch` (stack; typed client from the generated types), `@tanstack/react-query` (stack; request state now, cache/persistence later).
+  - A Metro dev server that was already running while packages were installed fails with "Unable to resolve module ./useQueries.js from …/@tanstack/react-query/…" (its file map missed the new files). Fix: stop it and run `npx expo start --clear`.
+- Manual check (acceptance): iPhone in Expo Go on the home Wi-Fi shows "Backend: ok" with version and server time from `http://192.168.178.29:8080/v1/health` (2026-11-08).
+- Next: 0.9 CI.
 
 ### 2026-11-07 — task 0.7
 - Done:
