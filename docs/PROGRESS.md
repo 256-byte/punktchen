@@ -5,8 +5,8 @@
 ## Current status
 
 - **Active phase:** Phase 0 — Skeleton & tooling
-- **Next task:** 0.9
-- **Blocked by:** nothing
+- **Next task:** Phase 1 (1.1) — needs the user's OK, because 0.9 is still blocked
+- **Blocked by:** 0.9 — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
 
@@ -20,8 +20,8 @@
 | 0 | 0.6 sqlc | done | sqlc runs in Docker (pinned image); `go generate ./...` needs Docker |
 | 0 | 0.7 Expo app | done | Expo Go needs a signed-in Expo account on PC and phone (see session log) |
 | 0 | 0.8 Phone → backend networking | done | Restart Expo with `--clear` after installing packages |
-| 0 | 0.9 CI | in progress | Workflow ready and simulated locally; waiting for a green PR run |
-| 0 | 0.10 Real commands in CLAUDE.md | todo | |
+| 0 | 0.9 CI | blocked | Workflow merged (PR #1); jobs not started: GitHub account billing lock. Re-run when unlocked |
+| 0 | 0.10 Real commands in CLAUDE.md | done | All commands run from the repo root; tested in Windows PowerShell 5.1 |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
 
@@ -57,6 +57,16 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Next:
 -->
 
+### 2026-11-08 — task 0.10
+- Done:
+  - CLAUDE.md §5 rewritten: every command runs from the repo root (`go -C backend …`, `npm --prefix mobile …`), so each line can be pasted on its own. Covers Compose up/health/logs/down, `go vet`, full and `-short` tests, golangci-lint via Docker (v2.15.0, same as CI), `go generate` + `gen:api` (with "commit the generated files"), `npm ci`/typecheck/lint/test/start, `start -- --clear`, `expo install`, and the Phase 1.7 import trigger (marked as not implemented). Notes on Docker requirements, `-race`, phone setup.
+  - `curl.exe` instead of `curl` (in Windows PowerShell 5.1 `curl` is an alias of Invoke-WebRequest).
+  - `tests/node/core-boundary.test.ts`: ESLint warm-up moved to `beforeAll` (60 s timeout). The first lint loads all Expo plugins and took 7.8 s on a busy machine → the first case hit Vitest's 5 s default and failed. Would have been flaky in CI too.
+- Tests (acceptance): ran every command verbatim in Windows PowerShell 5.1.26100 from the repo root: compose up `--wait` → healthy, health → `ok`, logs, vet, test (full + `-short`), golangci-lint 0 issues, `go generate` + `gen:api` → no diff, `npm ci` (on a scratch clone, because Expo was running in `mobile/`), typecheck, lint, test (Vitest 33 + Jest 7), `start -- --clear --help` (arg passing through npm.ps1 works), `cd mobile; npx expo install --check; cd ..`. Not run: `compose down`, `logs -f` and `start` without `--help` (long-running / would stop the running stack).
+- New deps (+ why): none.
+- Phase 0 status: all tasks done except 0.9 (blocked by the GitHub billing lock, see below).
+- Next: Phase 1, task 1.1 (data exploration), once the user agrees to start it while 0.9 is blocked.
+
 ### 2026-11-08 — task 0.9
 - Done:
   - `.github/workflows/ci.yml` (on push to master and on every PR; `contents: read`; concurrency cancels superseded runs). Actions pinned to commit SHAs with the release in a comment: checkout v7.0.1, setup-go v7.0.0, setup-node v7.1.0, golangci-lint-action v9.3.0 (all released ≥ 4 weeks ago).
@@ -66,7 +76,9 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
   - `backend/.golangci.yml` (v2): standard linters + `gofmt` formatter, so unformatted Go fails CI. Generated code excluded (`lax`).
 - Tests (local simulation): `golangci-lint config verify` OK, `run` → 0 issues; a deliberately mis-formatted file is reported by `gofmt`. `actionlint` (incl. shellcheck) clean. Fresh `git clone` (no `.env`, `.expo`, `node_modules`) → `npm ci`, typecheck, lint, Vitest 33 + Jest 7 green; regenerate everything → no diff.
 - New deps (+ why): none. CI only.
-- Next: push + PR, check all three jobs green; then 0.10.
+- PR run (2026-11-08): https://github.com/256-byte/punktchen/pull/1 → all three jobs failed after 2 s without running a step. Annotation: "The job was not started because your account is locked due to a billing issue." Not a workflow problem; the user is resolving it with GitHub support.
+- Decision (user, 2026-11-08): merge PR #1 anyway (CI config only, simulated locally), mark 0.9 `blocked`, continue with 0.10. 0.9 is done when a PR run is green after the account is unlocked (re-run with `gh run rerun`).
+- Next: 0.10.
 
 ### 2026-11-08 — task 0.8
 - Done:
