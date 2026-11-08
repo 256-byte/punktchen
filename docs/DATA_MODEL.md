@@ -10,7 +10,7 @@
 | **GTFS** | General Transit Feed Specification. Zip of CSV files describing the schedule. |
 | **GTFS-RT** | GTFS Realtime. Protobuf feed with delays/cancellations (TripUpdates), positions, alerts. |
 | **VDV** | German transport association standards (VDV 452/453/454). Upstream source of VBB realtime; we never consume VDV directly. |
-| **Station** | Parent stop (`location_type = 1`), e.g. "U Wedding". |
+| **Station** | Group of poles, e.g. "S+U Wedding". `parent_station` if set, else the DHID prefix `de:<AGS>:<station>` of the pole id (§7 #4). |
 | **Pole** (Mast) | A physical stop point / platform (`location_type = 0` or empty) with its own coordinates. "Mastscharf" = data at pole precision. |
 | **Direction** | `(route, direction_id, headsign)` departing from a pole. |
 | **Service day** | The operating day a trip belongs to. Times ≥ 24:00:00 belong to the previous calendar date. |
@@ -58,11 +58,11 @@ What leaves from each pole. Used for markers and for showing directions with no 
 | column | type | notes |
 |---|---|---|
 | `stop_id` | text | pole |
-| `station_id` | text | parent station or the pole itself if no parent |
+| `station_id` | text | `parent_station`, else DHID prefix `de:<AGS>:<station>`, else the pole itself (§7 #4) |
 | `route_id` | text | |
 | `line` | text | `route_short_name`, e.g. `U6`, `S1`, `M27` |
 | `mode` | text | mapped from `route_type`, §6 |
-| `direction_id` | smallint | may be null in data **(verify)** |
+| `direction_id` | smallint | always 0/1 in VBB data (§7 #8); nullable column anyway (optional in GTFS) |
 | `headsign` | text | e.g. `Alt-Tegel`, `Wannsee` |
 | `is_terminal` | bool | pole is the last stop for ≥ 95% of trips of this (route, direction, headsign) |
 | `is_origin` | bool | pole is the first stop of those trips |
@@ -158,7 +158,7 @@ Rules: `radius` 100–1000 (default 500). `layers` comma-separated, default `tra
 
 - `predicted` and `delaySeconds` are null when `source = "scheduled"`.
 - Max 3 departures per direction in `/nearby`; max 10 in `/stations/{id}`.
-- IDs above are illustrative **(verify)** — use real formats found in Phase 1.
+- Station and pole IDs above are real VBB formats (§7 #3, #4); the `tripId` value is illustrative (real ones are numeric, e.g. `303041996`).
 
 ### 5.3 Errors
 
@@ -171,38 +171,50 @@ Rules: `radius` 100–1000 (default 500). `layers` comma-separated, default `tra
 
 ## 6. Mode mapping (`route_type` → `mode`)
 
-VBB uses **extended route types** **(verify exact values in Phase 1)**:
+VBB uses **extended route types**. Values present in the feed of 2026-08-21 (§7 #5) are marked ✓; the others are fallbacks for future feeds.
 
-| route_type | mode | UI |
-|---|---|---|
-| 109 | `sbahn` | S-Bahn |
-| 400 | `ubahn` | U-Bahn |
-| 900 | `tram` | Tram |
-| 700, 3 | `bus` | Bus |
-| 1000, 4 | `ferry` | Ferry |
-| 100, 106, 2 | `regional` | RE/RB |
-| 0 | `tram` | basic type fallback |
-| 1 | `ubahn` | basic type fallback |
-| anything else | `other` | log once per value |
+| route_type | mode | UI | in feed |
+|---|---|---|---|
+| 109 | `sbahn` | S-Bahn | ✓ |
+| 400 | `ubahn` | U-Bahn | ✓ |
+| 900 | `tram` | Tram | ✓ |
+| 700, 3 | `bus` | Bus (also rail replacement buses named S…/U…, §7 #6) | ✓ ✓ |
+| 1000, 4 | `ferry` | Ferry | ✓ – |
+| 100, 106, 2 | `regional` | RE/RB | ✓ ✓ – |
+| 0 | `tram` | basic type fallback | – |
+| 1 | `ubahn` | basic type fallback | – |
+| anything else | `other` | log once per value | – |
 
 ## 7. Verified facts (fill during Phase 1+)
 
 > Every entry: fact, how it was verified (query/file), date. Remove the matching **(verify)** marks above.
 
+Evidence tool: `backend/internal/tools/gtfsexplore` (task 1.1, not shipped). Unless noted, numbers are from the **current** feed `https://www.vbb.de/gtfs` downloaded 2026-11-08 (files dated 2026-11-05, sha256 `d9625924…c4df7`), see #15: "static" = `go run ./internal/tools/gtfsexplore static -zip …`, "stops" = `… stops -id/-name`, "rt" = `… rt` on 5 live GTFS-RT samples of 2026-11-08 22:59–23:00 UTC (Sunday → Monday 00:00 Berlin).
+
 | # | Fact | Evidence | Date |
 |---|---|---|---|
-| — | — | — | — |
+| 1 | **Static feed shape.** Zip 84,505,287 bytes (~650 MB unzipped). Files: agency (32), calendar, calendar_dates, frequencies (header only, no frequency-based trips), levels, pathways, routes (1,275), shapes (195 MB), stop_times (411 MB, 5,836,294 rows), stops (42,289), transfers, trips (263,715). **No `feed_info.txt`.** | static | 2026-11-08 |
+| 2 | **Validity / republishing (verify #9).** All 3,200 `calendar` rows run 2026-11-05 … 2027-12-11; `calendar_dates` same range (101,963 added, 63,767 removed dates). VBB publishes a new file irregularly (previous one: 2026-08-21, see #15), not daily; the daily check stays, the real cadence will show in `meta.feed_imports`. | static | 2026-11-08 |
+| 3 | **stop_id formats (verify #1).** Stations (`location_type=1`, 880): `de:<AGS>:<9 digits>`, e.g. `de:11000:900009104` "S+U Wedding (Berlin)". Poles (`0`, 28,105): `de:<AGS>:<station>::<n>` (26,416, e.g. `de:11000:900009104::3`), `de:<AGS>:<station>:<area>:<platform>` (1,133, rail, e.g. `de:11000:900009104:1:50`), bare `de:<AGS>:<station>` (179), numeric non-DHID (352, outside Berlin, e.g. `000000104801`), a few others. Entrances (`2`, 6,494) and generic nodes (`3`, 6,810) have numeric ids (e.g. `000300158001`) and exist for pathways. `stop_times` references only `location_type=0`. Names carry a locality suffix: "(Berlin)". | static, stops | 2026-11-08 |
+| 4 | **Pole → station (verify #1).** Only 2,135 poles have `parent_station` (2,099 of them = their DHID prefix). Bus/tram poles of the same station usually have **no parent**: at S+U Wedding the U-Bahn (`::1`, `::2`) and S-Bahn (`:1:50`, `:1:51`) poles have parent `de:11000:900009104`, the bus poles `::3`–`::8` have none. 22,441 poles have a DHID prefix that is not in `stops.txt` at all. ⇒ station = `parent_station`, else DHID prefix, else the pole (13,089 distinct prefixes). A prefix "station" has no row of its own: name and location must be derived from its poles; 53 prefixes have poles with different names (e.g. `de:11000:900003155`: "Alt-Moabit/Rathaus Tiergarten (Berlin)" / "Rathaus Tiergarten (Berlin)"). "S Wedding/Martha-Ndumbe-Platz" (`de:11000:900008103`) is a separate station 150 m away. | static, stops | 2026-11-08 |
+| 5 | **route_type values (verify #4).** 700 bus (1,061 routes / 190,077 trips), 3 bus (33 / 497), 900 tram (48 / 31,805), 109 S-Bahn (53 / 22,027), 400 U-Bahn (9 / 11,708), 100 regional (49 / 5,514), 106 regional (14 / 1,358), 1000 ferry (8 / 729). No 0, 1, 2, 4. `route_id` format `<n>_<route_type>`, e.g. `17521_400`. `route_type=109` also contains `RB31` and `RE10`. Tram short names include non-Berlin lines `1`–`6` (Potsdam, Cottbus, …) besides `M1`…`M17`, `12`…`99`. | static, routes.txt | 2026-11-08 |
+| 6 | **Rail replacement buses.** 25 `route_type=700` routes carry rail line names (S1 ×2, S2, S3, S3A, S3B, S41, S42, S46, S46A, S46X, S47, S5, S7, S75, S7A, S7B, S8, S9, S9A, S9X, U2, U5, U6). ⇒ mode comes from `route_type`, never from the line name; a "U6" direction can be a bus. | routes.txt | 2026-11-08 |
+| 7 | **route_color.** Set for U-Bahn 100 %, S-Bahn 87 %, regional 71–76 %, tram 37.5 %, bus 6 %, ferry 0 %. ⇒ API `color` is often null; the app needs per-mode default colors. | static | 2026-11-08 |
+| 8 | **direction_id (verify #6).** Set on 100 % of trips (0: 137,504, 1: 126,211). `trip_headsign` never empty. `trip_id` numeric (e.g. `310952817`), `service_id` small integers as text (e.g. `1010`). | static | 2026-11-08 |
+| 9 | **platform_code (verify #7).** 6.5 % of all poles. By mode of the poles' trips: U-Bahn 99.0 % (396 poles), S-Bahn 54.3 % (451), regional 66–67 %, tram 10.4 %, bus 1.8 %, ferry 0 %. ⇒ `Pole.platform` is nullable; the UI needs a fallback label (e.g. direction headsign). | static | 2026-11-08 |
+| 10 | **Times past 24:00 (verify #8).** Max `departure_time` `31:17:00` (trip 310876822). 223,320 departures (3.8 %) ≥ 24:00, 30,448 ≥ 27:00, 689 ≥ 30:00; 8,921 trips *start* ≥ 24:00. No unparseable times. ⇒ the schedule window must include trips of the previous service day up to +31:17 h (use a margin, e.g. 32 h). `pickup_type`/`drop_off_type` mostly 0; 5,644 no-pickup and 3,328 no-drop-off stop times. | static | 2026-11-08 |
+| 11 | **Ring and loop lines (verify #5).** S41/S42 (`route_type=109`): full-circle trips start and end at S Beusselstr. with headsign **"Ringbahn S 41"** / **"Ringbahn S 42"** (909 / 1,062 trips, all `direction_id=0`); partial trips have normal station headsigns (e.g. "S Westend (Berlin)"). ⇒ `isRing` = S-Bahn line S41/S42, or headsign starting with "Ringbahn". 67 other lines (mostly buses, e.g. 365 "S Baumschulenweg") have loop trips (first station = last station, headsign = that station). ⇒ terminal/origin detection (§3.2) must treat loop trips separately, otherwise a loop's start pole is marked terminal and its departures are hidden. | static (loops section) | 2026-11-08 |
+| 12 | **Scope (bbox).** Default Berlin bbox contains 10,841 poles. Station count depends on the grouping of #4; computed in task 1.4. | static | 2026-11-08 |
+| 13 | **GTFS-RT HTTP.** `HEAD`/`GET` return `ETag` and `Last-Modified`; `If-None-Match` → `304` with empty body. gzip and zstd are supported (ETag differs per encoding). Live: `Content-Type: application/protobuf; schedule_sha256=d8202ba3` (meaning unknown: it is not the sha256 of either static zip). ~4.9 MB raw, ~1 MB gzip. `Last-Modified` changes every few seconds. | record, HEAD | 2026-11-08 |
+| 14 | **GTFS-RT can be empty and stale.** From ≤ 22:45 to ≥ 22:57 UTC on 2026-11-08 the feed returned a 15-byte FeedMessage: version 2.0, FULL_DATASET, **0 entities**, `header.timestamp` 2026-10-30T19:04:09Z (9 days old). Before and after, a live feed was served. ⇒ freshness and health must use `header.timestamp`, not HTTP success; an empty feed is "no data", not "no delays", and must not wipe realtime state silently. Fixture: `backend/testdata/gtfsrt/vbb-empty-stale.pb`. | record, rt | 2026-11-08 |
+| 15 | **Which static feed matches GTFS-RT.** The former default `LIVESTOP_GTFS_URL` (unternehmen.vbb.de `gtfs-mastscharf/GTFS.zip`) is **stale**: Last-Modified 2026-08-21, valid only until 2026-12-12; only 46.9 % of RT `trip_id`s exist in it (almost only S-Bahn). `https://www.vbb.de/gtfs` (also via `/vbbgtfs` → 307) is the current, equally pole-precise feed: **100 %** of RT `trip_id`s and 98.7 % of RT `stop_id`s match it. It sends **no ETag / Last-Modified** → change detection by SHA-256 only (full 84.5 MB download per check). Default switched to it on 2026-11-08. | download, rt with both zips | 2026-11-08 |
+| 16 | **GTFS-RT content.** FULL_DATASET with **TripUpdates only** (no VehiclePositions, no Alerts), ~4,900 entities. `header.timestamp` 2–18 s old at fetch. TripDescriptor: `trip_id`, `route_id`, `start_date`, `direction_id` always set; **`start_time` never**; `schedule_relationship` SCHEDULED, rarely CANCELED (5 of 24,686). `TripUpdate.timestamp` always set, `TripUpdate.delay` and `vehicle` never. | rt | 2026-11-08 |
+| 17 | **RT trip identity (verify #3).** RT uses the static `trip_id` + `start_date` (`YYYYMMDD`) directly; `route_id` equals the static one in 100 %. `start_date` is the service day: at 00:00 Berlin on 2026-11-09, 5,893 of 24,686 updates still had `start_date=20261108` (trips of the previous service day). | rt | 2026-11-08 |
+| 18 | **RT stop identity (verify #2).** `stop_id` always set: 98.7 % are static poles (`location_type=0`), never stations; 1.3 % are bare station numbers without DHID (e.g. `900220139` for poles `de:12069:900220139::1`/`::2`) → pole unknown, use `stop_sequence` (set on 98.7 %). Times are absolute: `arrival.time` / `departure.time` set on ~99.8 %, `delay` only on ~24 % ⇒ compute delay = time − scheduled ourselves. STU `schedule_relationship`: SCHEDULED 471,907, SKIPPED 6,015, NO_DATA 331. ~19 STUs per TripUpdate. Arrival delay: min −281 s, p10 −60 s, median 0, p90 +60 s, max +2,520 s. | rt | 2026-11-08 |
+| 19 | **RT coverage by mode.** Share of TripUpdates (5 samples, Sunday midnight): S-Bahn 61 %, regional 18 %, bus 15 %, tram 3.5 %, U-Bahn 1.7 %. The provider page states "limited data coverage since 2026-06-04". ⇒ for BVG U-Bahn, tram and bus, scheduled-only departures are the normal case. Repeat at daytime before Phase 4. | rt, provider page | 2026-11-08 |
+| 20 | **GTFS-RT usage terms** (provider page https://production.gtfsrt.vbb.de/): rate limit **7 requests/minute since 2026-11-02** (was 60; "allows fetching every 10 seconds"); send `Accept-Encoding: gzip` or `zstd`; informative `User-Agent` with contact info required, generic ones may be blocked; Atom feed for downtime notices; CORS enabled; CC BY 4.0. | provider page | 2026-11-08 |
 
-Things to verify in Phase 1:
-1. `stop_id` format in static GTFS (e.g. `de:11000:900009104::1`?) and how stations/poles relate.
-2. `stop_id` format used in GTFS-RT `stop_time_update` and whether it matches static IDs 1:1.
-3. Whether GTFS-RT uses `trip_id` + `start_date` from the static feed directly.
-4. Actual `route_type` values present.
-5. Headsign values of ring lines S41/S42 (and any other ring/loop lines) → how to set `isRing`.
-6. Whether `direction_id` is populated.
-7. Presence of `platform_code` for U-Bahn/S-Bahn poles.
-8. Max `departure_time` value (how far past 24:00 times go).
-9. Feed validity range (`calendar.end_date`) and how often VBB republishes.
+All Phase 1 **(verify)** items are answered. Fixtures: `backend/testdata/gtfsrt/` (README there).
 
 ## 8. Go in-memory types (reference)
 

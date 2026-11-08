@@ -95,6 +95,7 @@ func TestLoadInvalid(t *testing.T) {
 		{EnvGTFSRTURL, "not a url"},
 		{EnvGTFSRTPollInterval, "15"},
 		{EnvGTFSRTPollInterval, "1s"},
+		{EnvGTFSRTPollInterval, "9s"}, // 7 requests/min upstream limit → floor 10 s
 	}
 	for _, tt := range tests {
 		t.Run(tt.key+"="+tt.value, func(t *testing.T) {
@@ -107,6 +108,13 @@ func TestLoadInvalid(t *testing.T) {
 				t.Fatalf("error should name %s, got: %v", tt.key, err)
 			}
 		})
+	}
+}
+
+func TestLoadPollIntervalAtFloor(t *testing.T) {
+	cfg, err := Load(env(map[string]string{EnvDatabaseURL: testDBURL, EnvGTFSRTPollInterval: "10s"}))
+	if err != nil || cfg.GTFSRTPollInterval != MinGTFSRTPollInterval {
+		t.Fatalf("10s: cfg=%v err=%v; want accepted", cfg.GTFSRTPollInterval, err)
 	}
 }
 

@@ -19,7 +19,7 @@ VBB GTFS zip  ───► │ transit/static   ── import (daily) ──► 
                    │                                                   │                           │
                    │ transit/departures ◄── schedule window (every 60 s) ┘                          │
 VBB GTFS-RT   ───► │ transit/realtime ── TripUpdates (every 15 s, ETag) ──► merge                   │
- (60 req/min)      │                                                         │                      │
+ (7 req/min)       │                                                         │                      │
                    │                                      Snapshot (immutable, atomic.Pointer)      │
                    │                                                         │                      │
                    │ layer registry ── transit Provider ─────────────────────┘                      │
@@ -39,11 +39,10 @@ All backend parts live in **one binary** (modular monolith, ADR-0002). Package b
 
 ### 3.1 `transit/static` — GTFS schedule import
 
-- **Source:** VBB "mastscharf" GTFS (stop-pole level precision), URL in config (`LIVESTOP_GTFS_URL`). Default:
-  `https://unternehmen.vbb.de/fileadmin/user_upload/VBB/Dokumente/API-Datensaetze/gtfs-mastscharf/GTFS.zip`
-- **Size:** ~77 MB zipped, ~620 MB unzipped. `stop_times.txt` dominates.
+- **Source:** current VBB GTFS (stop-pole precision), URL in config (`LIVESTOP_GTFS_URL`). Default: `https://www.vbb.de/gtfs`. It is the feed the GTFS-RT trip ids refer to; the older "mastscharf" download on unternehmen.vbb.de is not kept up to date (DATA_MODEL §7 #15).
+- **Size:** ~85 MB zipped, ~650 MB unzipped. `stop_times.txt` dominates (~5.8 M rows).
 - **Schedule:** once a day (default 03:30 Europe/Berlin) + on startup if no data.
-- **Change detection:** `HEAD`/conditional GET (`ETag`, `Last-Modified`), plus SHA-256 of the zip stored in `meta.feed_imports`. Unchanged → skip.
+- **Change detection:** conditional GET with `ETag` / `Last-Modified` when the server sends them; the default URL sends neither, so the zip is downloaded and its **SHA-256** compared with the last successful import in `meta.feed_imports`. Unchanged → `skipped`.
 - **Import (ADR-0004):**
   1. Stream zip → CSV readers (no full extraction to RAM).
   2. Load into schema `gtfs_staging` using `pgx.CopyFrom`.
@@ -61,12 +60,14 @@ All backend parts live in **one binary** (modular monolith, ADR-0002). Package b
 
 ### 3.3 `transit/realtime` — GTFS-RT ingestor
 
-- **Source:** `https://production.gtfsrt.vbb.de/data` (CC BY 4.0, no auth, max 60 req/min, ETag supported). Config: `LIVESTOP_GTFSRT_URL`.
-- Poll every 15 s (config) with `If-None-Match`. 304 → nothing to do.
-- Parse protobuf `FeedMessage`; use **TripUpdate** entities.
+- **Source:** `https://production.gtfsrt.vbb.de/data` (CC BY 4.0, no auth, **max 7 req/min** since 2026-11-02, ETag supported). Config: `LIVESTOP_GTFSRT_URL`. Terms on https://production.gtfsrt.vbb.de/ (DATA_MODEL §7 #20).
+- Poll every 15 s (config, floor 10 s) with `If-None-Match`. 304 → nothing to do.
+- Request compressed data (`Accept-Encoding: gzip`; ~5× smaller) and send a User-Agent that names the project and its repository URL.
+- Parse protobuf `FeedMessage`; the feed contains **TripUpdates only** (no vehicle positions, no alerts).
 - Keep latest state per trip instance `(trip_id, start_date)`.
-- The VBB feed matches VDV data to GTFS itself; ambiguous matches are dropped upstream → **not every trip has realtime**. Schedule fallback is mandatory, not optional.
-- Errors/timeouts: exponential backoff (max 2 min), keep last good state, expose `feed_age_seconds`.
+- The VBB feed matches VDV data to GTFS itself; ambiguous matches are dropped upstream → **not every trip has realtime** (BVG U-Bahn, tram and bus coverage is low, DATA_MODEL §7 #19). Schedule fallback is mandatory, not optional.
+- **Freshness comes from `header.timestamp`, not from HTTP success.** The feed sometimes serves an empty FullDataset with a days-old header (DATA_MODEL §7 #14). Such a response is "no data": keep the last good state until it is too old, never treat it as "no delays".
+- Errors/timeouts: exponential backoff (max 2 min), keep last good state, expose `feed_age_seconds` (= now − `header.timestamp` of the last applied feed).
 
 ### 3.4 Merge → `Snapshot`
 
@@ -116,7 +117,7 @@ type Provider interface {
 
 - Logs: `log/slog` JSON, one line per request, plus component logs with `component=` attribute.
 - Metrics (Prometheus): `livestop_gtfsrt_feed_age_seconds`, `livestop_gtfsrt_poll_total{result}`, `livestop_rt_match_ratio`, `livestop_snapshot_build_seconds`, `livestop_snapshot_version`, `livestop_import_duration_seconds`, `livestop_import_last_success_timestamp`, `livestop_http_request_duration_seconds{route,status}`, `livestop_cache_hits_total{result}`.
-- `/v1/health`: `ok` | `degraded` (RT feed older than 2 min, or schedule older than 3 days) | `down` (no schedule data).
+- `/v1/health`: `ok` | `degraded` (RT feed older than 2 min by `header.timestamp`, or schedule older than 3 days) | `down` (no schedule data).
   - Always HTTP 200 while the process runs; the body carries the status. The Docker healthcheck (`livestop healthcheck`) is therefore a pure liveness check and does not restart the container during e.g. a long first import.
   - Phase 0: `down` if the database is unreachable, else `ok`. Freshness rules are added with the importer (Phase 1) and the realtime poller (Phase 4).
 

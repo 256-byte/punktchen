@@ -4,9 +4,9 @@
 
 ## Current status
 
-- **Active phase:** Phase 0 — Skeleton & tooling
-- **Next task:** Phase 1 (1.1) — needs the user's OK, because 0.9 is still blocked
-- **Blocked by:** 0.9 — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
+- **Active phase:** Phase 1 — Static GTFS (started 2026-11-08 with the user's OK while 0.9 is blocked)
+- **Next task:** 1.2
+- **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
 
@@ -22,6 +22,14 @@
 | 0 | 0.8 Phone → backend networking | done | Restart Expo with `--clear` after installing packages |
 | 0 | 0.9 CI | blocked | Workflow merged (PR #1); jobs not started: GitHub account billing lock. Re-run when unlocked |
 | 0 | 0.10 Real commands in CLAUDE.md | done | All commands run from the repo root; tested in Windows PowerShell 5.1 |
+| 1 | 1.1 Data exploration | done | DATA_MODEL §7 #1–#20; all (verify) items answered. Default GTFS URL and RT rate limit updated |
+| 1 | 1.2 Downloader | todo | |
+| 1 | 1.3 Streaming import | todo | |
+| 1 | 1.4 Indexes + in_scope | todo | |
+| 1 | 1.5 Derived tables | todo | |
+| 1 | 1.6 Sanity checks + swap | todo | |
+| 1 | 1.7 Scheduler | todo | |
+| 1 | 1.8 Nearby query | todo | |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
 
@@ -37,6 +45,9 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 | 2026-11-05 | Geohash cell cache keyed by provider versions | 0006 |
 | 2026-11-05 | Absolute timestamps, countdown on device | 0007 |
 | 2026-11-05 | Generic Provider/Layer system, transit only | 0008 |
+| 2026-11-08 | Default static feed `https://www.vbb.de/gtfs` (current, matches GTFS-RT); change detection by SHA-256 | — (config, DATA_MODEL §7 #15) |
+| 2026-11-08 | GTFS-RT limit 7 req/min: CLAUDE.md rule 7 updated, poll interval floor 10 s | — (config, DATA_MODEL §7 #20) |
+| 2026-11-08 | User: keep config/docs in line with current upstream facts without asking first | — |
 
 ## Open questions
 
@@ -56,6 +67,23 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-08 — task 1.1
+- Done:
+  - `backend/internal/tools/gtfsexplore` (dev tool, not in the server binary): `download`, `static` (report), `stops` (list by id/name), `record` (GTFS-RT samples + one conditional GET), `rt` (RT vs. static report), `trim` (fixtures around a point).
+  - Findings in DATA_MODEL §7 #1–#20; all **(verify)** marks removed (§1 Station, §3.2 `station_id`/`direction_id`, §5.2 ids, §6 route types).
+  - Fixtures in `backend/testdata/gtfsrt/` (1.6 MB total): empty/stale feed + 4 live samples trimmed to 800 m around U Wedding.
+- Data facts found (most important):
+  - The configured static URL is stale (2026-08-21); `https://www.vbb.de/gtfs` is current and matches GTFS-RT 100 % (vs 46.9 %). → open question #4.
+  - GTFS-RT rate limit is 7/min since 2026-11-02. → open question #5. Provider also asks for compressed responses and a User-Agent with contact info (for the Phase 4 poller).
+  - GTFS-RT was empty with a 9-day-old header for ≥ 12 min; freshness must come from `header.timestamp`.
+  - Stations must be grouped by `parent_station` or the DHID prefix: most bus poles have no parent.
+  - RT sends absolute times (delay only on 24 %), TripUpdates only, sparse for BVG U-Bahn/tram/bus.
+- Tests: exploration only (task allows "script/test, not shipped"). `go vet`, `gofmt`, golangci-lint 0 issues. Re-running `rt` on the trimmed fixtures reproduces the match rates (100 % trips, 99.7 % stops).
+- Requests to VBB: 2 static downloads, ~20 GTFS-RT requests over 75 min (all ≤ 7/min).
+- New deps (+ why): `github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs` v1.0.0 (in stack; decode GTFS-RT protobuf; also used by the Phase 4 poller), `google.golang.org/protobuf` (now direct; marshal trimmed fixtures).
+- Follow-up (user decision, same day): `DefaultGTFSURL` → `https://www.vbb.de/gtfs`; `MinGTFSRTPollInterval` 5 s → 10 s (+ boundary tests 9 s rejected / 10 s accepted); CLAUDE.md rule 7, ARCHITECTURE §2/§3.1/§3.3/§3.7, PLAN 4.1, `.env.example` updated (7 req/min, gzip, User-Agent, freshness from `header.timestamp`).
+- Next: 1.2.
 
 ### 2026-11-08 — task 0.10
 - Done:
