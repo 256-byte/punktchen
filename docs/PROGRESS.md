@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 0 — Skeleton & tooling
-- **Next task:** 0.7
+- **Next task:** 0.8
 - **Blocked by:** nothing
 
 ## Task status
@@ -18,7 +18,7 @@
 | 0 | 0.4 Migrations | done | |
 | 0 | 0.5 OpenAPI v0 + health | done | layers/nearby/stations return 501 until 2.5 |
 | 0 | 0.6 sqlc | done | sqlc runs in Docker (pinned image); `go generate ./...` needs Docker |
-| 0 | 0.7 Expo app | todo | |
+| 0 | 0.7 Expo app | done | Expo Go needs a signed-in Expo account on PC and phone (see session log) |
 | 0 | 0.8 Phone → backend networking | todo | |
 | 0 | 0.9 CI | todo | |
 | 0 | 0.10 Real commands in CLAUDE.md | todo | |
@@ -56,6 +56,31 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-07 — task 0.7
+- Done:
+  - `mobile/`: Expo SDK 58 (expo 58.0.23, React Native 0.88.1, React 19.3.0, TypeScript 6.0), Expo Router with routes in `mobile/app/` (CLAUDE.md §4; the SDK 58 template would use `src/app/`). Placeholder `app/index.tsx` + Stack layout. iOS and Android only (`platforms`), typed routes on.
+  - Started from `create-expo-app --template default` in a scratch dir and kept only what is needed: no example screens, no Expo-branded assets/icons (app icon comes in Phase 7), no web target, no Reanimated/Gesture Handler/bottom-sheet yet (added in the phase that uses them).
+  - `tsconfig.json`: Expo base + `strict`, `noUncheckedIndexedAccess`, `noFallthroughCasesInSwitch`, alias `@/*` → `src/*`.
+  - ESLint 9 flat config: `eslint-config-expo` + `eslint-config-prettier`; `no-restricted-imports` for `src/core/**` forbids `react`, `react-native`, `expo` (and subpaths), `react-native-*`, `expo-*`, `@expo/*`, `@react-native/*`, `@react-navigation/*`.
+  - Prettier (single quotes, width 100). `npm run lint` = ESLint + `prettier --check`.
+  - Vitest for `src/core` + `tests/node`; Jest (jest-expo preset) + RNTL 14 for UI, ignoring those two dirs. `npm test` runs both.
+  - `npm run gen:api`: openapi-typescript → `src/api/schema.gen.ts` (marked generated in `.gitattributes`).
+  - ARCHITECTURE §4.6 (tooling and tests).
+- Findings:
+  - TypeScript 6 no longer loads `@types/*` automatically (`types` defaults to `[]`). Jest tests import `describe/it/expect` from `@jest/globals` (same style as Vitest); `@types/jest` not needed.
+  - openapi-typescript 7.13.0 (latest) declares `peer typescript ^5.x`; Expo SDK 58 ships TS 6. npm `overrides` lets it use the project's TS 6; output is byte-identical across runs and typechecks.
+  - npm resolved the optional `react-dom` peer (via expo-router's web deps) to 19.3.1, which needs react 19.3.1 → ERESOLVE. Pinned `react-dom` 19.3.0 like the Expo template does.
+  - npm 11 blocks install scripts by default. `@parcel/watcher` (via jest-haste-map) wants `node-gyp rebuild` as a fallback; the prebuilt `@parcel/watcher-win32-x64` is installed, so the script is denied in `allowScripts`.
+- Tests: `npm run typecheck`, `npm run lint`, `npm test` green. Vitest: 13 cases for the core boundary rule (9 forbidden imports rejected, 3 allowed, rule inactive outside `src/core`) run against the real ESLint config. Jest: HomeScreen renders. `gen:api` twice → identical sha256. `npx expo export --platform ios` bundles (Hermes, 2.5 MB). `npx expo-doctor` 20/20 checks passed.
+- New deps (+ why):
+  - runtime: `expo`, `expo-router`, `react`, `react-native` (stack); `expo-constants`, `expo-linking`, `@expo/metro-runtime`, `react-native-screens`, `react-native-safe-area-context` (required peers of expo-router); `react-dom` (peer pin, see findings).
+  - dev: `typescript`, `@types/react`, `eslint`, `eslint-config-expo`, `eslint-config-prettier`, `prettier` (lint/format); `vitest` (core tests); `jest`, `jest-expo`, `@jest/globals`, `@testing-library/react-native`, `test-renderer` (UI tests; test-renderer is RNTL 14's required peer); `openapi-typescript` (API types).
+  - Expo Go (SDK 58) only opens a project when the same Expo account is signed in both in Expo Go and in Expo CLI ("You need to be signed in to Expo Go and Expo CLI"). A free account is enough.
+  - `npx expo login` (browser flow) crashes on Windows: the CLI passes the login URL unquoted to `cmd /c start`, so the `&` in the URL splits the command. Workarounds: `npx expo login --no-browser` (accounts with a password), or an access token in `EXPO_TOKEN` (works for Google/GitHub sign-up accounts). Never commit the token.
+  - Metro picked the right LAN address (WLAN `192.168.178.29`, not the VMware adapters). Windows Firewall already had an inbound allow rule for Node.js.
+- Manual check (acceptance): `npx expo start` on the PC, QR code scanned on the iPhone → app opens in Expo Go and shows "LiveStop / Live departures around you" (2026-11-08).
+- Next: 0.8 phone → backend networking (README section on LAN IP + firewall can reuse the findings above).
 
 ### 2026-11-07 — task 0.6
 - Done:

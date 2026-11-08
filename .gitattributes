@@ -18,3 +18,4 @@
 
 # Generated code: collapse in GitHub diffs
 /backend/gen/** linguist-generated=true
+/mobile/src/api/*.gen.ts linguist-generated=true

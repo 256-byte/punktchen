@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "LiveStop",
+    "slug": "livestop",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "livestop",
+    "userInterfaceStyle": "automatic",
+    "platforms": ["ios", "android"],
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

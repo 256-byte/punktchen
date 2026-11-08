@@ -1,0 +1,7 @@
+.expo/
+coverage/
+dist/
+package-lock.json
+# Generated: must match the generator byte for byte (CI drift check).
+src/api/*.gen.ts
+expo-env.d.ts

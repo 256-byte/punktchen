@@ -1,0 +1,61 @@
+{
+  "name": "livestop-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "test": "vitest run && jest",
+    "test:core": "vitest run",
+    "test:ui": "jest",
+    "gen:api": "openapi-typescript ../api/openapi.yaml --output src/api/schema.gen.ts"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~58.0.17",
+    "expo": "~58.0.23",
+    "expo-constants": "~58.0.15",
+    "expo-linking": "~58.0.16",
+    "expo-router": "~58.0.30",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-native": "0.88.1",
+    "react-native-safe-area-context": "~5.11.1",
+    "react-native-screens": "~4.30.1"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "<rootDir>/src/core/",
+      "<rootDir>/tests/node/"
+    ]
+  },
+  "overrides": {
+    "openapi-typescript": {
+      "typescript": "$typescript"
+    }
+  },
+  "devDependencies": {
+    "@jest/globals": "~30.5.0",
+    "@testing-library/react-native": "^14.1.0",
+    "@types/react": "~19.3.0",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "~58.0.4",
+    "eslint-config-prettier": "^10.1.8",
+    "jest": "~30.5.2",
+    "jest-expo": "~58.0.14",
+    "openapi-typescript": "^7.13.0",
+    "prettier": "^3.9.10",
+    "test-renderer": "^1.3.1",
+    "typescript": "~6.0.3",
+    "vitest": "^5.1.0"
+  },
+  "allowScripts": {
+    "@parcel/watcher": false
+  }
+}
