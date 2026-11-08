@@ -20,7 +20,7 @@
 | 0 | 0.6 sqlc | done | sqlc runs in Docker (pinned image); `go generate ./...` needs Docker |
 | 0 | 0.7 Expo app | done | Expo Go needs a signed-in Expo account on PC and phone (see session log) |
 | 0 | 0.8 Phone → backend networking | done | Restart Expo with `--clear` after installing packages |
-| 0 | 0.9 CI | todo | |
+| 0 | 0.9 CI | in progress | Workflow ready and simulated locally; waiting for a green PR run |
 | 0 | 0.10 Real commands in CLAUDE.md | todo | |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
@@ -56,6 +56,17 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-08 — task 0.9
+- Done:
+  - `.github/workflows/ci.yml` (on push to master and on every PR; `contents: read`; concurrency cancels superseded runs). Actions pinned to commit SHAs with the release in a comment: checkout v7.0.1, setup-go v7.0.0, setup-node v7.1.0, golangci-lint-action v9.3.0 (all released ≥ 4 weeks ago).
+    - `backend`: Go from `backend/go.mod`, `go vet ./...`, golangci-lint v2.15.0 (same version as local), `go test -race -count=1 ./...` (testcontainers uses the runner's Docker; `-race` needs cgo, which the Windows dev machine lacks → first race-detector run happens here).
+    - `mobile`: Node from `mobile/.nvmrc` (26, same major as local), `npm ci`, `typecheck`, `lint`, `test`.
+    - `contract`: `go generate ./...` (oapi-codegen + sqlc in Docker) and `npm run gen:api`, then fails with a hint and the diff if `git status --porcelain` is not empty.
+  - `backend/.golangci.yml` (v2): standard linters + `gofmt` formatter, so unformatted Go fails CI. Generated code excluded (`lax`).
+- Tests (local simulation): `golangci-lint config verify` OK, `run` → 0 issues; a deliberately mis-formatted file is reported by `gofmt`. `actionlint` (incl. shellcheck) clean. Fresh `git clone` (no `.env`, `.expo`, `node_modules`) → `npm ci`, typecheck, lint, Vitest 33 + Jest 7 green; regenerate everything → no diff.
+- New deps (+ why): none. CI only.
+- Next: push + PR, check all three jobs green; then 0.10.
 
 ### 2026-11-08 — task 0.8
 - Done:
