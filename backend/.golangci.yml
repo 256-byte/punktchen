@@ -1,0 +1,14 @@
+# golangci-lint v2. Linters: the "standard" set (errcheck, govet,
+# ineffassign, staticcheck, unused). Formatting is checked too, so CI fails
+# on files that are not gofmt-ed.
+version: "2"
+
+linters:
+  default: standard
+
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    # Generated code is checked by the CI drift job instead.
+    generated: lax

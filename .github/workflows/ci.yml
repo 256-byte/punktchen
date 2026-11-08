@@ -1,0 +1,115 @@
+# CI for the monorepo (PLAN task 0.9). Three independent jobs:
+#   backend  — go vet, golangci-lint, go test (integration tests use Docker)
+#   mobile   — typecheck, lint, Vitest + Jest
+#   contract — regenerate all generated code and fail if it differs from git
+#
+# Actions are pinned to commit SHAs; the comment names the release.
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.15.0
+          working-directory: backend
+
+      # Integration tests start PostGIS containers via testcontainers; the
+      # runner's Docker daemon is used. -race needs cgo, available here.
+      - name: go test
+        run: go test -race -count=1 ./...
+
+  mobile:
+    name: mobile
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+  contract:
+    name: contract (generated code up to date)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      # oapi-codegen (go tool) + sqlc (pinned Docker image, see backend/internal/tools/sqlc).
+      - name: go generate
+        working-directory: backend
+        run: go generate ./...
+
+      - name: npm run gen:api
+        working-directory: mobile
+        run: |
+          npm ci
+          npm run gen:api
+
+      - name: fail on drift
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::Generated code is out of date. Run 'go generate ./...' in backend/ and 'npm run gen:api' in mobile/, then commit the result."
+            git status --short
+            git diff
+            exit 1
+          fi
+          echo "Generated code matches api/openapi.yaml and db/queries."
