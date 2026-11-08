@@ -23,7 +23,7 @@ If something you are asked to do contradicts these documents, **stop and ask the
 4. **No new dependency without a reason.** Prefer the standard library. If you add a dependency, note it and the reason in the PROGRESS session log.
 5. **API is contract-first.** Change `api/openapi.yaml` first, then regenerate Go + TypeScript code. Never hand-edit generated files.
 6. **The mobile app never talks to VBB or any third-party data source.** It only talks to our backend.
-7. **Respect upstream limits.** The VBB GTFS-RT feed allows max 60 requests/minute. We poll it from exactly one place (the ingestor), never per user request.
+7. **Respect upstream limits.** The VBB GTFS-RT feed allows max 7 requests/minute (since 2026-11-02; check https://production.gtfsrt.vbb.de/ for changes). We poll it from exactly one place (the ingestor), never per user request, with compressed responses and a User-Agent that names the project.
 8. **Times are absolute.** The API sends ISO-8601 timestamps with offset (`2026-11-05T14:32:00+01:00`). Countdowns are computed on the device. Never send "3 min".
 9. **Generic layers, single implementation.** The Provider/Layer system is generic (see ARCHITECTURE §3.5 backend, §4.4 mobile), but only the `transit` layer is implemented. Do not build `toilets`, `alerts` etc. before their phase.
 10. **`mobile/src/core` is pure TypeScript.** It must not import `react`, `react-native` or `expo-*`. Enforced by ESLint.

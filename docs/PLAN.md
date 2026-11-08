@@ -66,7 +66,7 @@ Goal: see live-counting pins around you on the iPhone.
 
 | ID | Task | Acceptance criteria |
 |---|---|---|
-| 4.1 | GTFS-RT poller: interval, `If-None-Match`, timeout, backoff, metrics; never > 60 req/min | Unit test with fake server: 304 path, error/backoff path |
+| 4.1 | GTFS-RT poller: interval, `If-None-Match`, gzip, timeout, backoff, metrics; never > 7 req/min (provider limit since 2026-11-02) | Unit test with fake server: 304 path, error/backoff path |
 | 4.2 | Parser → trip-instance state (latest wins), using recorded testdata | Golden tests on recorded feeds |
 | 4.3 | Merge rules (ARCHITECTURE §3.4): stop match, delay propagation, cancellations, skipped stops, `source` flag | Table-driven tests for each rule |
 | 4.4 | Rebuild snapshot on RT change; `realtimeAgeSeconds`; health `degraded` when feed > 2 min old | Killing upstream (fake) → degraded, schedule still served |

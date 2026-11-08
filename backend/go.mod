@@ -3,12 +3,14 @@ module github.com/256-byte/punktchen/backend
 go 1.27
 
 require (
+	github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs v1.0.0
 	github.com/golang-migrate/migrate/v4 v4.20.1
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/oapi-codegen/runtime v1.8.0
 	github.com/prometheus/client_golang v1.25.0
 	github.com/testcontainers/testcontainers-go v0.45.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.45.0
+	google.golang.org/protobuf v1.36.12
 )
 
 require (
@@ -85,7 +87,6 @@ require (
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/tools v0.51.0 // indirect
-	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
