@@ -89,14 +89,18 @@ Every time either the schedule window or the RT state changes:
 
 ```go
 type Provider interface {
-    Layer() string                                         // "transit", later "toilets", "alerts", ...
-    Nearby(ctx context.Context, q NearbyQuery) (LayerResult, error)
+    Info() Info                                            // ID "transit" (later "toilets", ...), name, attribution
+    Nearby(ctx context.Context, q NearbyQuery) (Result, error) // Result{Version, Payload}
     Version() uint64                                       // changes when data changes → cache invalidation
-    Health() ProviderHealth                                // freshness, last error
+    Health() Health                                        // status, realtime age, last error (no I/O)
 }
 ```
 
-- The API asks the registry for the requested layers and composes the response.
+- `Registry` is built once at startup and read-only afterwards. `Resolve(ids)` removes duplicates, returns providers in registration order (stable composition and cache keys) and rejects unknown ids with `ErrUnknownLayer` (→ 400).
+- `Registry.Nearby(ctx, q, ids)` asks the requested layers **concurrently** and returns a `Composite`: one `LayerResponse{Info, Version, Health, Payload, Err}` per layer plus the deduplicated attribution of the layers that returned data.
+- A failing (or panicking) provider marks only its own layer `down` without payload; the other layers are still served. `Nearby` itself fails only for an invalid query, unknown layers or a cancelled context.
+- `Result.Version` comes from the same data as the payload, so a response never pairs a payload with another state's version. `Provider.Version()` is for building cache keys before a response exists (ADR-0006).
+- The package does not import the OpenAPI types: payloads are opaque (`any`) and the API maps each layer's payload to its typed field.
 - Each layer has its **own typed payload** in OpenAPI (discriminated by `layer`).
 - Static layers (e.g. toilets) refresh rarely; live layers (transit) refresh in seconds. The cache handles both through `Version()`.
 - Only `transit` is implemented until a later phase says otherwise.
