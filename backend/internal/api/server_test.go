@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/256-byte/punktchen/backend/internal/layer"
 	"github.com/256-byte/punktchen/backend/internal/transit/static"
 )
 
@@ -165,6 +166,17 @@ func TestHealthFollowsTheSchedule(t *testing.T) {
 			status, _, body := get(t, srv.URL+"/v1/health")
 			if status != http.StatusOK || body["status"] != tc.want {
 				t.Fatalf("status %d, body %v; want 200 with %s", status, body, tc.want)
+			}
+		})
+	}
+
+	// Task 4.4: a degraded transit layer (e.g. realtime older than 2 min)
+	// degrades the service; the schedule is still served.
+	for _, st := range []layer.Status{layer.StatusDegraded, layer.StatusDown} {
+		t.Run("transit "+string(st), func(t *testing.T) {
+			srv := newTestServer(t, fakePinger{}, func(c *Config) { c.Transit = &fakeStations{status: st} })
+			if _, _, body := get(t, srv.URL+"/v1/health"); body["status"] != "degraded" {
+				t.Fatalf("body %v; want degraded", body)
 			}
 		})
 	}

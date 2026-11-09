@@ -30,6 +30,7 @@ import (
 	"github.com/256-byte/punktchen/backend/internal/platform"
 	"github.com/256-byte/punktchen/backend/internal/transit"
 	"github.com/256-byte/punktchen/backend/internal/transit/departures"
+	"github.com/256-byte/punktchen/backend/internal/transit/realtime"
 	"github.com/256-byte/punktchen/backend/internal/transit/static"
 )
 
@@ -98,10 +99,24 @@ func serve(ctx context.Context, log *slog.Logger, cfg config.Config) error {
 	}
 	importer := static.NewImporter(pool, dl, static.NewLoader(pool, cfg.ScopeBBox, importLog), il, static.DefaultSanityLimits, importLog)
 
+	// Realtime (ARCHITECTURE §3.3): the only place that polls the VBB GTFS-RT
+	// feed (CLAUDE.md rule 7); each applied feed goes into the store.
+	rtLog := log.With("component", "realtime")
+	rtStore := realtime.NewStore(rtLog)
+	poller, err := realtime.NewPoller(realtime.PollerConfig{
+		URL: cfg.GTFSRTURL, UserAgent: userAgent(), Interval: cfg.GTFSRTPollInterval,
+	}, rtStore.Apply, realtime.NewMetrics(metrics), rtLog)
+	if err != nil {
+		return err
+	}
+	realtime.RegisterFeedAge(metrics, rtStore, time.Now)
+
 	// Departures snapshot (ARCHITECTURE §3.2, §3.4): moves the window every
-	// minute and loads the whole window again after an import.
-	builder := departures.NewBuilder(departures.BuilderConfig{}, departures.NewLoader(pool),
-		departures.NewMetrics(metrics), log.With("component", "departures"))
+	// minute, loads the whole window again after an import, and merges the
+	// realtime state into every snapshot; a new feed republishes at once.
+	builder := departures.NewBuilder(departures.BuilderConfig{Realtime: rtStore.Merger(realtime.DefaultMaxAge)},
+		departures.NewLoader(pool), departures.NewMetrics(metrics), log.With("component", "departures"))
+	rtStore.OnApply(builder.RealtimeChanged)
 	runImport := func(ctx context.Context) (*static.Outcome, error) {
 		out, err := importer.Run(ctx)
 		if err == nil && out != nil && out.Changed {
@@ -111,7 +126,7 @@ func serve(ctx context.Context, log *slog.Logger, cfg config.Config) error {
 	}
 
 	// Map layers (ADR-0008): only transit for now.
-	transitLayer := transit.NewProvider(pool, builder)
+	transitLayer := transit.NewProvider(pool, builder, transit.WithRealtime(transit.DefaultRealtimeStaleAfter))
 	layers, err := layer.NewRegistry(transitLayer)
 	if err != nil {
 		return err
@@ -140,6 +155,7 @@ func serve(ctx context.Context, log *slog.Logger, cfg config.Config) error {
 	// so a running import can record its outcome.
 	defer runBackground(ctx, scheduler.Run)()
 	defer runBackground(ctx, builder.Run)()
+	defer runBackground(ctx, func(ctx context.Context) { _ = poller.Run(ctx) })()
 
 	return platform.Serve(ctx, log, shutdownTimeout, apiSrv, metricsSrv)
 }

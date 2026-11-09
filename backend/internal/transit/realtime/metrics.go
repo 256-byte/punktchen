@@ -1,6 +1,10 @@
 package realtime
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+)
 
 // Metrics of the GTFS-RT ingestor (ARCHITECTURE §3.7). A nil *Metrics
 // records nothing.
@@ -28,4 +32,20 @@ func (m *Metrics) polled(r Result) {
 		return
 	}
 	m.polls.WithLabelValues(string(r)).Inc()
+}
+
+// RegisterFeedAge exports livestop_gtfsrt_feed_age_seconds: now minus the
+// header.timestamp of the store's current state, read at scrape time; 0
+// before the first feed.
+func RegisterFeedAge(reg prometheus.Registerer, s *Store, now func() time.Time) {
+	reg.MustRegister(prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+		Name: "livestop_gtfsrt_feed_age_seconds",
+		Help: "Age of the applied GTFS-RT feed by its header.timestamp; 0 before the first feed.",
+	}, func() float64 {
+		st := s.Current()
+		if st == nil {
+			return 0
+		}
+		return now().Sub(st.FeedTime).Seconds()
+	}))
 }

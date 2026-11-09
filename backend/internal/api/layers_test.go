@@ -66,11 +66,19 @@ func mustRegistry(t *testing.T, providers ...layer.Provider) *layer.Registry {
 	return r
 }
 
-// fakeStations knows one station.
-type fakeStations struct{ err error }
+// fakeStations knows one station; its health is status (default ok).
+type fakeStations struct {
+	err    error
+	status layer.Status
+}
 
-func (f *fakeStations) Info() layer.Info     { return (&fakeLayer{}).Info() }
-func (f *fakeStations) Health() layer.Health { return layer.Health{Status: layer.StatusDegraded} }
+func (f *fakeStations) Info() layer.Info { return (&fakeLayer{}).Info() }
+func (f *fakeStations) Health() layer.Health {
+	if f.status == "" {
+		return layer.Health{Status: layer.StatusOK}
+	}
+	return layer.Health{Status: f.status}
+}
 
 func (f *fakeStations) Station(_ context.Context, id string) (*openapi.Station, uint64, error) {
 	if f.err != nil {
@@ -187,7 +195,7 @@ func TestNearbyLayerDown(t *testing.T) {
 }
 
 func TestGetStation(t *testing.T) {
-	srv := newTestServer(t, fakePinger{})
+	srv := newTestServer(t, fakePinger{}, func(c *Config) { c.Transit = &fakeStations{status: layer.StatusDegraded} })
 	status, _, body := get(t, srv.URL+"/v1/stations/de:11000:900009104")
 	if status != http.StatusOK {
 		t.Fatalf("status %d body %v", status, body)

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/256-byte/punktchen/backend/gen/openapi"
+	"github.com/256-byte/punktchen/backend/internal/layer"
 	"github.com/256-byte/punktchen/backend/internal/platform"
 	"github.com/256-byte/punktchen/backend/internal/transit/static"
 )
@@ -124,6 +125,10 @@ func (s *Server) GetHealth(ctx context.Context, _ openapi.GetHealthRequestObject
 	case !st.HasData:
 		resp.Status = openapi.StatusDown
 	case st.CheckedAt == nil || now.Sub(*st.CheckedAt) > scheduleMaxAge:
+		resp.Status = openapi.StatusDegraded
+	case s.cfg.Transit != nil && s.cfg.Transit.Health().Status != layer.StatusOK:
+		// Departures not refreshed, or realtime missing or older than 2 min
+		// (task 4.4): the schedule is still served.
 		resp.Status = openapi.StatusDegraded
 	}
 	return resp, nil

@@ -132,8 +132,8 @@ func buildPole(s *departures.Snapshot, pr poleRow, rows []queries.PoleDirections
 	// that left since are dropped by the app.
 	next := map[dirKey][]departures.Departure{}
 	for _, d := range s.Departures(pr.id) {
-		if d.Scheduled.Before(s.GeneratedAt) {
-			continue
+		if d.Predicted().Before(s.GeneratedAt) {
+			continue // left: a late one stays until it leaves
 		}
 		k := dirKey{route: d.RouteID, direction: d.DirectionID, headsign: d.Headsign}
 		if len(next[k]) < limit {
@@ -212,7 +212,7 @@ func buildPole(s *departures.Snapshot, pr poleRow, rows []queries.PoleDirections
 	}
 	for i, m := range keep {
 		slices.SortFunc(m.deps, func(a, b departures.Departure) int {
-			return cmp.Or(a.Scheduled.Compare(b.Scheduled), cmp.Compare(a.TripID, b.TripID))
+			return cmp.Or(a.Predicted().Compare(b.Predicted()), cmp.Compare(a.TripID, b.TripID))
 		})
 		deps := make([]openapi.Departure, 0, min(len(m.deps), limit))
 		for _, d := range m.deps[:min(len(m.deps), limit)] {
@@ -242,14 +242,22 @@ func cmpBool(a, b bool) int {
 	}
 }
 
-// apiDeparture is a scheduled departure; realtime fields come in Phase 4.
+// apiDeparture maps a departure: realtime ones get predicted and
+// delaySeconds (source realtime), the others leave them null.
 func apiDeparture(d departures.Departure) openapi.Departure {
-	return openapi.Departure{
+	out := openapi.Departure{
 		TripId:      d.TripID,
 		ServiceDate: openapi_types.Date{Time: time.Date(d.ServiceDate.Year, d.ServiceDate.Month, d.ServiceDate.Day, 0, 0, 0, 0, time.UTC)},
 		Scheduled:   d.Scheduled,
 		Source:      openapi.DepartureSourceScheduled,
+		Cancelled:   d.Cancelled,
 	}
+	if d.Realtime {
+		predicted, delay := d.Predicted(), d.Delay
+		out.Predicted, out.DelaySeconds = &predicted, &delay
+		out.Source = openapi.DepartureSourceRealtime
+	}
+	return out
 }
 
 // nonEmpty trims s; nil for nil or blank (GTFS stop_desc).

@@ -14,7 +14,11 @@ export interface paths {
         /**
          * Service status and freshness
          * @description Always answers 200 while the process runs; the body tells how usable
-         *     the data is. `down` means no data can be served.
+         *     the data is. `down` means no data can be served. `degraded`: the
+         *     schedule was not confirmed current for 3 days, or the transit layer is
+         *     degraded (departures not refreshed, no realtime data, or the realtime
+         *     feed older than 2 min by its own timestamp); the schedule is still
+         *     served.
          */
         get: operations["getHealth"];
         put?: never;
@@ -200,7 +204,10 @@ export interface components {
             status: components["schemas"]["Status"];
             /**
              * Format: int32
-             * @description Age of the realtime data. Only for live layers; null if no realtime data yet.
+             * @description Age of the realtime data merged into this answer, by the feed's own
+             *     timestamp (header.timestamp), not by when it was fetched. Only for
+             *     live layers; null if no realtime data yet. Over 120 → `degraded`;
+             *     realtime older than 5 min is not merged (schedule only).
              */
             realtimeAgeSeconds?: number | null;
         };

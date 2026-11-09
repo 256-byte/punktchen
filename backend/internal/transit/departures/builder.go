@@ -12,7 +12,11 @@ import (
 
 // Defaults of the departures window (ARCHITECTURE §3.2).
 const (
-	DefaultLookBack     = 2 * time.Minute  // keep departures this long after their time
+	// DefaultLookBack keeps departures this long after their scheduled time,
+	// so a late vehicle stays listed until it leaves: realtime delays went up
+	// to 42 min in the recorded feeds (DATA_MODEL §7 #18). Readers drop the
+	// ones that left by predicted time.
+	DefaultLookBack     = 30 * time.Minute
 	DefaultLookAhead    = 90 * time.Minute // load departures this far ahead
 	DefaultRefreshEvery = time.Minute
 )
@@ -21,7 +25,14 @@ const (
 const (
 	loadFull        = "full"        // whole window from the database
 	loadIncremental = "incremental" // only the new part of the window
+	loadRealtime    = "realtime"    // same window, new realtime data merged
 )
+
+// RealtimeFunc merges realtime data into the departures of a window at time
+// now (realtime.Store.Merger). It returns the departures to publish (deps
+// itself when there is nothing to merge; deps must not be changed) and the
+// header.timestamp of the feed used, zero if none.
+type RealtimeFunc func(deps []Departure, now time.Time) ([]Departure, time.Time)
 
 // BuilderConfig sets the window [now − LookBack, now + LookAhead) and how
 // often it moves. Zero values take the defaults.
@@ -29,6 +40,8 @@ type BuilderConfig struct {
 	LookBack, LookAhead, Every time.Duration
 	// Now is the clock (default time.Now); tests fix it.
 	Now func() time.Time
+	// Realtime merges realtime data into every snapshot; nil: schedule only.
+	Realtime RealtimeFunc
 }
 
 // WindowLoader loads the departures of a time window (*Loader).
@@ -42,7 +55,9 @@ type WindowLoader interface {
 // Each refresh moves the window to now: it drops departures that fell out at
 // the start and loads only the new part at the end. A full load happens at
 // the start, after an import (Reload, or a changed ScheduleID), and when the
-// clock jumped. A failed refresh keeps the last snapshot.
+// clock jumped. Realtime data is merged into every snapshot; after new
+// realtime data (RealtimeChanged) the same window is published again with it,
+// without touching the database. A failed refresh keeps the last snapshot.
 //
 // Readers call Current at any time from any goroutine; it never blocks.
 type Builder struct {
@@ -52,8 +67,9 @@ type Builder struct {
 	log     *slog.Logger
 	now     func() time.Time
 
-	current atomic.Pointer[Snapshot]
-	reload  chan struct{}
+	current  atomic.Pointer[Snapshot]
+	reload   chan struct{}
+	realtime chan struct{}
 
 	mu      sync.Mutex // one refresh at a time; guards the fields below
 	version uint64     // of the last published snapshot
@@ -81,9 +97,10 @@ func NewBuilder(cfg BuilderConfig, loader WindowLoader, m *Metrics, log *slog.Lo
 	}
 	return &Builder{
 		cfg: cfg, loader: loader, metrics: m, log: log,
-		now:     cfg.Now,
-		reload:  make(chan struct{}, 1),
-		version: uint64(time.Now().UnixMilli()),
+		now:      cfg.Now,
+		reload:   make(chan struct{}, 1),
+		realtime: make(chan struct{}, 1),
+		version:  uint64(time.Now().UnixMilli()),
 	}
 }
 
@@ -101,8 +118,18 @@ func (b *Builder) Reload() {
 	}
 }
 
-// Run refreshes now and then every cfg.Every, and on Reload, until ctx is
-// done.
+// RealtimeChanged asks Run to publish the current window again with the
+// latest realtime data. It never blocks; the realtime store calls it after
+// each applied feed.
+func (b *Builder) RealtimeChanged() {
+	select {
+	case b.realtime <- struct{}{}:
+	default: // one is pending already
+	}
+}
+
+// Run refreshes now and then every cfg.Every, on Reload, and on
+// RealtimeChanged, until ctx is done.
 func (b *Builder) Run(ctx context.Context) {
 	b.refreshLogged(ctx, false)
 	t := time.NewTicker(b.cfg.Every)
@@ -115,6 +142,8 @@ func (b *Builder) Run(ctx context.Context) {
 			b.refreshLogged(ctx, false)
 		case <-b.reload:
 			b.refreshLogged(ctx, true)
+		case <-b.realtime:
+			b.republishLogged()
 		}
 	}
 }
@@ -124,6 +153,23 @@ func (b *Builder) Run(ctx context.Context) {
 func (b *Builder) Refresh(ctx context.Context) (*Snapshot, error) {
 	s, _, err := b.refresh(ctx, false)
 	return s, err
+}
+
+// Republish publishes the current window again with the latest realtime
+// data; nil before the first refresh.
+func (b *Builder) Republish() *Snapshot {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.win == nil {
+		return nil
+	}
+	return b.publish(loadRealtime, b.now(), b.win, time.Now())
+}
+
+func (b *Builder) republishLogged() {
+	if s := b.Republish(); s != nil {
+		b.log.Debug("departures republished with realtime", "version", s.Version, "feed_time", s.RealtimeFeedTime)
+	}
 }
 
 func (b *Builder) refreshLogged(ctx context.Context, full bool) {
@@ -163,11 +209,21 @@ func (b *Builder) refresh(ctx context.Context, full bool) (s *Snapshot, kind str
 		return nil, "", err
 	}
 	b.win = w
+	return b.publish(kind, generated, w, start), kind, nil
+}
+
+// publish merges realtime into window w and publishes it as the next
+// snapshot. b.mu must be held.
+func (b *Builder) publish(kind string, generated time.Time, w *Window, start time.Time) *Snapshot {
+	deps, feedTime := w.Departures, time.Time{}
+	if b.cfg.Realtime != nil {
+		deps, feedTime = b.cfg.Realtime(w.Departures, generated)
+	}
 	b.version++
-	s = newSnapshot(b.version, generated, w)
+	s := newSnapshot(b.version, generated, w, deps, feedTime)
 	b.current.Store(s)
 	b.metrics.published(kind, time.Since(start), s)
-	return s, kind, nil
+	return s
 }
 
 // advance returns the window [from, to). If it only moved forward and still

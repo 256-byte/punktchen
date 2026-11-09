@@ -342,7 +342,7 @@ type TripUpdate struct {
 type State struct { FeedTime time.Time /* header.timestamp */; trips map[TripKey]*TripUpdate }
 ```
 
-- Realtime fields of `departures.Departure` (task 4.3, set by `realtime.Merge`): `Delay int32` (seconds), `Realtime bool` (a delay, own or propagated), `Cancelled bool`; `Predicted()` = Scheduled + Delay when Realtime. Still planned (4.4): `Snapshot.RealtimeFeedTime` (header.timestamp of the applied feed) and ordering inside a pole by effective time (predicted, else scheduled).
+- Realtime fields of `departures.Departure` (task 4.3, set by `realtime.Merge`): `Delay int32` (seconds), `Realtime bool` (a delay, own or propagated), `Cancelled bool`; `Predicted()` = Scheduled + Delay when Realtime. Since task 4.4: `Snapshot.RealtimeFeedTime` (header.timestamp of the merged feed, zero without realtime) and departures inside a pole ordered by `Predicted()`. API: realtime departures get `predicted` (scheduled + delay, Berlin offset), `delaySeconds` and `source: realtime`; `cancelled` from the trip; `realtimeAgeSeconds` = now − `RealtimeFeedTime`.
 
 ## 9. Mobile core types (reference)
 
