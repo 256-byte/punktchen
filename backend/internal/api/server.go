@@ -45,8 +45,10 @@ type Config struct {
 	Version  string
 	DB       Pinger
 	Schedule ScheduleSource
-	Imports  ImportTrigger // used only when Dev
-	Dev      bool          // LIVESTOP_DEV: enables /internal/*
+	Layers   Layers          // /v1/layers, /v1/nearby
+	Transit  TransitStations // /v1/stations/{id}
+	Imports  ImportTrigger   // used only when Dev
+	Dev      bool            // LIVESTOP_DEV: enables /internal/*
 	Log      *slog.Logger
 }
 
@@ -142,28 +144,13 @@ func (s *Server) TriggerImport(context.Context, openapi.TriggerImportRequestObje
 	return openapi.TriggerImport202JSONResponse{Status: openapi.ImportStartedStatusStarted}, nil
 }
 
-// ListLayers is implemented in Phase 2 (task 2.5).
-func (s *Server) ListLayers(context.Context, openapi.ListLayersRequestObject) (openapi.ListLayersResponseObject, error) {
-	return openapi.ListLayersdefaultJSONResponse{StatusCode: http.StatusNotImplemented, Body: notImplemented()}, nil
-}
-
-// GetNearby is implemented in Phase 2 (task 2.5).
-func (s *Server) GetNearby(context.Context, openapi.GetNearbyRequestObject) (openapi.GetNearbyResponseObject, error) {
-	return openapi.GetNearbydefaultJSONResponse{StatusCode: http.StatusNotImplemented, Body: notImplemented()}, nil
-}
-
-// GetStation is implemented in Phase 2 (task 2.5).
-func (s *Server) GetStation(context.Context, openapi.GetStationRequestObject) (openapi.GetStationResponseObject, error) {
-	return openapi.GetStationdefaultJSONResponse{StatusCode: http.StatusNotImplemented, Body: notImplemented()}, nil
-}
-
 // Error codes (see Error.code in api/openapi.yaml).
 const (
 	codeInvalidArgument = "invalid_argument"
 	codeNotFound        = "not_found"
-	codeNotImplemented  = "not_implemented"
 	codeConflict        = "conflict"
 	codeInternal        = "internal"
+	codeUnavailable     = "unavailable"
 )
 
 func errorBody(code, message string) openapi.Error {
@@ -171,10 +158,6 @@ func errorBody(code, message string) openapi.Error {
 	e.Error.Code = code
 	e.Error.Message = message
 	return e
-}
-
-func notImplemented() openapi.Error {
-	return errorBody(codeNotImplemented, "not implemented yet")
 }
 
 // writeError is for paths outside the generated handlers (router errors).

@@ -70,7 +70,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One transit station with all poles and more departures */
+        /**
+         * One transit station with all poles and more departures
+         * @description 404 if no station with this id has a served pole in scope. 503
+         *     (`unavailable`) while there are no departures yet (before the first
+         *     schedule import).
+         */
         get: operations["getStation"];
         put?: never;
         post?: never;
@@ -444,7 +449,12 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Features grouped by layer. Only requested layers are present. */
+            /**
+             * @description Features grouped by layer. Only requested layers are present. A
+             *     layer that cannot serve data (e.g. before the first schedule
+             *     import) is missing from `layers` and reported as `down` in
+             *     `meta.layers`; the other layers are still served.
+             */
             200: {
                 headers: {
                     ETag: components["headers"]["ETag"];

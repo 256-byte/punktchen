@@ -137,6 +137,7 @@ Notes:
 - Phone setup (LAN IP, `mobile/.env`, firewall, Expo login): README "Run the app on your phone".
 - `go test -race` needs cgo (not available on the Windows dev machine); CI runs it. Locally in Docker: `docker run --rm -v "${PWD}\backend:/app" -w /app golang:1.27.3 go test -race ./internal/layer/` (any package path; packages with deps download modules first).
 - After `npm install`, restart a running Expo server with `--clear`, otherwise Metro fails with "Unable to resolve module".
+- Backend tests fail with "rootless Docker is not supported on Windows": testcontainers could not reach Docker Desktop (seen when many packages start containers at once, transient). Run again, or with fewer packages in parallel: `go -C backend test -p 2 ./...`.
 
 ## 6. Definition of done (every task)
 

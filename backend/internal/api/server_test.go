@@ -48,7 +48,10 @@ func freshSchedule() fakeSchedule {
 // mode off; opts change the config.
 func newTestServer(t *testing.T, db Pinger, opts ...func(*Config)) *httptest.Server {
 	t.Helper()
-	cfg := Config{Version: "test-version", DB: db, Schedule: freshSchedule(), Log: slog.New(slog.DiscardHandler)}
+	cfg := Config{
+		Version: "test-version", DB: db, Schedule: freshSchedule(), Log: slog.New(slog.DiscardHandler),
+		Layers: mustRegistry(t, &fakeLayer{}), Transit: &fakeStations{},
+	}
 	for _, o := range opts {
 		o(&cfg)
 	}
@@ -104,26 +107,6 @@ func TestHealthDatabaseDown(t *testing.T) {
 	// Still 200: the process is alive; the body says the data is unusable.
 	if status != http.StatusOK || body["status"] != "down" {
 		t.Fatalf("status %d, body %v; want 200 with status down", status, body)
-	}
-}
-
-func TestNotImplementedEndpoints(t *testing.T) {
-	srv := newTestServer(t, fakePinger{})
-	for _, path := range []string{
-		"/v1/layers",
-		"/v1/nearby?lat=52.5427&lng=13.366",
-		"/v1/nearby?lat=52.5427&lng=13.366&radius=300&layers=transit",
-		"/v1/stations/de:11000:900009104",
-	} {
-		t.Run(path, func(t *testing.T) {
-			status, ctype, body := get(t, srv.URL+path)
-			if status != http.StatusNotImplemented || ctype != "application/json" {
-				t.Fatalf("status %d, content-type %q; want 501 JSON", status, ctype)
-			}
-			if code := errorCode(body); code != "not_implemented" {
-				t.Fatalf("error.code = %q, want not_implemented", code)
-			}
-		})
 	}
 }
 

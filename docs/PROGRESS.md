@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 2 — Schedule-based API (started 2026-11-09)
-- **Next task:** 2.5 API handlers
+- **Next task:** 2.6 spot check vs. VBB
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -16,7 +16,7 @@
 | 0 | 0.2 Docker Compose | done | |
 | 0 | 0.3 Go skeleton | done | |
 | 0 | 0.4 Migrations | done | |
-| 0 | 0.5 OpenAPI v0 + health | done | layers/nearby/stations return 501 until 2.5 |
+| 0 | 0.5 OpenAPI v0 + health | done | layers/nearby/stations returned 501 until 2.5 (implemented there) |
 | 0 | 0.6 sqlc | done | sqlc runs in Docker (pinned image); `go generate ./...` needs Docker |
 | 0 | 0.7 Expo app | done | Expo Go needs a signed-in Expo account on PC and phone (see session log) |
 | 0 | 0.8 Phone → backend networking | done | Restart Expo with `--clear` after installing packages |
@@ -34,7 +34,7 @@
 | 2 | 2.2 Schedule window loader | done | Range loader `[from, to)`; new derived table `trip_info` + index `stop_times(departure_secs)` |
 | 2 | 2.3 Snapshot | done | Builder moves the window by the new minute only; race-clean (Docker). Found: no re-import after a layout change (fixed in PR #15) |
 | 2 | 2.4 Transit provider | done | Golden JSON for Wedding; directions merged + trimmed (174 → 51 at Wedding); colours incl. VBB list |
-| 2 | 2.5 API handlers | todo | |
+| 2 | 2.5 API handlers | done | Contract tests validate every response against openapi.yaml (kin-openapi); ETag/cell stay for Phase 5 |
 | 2 | 2.6 Spot check vs. VBB | todo | |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
@@ -77,6 +77,19 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 2.5
+- Done:
+  - `internal/api/layers.go`: `ListLayers` (registry), `GetNearby` (validation → `layer.Registry.Nearby` → typed `layers.transit` + `meta.layers` per layer), `GetStation` (transit provider). Interfaces `Layers` and `TransitStations` in `api.Config`; `cmd/server` builds the registry with the transit provider. 501 stubs removed.
+  - Validation: lat/lng ranges, radius 100–1000 (default 500), layers (default `transit`; unknown, empty, repeated → 400); all problems in one 400 message. Errors: 404 `not_found` (unknown station), 503 `unavailable` (sheet before the first snapshot), 500 `internal` (logged). A failing layer → 200 with `down` in meta and no payload (registry semantics).
+  - `Cache-Control: no-cache` on 200s. `cell`, `ETag`/304 and gzip stay for Phase 5 (5.1–5.3).
+  - Contract: descriptions only (nearby: a down layer is missing from `layers`; station: 404/503). Go + TS regenerated.
+  - Docs: ARCHITECTURE §3.6, DATA_MODEL §5.3 (status/code table); CLAUDE.md note on the transient testcontainers error.
+- Tests: unit (fake layer through the real registry) — `/v1/layers`; nearby defaults (radius 500, transit), radius/layers passed on, 8 bad requests with their messages, meta (`generatedAt` Berlin, attribution, version, `realtimeAgeSeconds`, no `cell`), `Cache-Control`; down layer → 200, `down`, no payload, no attribution; station 200/404/503/500. **PLAN criterion:** `TestContract` — 12 requests on the Wedding fixture (17:00) and on an empty state (health, layers, nearby default/1000 m/empty area/no departures, station sheet, unknown station, bad radius, unknown layer, missing lat, station without departures); every response validated against `api/openapi.yaml` (kin-openapi `openapi3filter.ValidateResponse`, JSON Schema 2020-12); `openapi.yaml` itself passes `doc.Validate`; a broken body is rejected (the validator really runs). vet, golangci-lint 0 issues, mobile typecheck + lint, all backend tests green (`-p 2`).
+- Manual check (Docker Compose, dev DB, full feed, 12:47): `/v1/layers` 96 B; `/v1/nearby` Wedding 26 KB in 60 ms (first request), Alexanderplatz 1000 m 133 KB in 34 ms, `/v1/stations/de:11000:900009104` 16 KB in 14 ms; radius=5 → 400, `/v1/stations/nope` → 404 with Error JSON. Departure times plausible (U6 every 5 min, S41/S42 Ring, 120 every 20 min).
+- Observed: twice "rootless Docker is not supported on Windows" from testcontainers when the whole backend suite ran next to other Docker work; a rerun (or `-p 2`) passed. Noted in CLAUDE.md §5.
+- New deps (+ why): `github.com/getkin/kin-openapi` moved from indirect (via oapi-codegen) to direct, **tests only**: validates responses against the OpenAPI 3.1 contract. No new module downloaded except the `gorilla/mux` checksum in go.sum (kin-openapi's module graph); nothing new in the binary.
+- Next: 2.6 spot check vs. official VBB departures for 5 stops (manual).
 
 ### 2026-11-09 — task 2.4
 - Done:

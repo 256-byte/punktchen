@@ -26,7 +26,9 @@ import (
 	"github.com/256-byte/punktchen/backend/db"
 	"github.com/256-byte/punktchen/backend/internal/api"
 	"github.com/256-byte/punktchen/backend/internal/config"
+	"github.com/256-byte/punktchen/backend/internal/layer"
 	"github.com/256-byte/punktchen/backend/internal/platform"
+	"github.com/256-byte/punktchen/backend/internal/transit"
 	"github.com/256-byte/punktchen/backend/internal/transit/departures"
 	"github.com/256-byte/punktchen/backend/internal/transit/static"
 )
@@ -108,13 +110,21 @@ func serve(ctx context.Context, log *slog.Logger, cfg config.Config) error {
 		return out, err
 	}
 
+	// Map layers (ADR-0008): only transit for now.
+	transitLayer := transit.NewProvider(pool, builder)
+	layers, err := layer.NewRegistry(transitLayer)
+	if err != nil {
+		return err
+	}
+
 	status := static.NewStatus(pool, static.SourceGTFS)
 	scheduler := static.NewScheduler(static.SchedulerConfig{
 		Hour: cfg.GTFSImportTime.Hour, Minute: cfg.GTFSImportTime.Minute, Loc: platform.Berlin,
 	}, runImport, status.Current, static.NewMetrics(metrics), importLog)
 
 	apiHandler := api.NewHandler(api.NewServer(api.Config{
-		Version: version, DB: pool, Schedule: status, Imports: scheduler, Dev: cfg.Dev,
+		Version: version, DB: pool, Schedule: status, Layers: layers, Transit: transitLayer,
+		Imports: scheduler, Dev: cfg.Dev,
 		Log: log.With("component", "api"),
 	}))
 	apiSrv, err := platform.Listen("api", cfg.HTTPAddr, apiHandler)
