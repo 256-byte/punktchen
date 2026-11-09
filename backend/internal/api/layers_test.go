@@ -21,6 +21,8 @@ type fakeLayer struct {
 	queries []layer.NearbyQuery
 	err     error
 	age     *time.Duration
+	version uint64        // 0: 1794220416761
+	delay   time.Duration // how long Nearby takes
 }
 
 func (f *fakeLayer) Info() layer.Info {
@@ -29,17 +31,30 @@ func (f *fakeLayer) Info() layer.Info {
 
 func (f *fakeLayer) Nearby(_ context.Context, q layer.NearbyQuery) (layer.Result, error) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	f.queries = append(f.queries, q)
+	delay := f.delay
+	f.mu.Unlock()
+	time.Sleep(delay)
 	if f.err != nil {
 		return layer.Result{}, f.err
 	}
-	return layer.Result{Version: 1794220416761, Payload: &openapi.TransitLayer{
+	return layer.Result{Version: f.Version(), Payload: &openapi.TransitLayer{
 		Layer: openapi.TransitLayerLayerTransit, Features: []openapi.Station{},
 	}}, nil
 }
 
-func (f *fakeLayer) Version() uint64 { return 1794220416761 }
+func (f *fakeLayer) Version() uint64 {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.version == 0 {
+		return 1794220416761
+	}
+	return f.version
+}
+
+func (f *fakeLayer) setVersion(v uint64) { f.mu.Lock(); f.version = v; f.mu.Unlock() }
+
+func (f *fakeLayer) calls() int { f.mu.Lock(); defer f.mu.Unlock(); return len(f.queries) }
 
 func (f *fakeLayer) Health() layer.Health {
 	if f.err != nil {

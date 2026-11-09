@@ -34,6 +34,9 @@ const cacheControl = "no-cache"
 // Layers composes the layers for /v1/nearby and lists them (*layer.Registry).
 type Layers interface {
 	Layers() []layer.Info
+	// Resolve returns the providers of ids in registration order (their
+	// versions make the cache key); unknown ids → layer.ErrUnknownLayer.
+	Resolve(ids []string) ([]layer.Provider, error)
 	Nearby(ctx context.Context, q layer.NearbyQuery, ids []string) (*layer.Composite, error)
 }
 
@@ -56,19 +59,28 @@ func (s *Server) ListLayers(context.Context, openapi.ListLayersRequestObject) (o
 
 // GetNearby returns the requested layers' features around a point. A layer
 // that fails is reported as down in meta and left out of layers; the
-// request still succeeds (ARCHITECTURE §3.5).
+// request still succeeds (ARCHITECTURE §3.5). Answers come from the cell
+// cache (ADR-0006); generatedAt is always the time of this response, so
+// clients can still correct their clock with it (ADR-0007).
 func (s *Server) GetNearby(ctx context.Context, req openapi.GetNearbyRequestObject) (openapi.GetNearbyResponseObject, error) {
 	p := req.Params
 	radius, ids, msg := nearbyParams(p)
 	if msg != "" {
 		return badNearby(msg), nil
 	}
-	// Snap to the cache cell (ADR-0006): everyone in the cell gets the
-	// answer for its centre, with the radius grown so that nothing within
-	// radius of the exact point is missed.
+	providers, err := s.cfg.Layers.Resolve(ids)
+	if err != nil {
+		return badNearby(err.Error()), nil
+	}
+	// Snap to the cache cell: everyone in the cell gets the answer for its
+	// centre, with the radius grown so that nothing within radius of the
+	// exact point is missed.
 	cell := geo.CellAt(p.Lat, p.Lng)
-	q := layer.NearbyQuery{Center: layer.Location{Lat: cell.Lat, Lng: cell.Lng}, RadiusMeters: cell.SearchRadius(float64(radius))}
-	comp, err := s.cfg.Layers.Nearby(ctx, q, ids)
+	radius = radiusBucket(radius)
+	key := nearbyKey(cell.Hash, radius, providerVersions(providers))
+	cached, _, err := s.nearby.get(ctx, key, func(ctx context.Context) built[*openapi.NearbyResponse] {
+		return s.buildNearby(ctx, cell, radius, ids)
+	})
 	switch {
 	case errors.Is(err, layer.ErrUnknownLayer), errors.Is(err, layer.ErrInvalidQuery):
 		return badNearby(err.Error()), nil
@@ -76,12 +88,32 @@ func (s *Server) GetNearby(ctx context.Context, req openapi.GetNearbyRequestObje
 		return nil, err
 	}
 
-	body := openapi.NearbyResponse{Meta: s.meta(comp.Attribution)}
+	body := *cached // shallow copy: the cached value stays as it is
+	body.Meta.GeneratedAt = s.meta(nil).GeneratedAt
+	cc := cacheControl
+	return openapi.GetNearby200JSONResponse{Body: body, Headers: openapi.GetNearby200ResponseHeaders{CacheControl: &cc}}, nil
+}
+
+// buildNearby asks the layers for the cell and composes the answer (without
+// generatedAt). It is stored under the versions it was built from, unless a
+// layer failed.
+func (s *Server) buildNearby(ctx context.Context, cell geo.Cell, radius int32, ids []string) built[*openapi.NearbyResponse] {
+	q := layer.NearbyQuery{Center: layer.Location{Lat: cell.Lat, Lng: cell.Lng}, RadiusMeters: cell.SearchRadius(float64(radius))}
+	comp, err := s.cfg.Layers.Nearby(ctx, q, ids)
+	if err != nil {
+		return built[*openapi.NearbyResponse]{err: err}
+	}
+
+	body := &openapi.NearbyResponse{Meta: s.meta(comp.Attribution)}
+	body.Meta.GeneratedAt = time.Time{}
 	body.Meta.Cell = &cell.Hash
+	ok := true
+	versions := make([]string, 0, len(comp.Layers))
 	for _, l := range comp.Layers {
 		lm := layerMeta(l.Version, l.Health)
 		if l.Err != nil {
 			s.log.Warn("layer failed", "layer", l.Info.ID, "error", l.Err.Error())
+			ok = false
 		} else {
 			switch payload := l.Payload.(type) {
 			case *openapi.TransitLayer:
@@ -89,12 +121,42 @@ func (s *Server) GetNearby(ctx context.Context, req openapi.GetNearbyRequestObje
 			default:
 				s.log.Error("layer payload of unknown type", "layer", l.Info.ID, "type", fmt.Sprintf("%T", l.Payload))
 				lm.Status = openapi.StatusDown
+				ok = false
 			}
 		}
 		body.Meta.Layers[l.Info.ID] = lm
+		versions = append(versions, layerVersion(l.Info.ID, l.Version))
 	}
-	cc := cacheControl
-	return openapi.GetNearby200JSONResponse{Body: body, Headers: openapi.GetNearby200ResponseHeaders{CacheControl: &cc}}, nil
+	out := built[*openapi.NearbyResponse]{val: body}
+	if ok {
+		out.key = nearbyKey(cell.Hash, radius, versions)
+	}
+	return out
+}
+
+// radiusBucket rounds a radius up to whole 100 m, so nearby radii share
+// cache entries and nothing within the asked radius is lost.
+func radiusBucket(r int32) int32 {
+	return (r + 99) / 100 * 100
+}
+
+// nearbyKey is the cell cache key: cell, radius bucket and the versions of
+// the requested layers in registration order ("transit=123", …), which also
+// name the layers.
+func nearbyKey(cell string, radius int32, versions []string) string {
+	return fmt.Sprintf("%s|%d|%s", cell, radius, strings.Join(versions, ","))
+}
+
+func providerVersions(providers []layer.Provider) []string {
+	out := make([]string, len(providers))
+	for i, p := range providers {
+		out[i] = layerVersion(p.Info().ID, p.Version())
+	}
+	return out
+}
+
+func layerVersion(id string, version uint64) string {
+	return fmt.Sprintf("%s=%d", id, version)
 }
 
 // nearbyParams checks what the generated binding does not (ranges, layer
