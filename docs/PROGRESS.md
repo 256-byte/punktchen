@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 4 — Realtime (Phase 3 done 2026-11-09)
-- **Next task:** 4.0 Realtime coverage check (share of trips with real `delay` per mode; decide on an extra source for BVG U-Bahn/tram)
+- **Next task:** 4.1 GTFS-RT poller (4.0 waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -43,7 +43,7 @@
 | 3 | 3.5 Transit layer markers | done | One marker per pole, up to 4 rows; labels re-render once a minute (Profiler test); iPhone: countdowns and "now" update correctly (user, 2026-11-09) |
 | 3 | 3.6 Station sheet | done | Tap marker → whole station; idle directions last (decision 2026-11-09); poles titled from VBB descriptions (new `Pole.description`); iPhone: sheet opens, sections correct (user) |
 | 3 | 3.7 Attribution | done | "Data: VBB (CC BY 4.0)" from `meta.attribution`: map bottom right, end of the station sheet |
-| 4 | 4.0 Realtime coverage check | todo | |
+| 4 | 4.0 Realtime coverage check | in progress | Monday evening + Sunday night measured (~87 % of running trips have a real delay, U-Bahn 80–100 %); Tuesday morning and noon samples pending |
 | 4 | 4.1 GTFS-RT poller | todo | |
 | 4 | 4.2 Parser → trip-instance state | todo | |
 | 4 | 4.3 Merge rules | todo | |
@@ -75,6 +75,7 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 | 2026-11-09 | Lines suspended for weeks (e.g. RE at Alexanderplatz until 2026-12-13) stay listed with an empty departure list; revisit after seeing it in the UI (3.5). A "runs within N days" filter would not hide them for good: it is evaluated against the calendar, so they come back on their own — user decision (former open question #4) | — (DATA_MODEL §3.2) |
 | 2026-11-09 | Dev-only place picker on the map (not in PLAN, user request): test other parts of Berlin on a phone without faking the GPS | — (dev tool, ARCHITECTURE §4.4 map screen) |
 | 2026-11-09 | Map markers show only directions with an upcoming departure; a pole with none has no marker. Directions without one (night lines by day, rail replacement, suspended lines) are listed last in the station sheet (3.6) — user decision after seeing 72 of 151 directions empty around Alexanderplatz | — (ARCHITECTURE §4.4, DATA_MODEL §3.2) |
+| 2026-11-09 | Exception to "one task at a time": 4.1 starts while 4.0 waits for the Tuesday morning/noon samples (4.1 is needed whatever 4.0 decides). 4.0's tool and first numbers go in their own PR; the final numbers and decision follow in a small PR — user decision | — |
 
 ## Open questions
 
@@ -94,6 +95,13 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 4.0 (in progress)
+- Done so far: `gtfsexplore coverage` (new): per GTFS-RT sample, the trips scheduled to run at the feed's header time (imported schedule in the Compose db, routes serving an in-scope pole) against the feed's TripUpdates; realtime = an arrival/departure delay or `TripUpdate.delay` (DATA_MODEL §7 #18). Also: share of stop time updates with a delay / a delay ≠ 0, running trips with a delay ≠ 0, cancelled, TripUpdates for trips not running now, and how many TripUpdate trip_ids are in the imported schedule. Unit tests (`coverage_test.go`). Tool User-Agent now names the repository (provider asks for an informative one, PLAN 4.1). CLAUDE.md §5: record + coverage commands.
+- Monday 2026-11-09 19:46 Berlin (2 samples, 8,542 TripUpdates each): trip_id in the imported schedule 100 % (the feed's `Content-Type` says `schedule_sha256=d8202ba3`, our import is `d9625924…`; ids match anyway). Running trips with a real delay: regional 74.6 %, S-Bahn 80.5 %, U-Bahn 100 %, tram 91.1 %, bus 88.7 %, all 88.0 % (3,566 running). With a delay ≠ 0: U-Bahn 33 %, tram 61 %, bus 71 %, S-Bahn 71 %.
+- Sunday 2026-11-08 ~00:00 Berlin (the 5 samples of 1.1, re-read): all 86.6 %, U-Bahn 79.5 %, tram 92.1 %.
+- Finding: DATA_MODEL §7 #19 read the feed's *mix* of TripUpdates by mode (U-Bahn 1.7 % of all updates) as coverage; U-Bahn just has few trips. #18's "delay on ~24 % of events" counted trips that have not started (schedule-filled). To correct both once the daytime numbers are in.
+- Pending: Tuesday 2026-11-10 morning (~08:00) and noon (~12:30) samples, then numbers in DATA_MODEL §7 and the decision (extra source for BVG U-Bahn/tram: looks unnecessary).
 
 ### 2026-11-09 — task 3.7
 - Done: `src/ui/Attribution.tsx`: `Attribution` renders the response's `meta.attribution` (nothing when it is empty) and `MapAttribution` places it on the map bottom right above the safe area (Apple Maps keeps its "Legal" link bottom left), not catching touches. Map screen shows it from `/v1/nearby`; the station sheet ends with the attribution of `/v1/stations/{id}`. Text comes from the API, so other layers bring their own (ADR-0008).

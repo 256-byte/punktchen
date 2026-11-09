@@ -110,6 +110,9 @@ go -C backend test -short ./...              # unit tests only, no Docker
 $env:LIVESTOP_LIVE_TESTS='1'; go -C backend test -run Live ./...; Remove-Item Env:LIVESTOP_LIVE_TESTS
                                              # tests against real VBB servers (downloads ~170 MB); never in CI
 go -C backend run ./internal/tools/gtfsexplore download   # VBB zip → backend/data/gtfs/GTFS.zip (git-ignored)
+go -C backend run ./internal/tools/gtfsexplore record -n 2   # 2 GTFS-RT samples (+1 conditional GET) → backend/data/gtfsrt/ (git-ignored)
+go -C backend run ./internal/tools/gtfsexplore coverage (Get-ChildItem backend/data/gtfsrt/*.pb).FullName
+                                             # realtime coverage of running trips per mode, against the imported schedule in the Compose db (task 4.0)
 $env:LIVESTOP_GTFS_ZIP='data/gtfs/GTFS.zip'; go -C backend test -run RealFeed -v ./internal/transit/static/; Remove-Item Env:LIVESTOP_GTFS_ZIP
                                              # load + full import pipeline on a real zip in a test DB (path relative to backend/; old zip: also set $env:LIVESTOP_TODAY='2026-11-01')
 docker run --rm -v "${PWD}\backend:/app" -v golangci-cache:/root/.cache -w /app golangci/golangci-lint:v2.15.0 golangci-lint run ./...
