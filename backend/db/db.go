@@ -26,3 +26,9 @@ const MigrationsDir = "migrations"
 //
 //go:embed gtfs/schema.sql
 var GTFSSchema string
+
+// GTFSIndexes adds keys and indexes to the GTFS tables after loading; same
+// rewrite rule as GTFSSchema.
+//
+//go:embed gtfs/indexes.sql
+var GTFSIndexes string

@@ -7,7 +7,7 @@
 --
 -- Columns follow the GTFS reference; all columns of the files we import are
 -- kept, also those we do not use yet. Empty CSV values become NULL.
--- No keys or indexes here: they are added after loading (task 1.4).
+-- No keys or indexes here: indexes.sql adds them after loading (faster COPY).
 
 CREATE SCHEMA gtfs;
 
@@ -82,6 +82,8 @@ CREATE TABLE gtfs.stops (
     wheelchair_boarding smallint,
     level_id            text,
     platform_code       text,
+    -- Not from the CSV: set after loading from LIVESTOP_SCOPE_BBOX (DATA_MODEL §4).
+    in_scope            boolean NOT NULL DEFAULT false,
     geom                geography(Point, 4326)
         GENERATED ALWAYS AS (geography(ST_SetSRID(ST_MakePoint(stop_lon, stop_lat), 4326))) STORED
 );
