@@ -58,6 +58,12 @@ All backend parts live in **one binary** (modular monolith, ADR-0002). Package b
 - Every 60 s, load all scheduled departures for **in-scope stops** in `[now - 2 min, now + 90 min]` from Postgres.
 - Must handle: service days (`calendar` + `calendar_dates`), times ≥ 24:00:00 (trip belongs to the previous service day), DST (GTFS times are relative to "noon minus 12h" of the service day).
 - Result: `map[stopID][]ScheduledDeparture` sorted by time.
+- `departures.Loader.Load(ctx, from, to)` (task 2.2) loads any half-open window `[from, to)`; adjacent windows never share a departure, so the refresh can load just the new minute instead of the whole window.
+  - Go splits the window into one seconds range per service day that can reach it: service day start = noon − 12 h in Europe/Berlin, looking back as many days as the feed's largest stop time needs (`max(departure_secs)`, VBB 31:17:00 → yesterday).
+  - One SQL query per service day (`ScheduledDepartures`): `stop_times` by `departure_secs` index, joined with `trip_info` and `service_dates` of that day, in-scope poles only. Left out: the trip's last stop (arrival only) and `pickup_type = 1`.
+  - Run with `plan_cache_mode = force_custom_plan` in a read-only transaction: a cached generic plan cannot see the range width and was 5–10× slower.
+  - Consistency: the OID of the `gtfs` schema is read before and after; an import swap in between → load again (max 3 tries). The OID is returned as `ScheduleID`, so callers know when the schedule changed.
+  - Full feed, dev PC: see PROGRESS 2.2 for timings.
 
 ### 3.3 `transit/realtime` — GTFS-RT ingestor
 

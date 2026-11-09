@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -16,6 +17,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/256-byte/punktchen/backend/gen/queries"
+	"github.com/256-byte/punktchen/backend/internal/platform"
+	"github.com/256-byte/punktchen/backend/internal/transit/departures"
 )
 
 // rulesFeed's services run 2026-11-09 … 2026-11-20.
@@ -416,4 +419,34 @@ func TestImportRealFeed(t *testing.T) {
 	alex := queries.NearbyPolesParams{Lat: 52.5219, Lng: 13.4132, RadiusM: 1000}
 	d, n = medianNearby(t, pool, alex, 25)
 	t.Logf("nearby Alexanderplatz 1000 m (max radius, densest area): %d rows, median %s", n, d)
+
+	// PLAN 2.2: schedule window at 17:00 (whole window and a 1-minute slice,
+	// the per-minute refresh) and just after midnight.
+	y, m, dd := im.now().In(platform.Berlin).Date()
+	evening := time.Date(y, m, dd, 17, 0, 0, 0, platform.Berlin)
+	night := time.Date(y, m, dd, 0, 15, 0, 0, platform.Berlin)
+	loader := departures.NewLoader(pool)
+	for _, c := range []struct {
+		name string
+		from time.Time
+		span time.Duration
+	}{
+		{"window 17:00 + 92 min", evening, 92 * time.Minute},
+		{"slice 18:32 + 1 min", evening.Add(92 * time.Minute), time.Minute},
+		{"window 00:15 + 92 min", night, 92 * time.Minute},
+	} {
+		var times []time.Duration
+		var count int
+		for range 5 {
+			start := time.Now()
+			w, err := loader.Load(context.Background(), c.from, c.from.Add(c.span))
+			if err != nil {
+				t.Fatal(err)
+			}
+			times = append(times, time.Since(start))
+			count = len(w.Departures)
+		}
+		slices.Sort(times)
+		t.Logf("%s: %d departures, median %s", c.name, count, times[len(times)/2])
+	}
 }

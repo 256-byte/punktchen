@@ -30,9 +30,12 @@ SELECT date, service_id FROM gtfs.calendar_dates WHERE exception_type = 2;
 
 ALTER TABLE gtfs.service_dates ADD PRIMARY KEY (service_date, service_id);
 
--- 3. Per trip: first/last stop_sequence, loop flag (starts and ends at the
---    same station, §7 #11) and number of instances.
-CREATE TEMP TABLE trip_info ON COMMIT DROP AS
+-- 3. Per trip (§3.5): direction key, first/last stop_sequence, loop flag
+--    (starts and ends at the same station, §7 #11) and number of instances.
+--    Kept after the import: the schedule window needs the service and the
+--    last stop of every trip (ARCHITECTURE §3.2).
+INSERT INTO gtfs.trip_info (trip_id, service_id, route_id, direction_id, headsign,
+                            first_stop_sequence, last_stop_sequence, is_loop, instances)
 WITH ends AS (
     SELECT trip_id, min(stop_sequence) AS first_seq, max(stop_sequence) AS last_seq
     FROM gtfs.stop_times
@@ -44,10 +47,10 @@ WITH ends AS (
 )
 -- 32 VBB trips have no trip_headsign (§7 #8): use the last stop's name, as the
 -- GTFS reference suggests.
-SELECT t.trip_id, t.route_id, t.direction_id, coalesce(t.trip_headsign, ls.stop_name, '') AS headsign,
+SELECT t.trip_id, t.service_id, t.route_id, t.direction_id, coalesce(t.trip_headsign, ls.stop_name, ''),
        e.first_seq, e.last_seq,
-       fs.station_id = ls.station_id AS is_loop,
-       coalesce(i.n, 0) AS instances
+       fs.station_id = ls.station_id,
+       coalesce(i.n, 0)
 FROM gtfs.trips t
 JOIN ends e ON e.trip_id = t.trip_id
 JOIN gtfs.stop_times f ON f.trip_id = e.trip_id AND f.stop_sequence = e.first_seq
@@ -55,6 +58,9 @@ JOIN gtfs.stop_times l ON l.trip_id = e.trip_id AND l.stop_sequence = e.last_seq
 JOIN gtfs.stops fs ON fs.stop_id = f.stop_id
 JOIN gtfs.stops ls ON ls.stop_id = l.stop_id
 LEFT JOIN instances i ON i.service_id = t.service_id;
+
+ALTER TABLE gtfs.trip_info ADD PRIMARY KEY (trip_id);
+ANALYZE gtfs.trip_info;
 
 -- 4. Directions per pole (§3.2). A pole is terminal (origin) for a direction
 --    when it is the last (first) stop of >= 95 % of the direction's non-loop
@@ -73,14 +79,14 @@ SELECT st.stop_id, s.station_id, ti.route_id, r.route_short_name,
        END,
        ti.direction_id, ti.headsign,
        mode() WITHIN GROUP (ORDER BY coalesce(st.stop_headsign, ti.headsign)),
-       coalesce(count(*) FILTER (WHERE NOT ti.is_loop AND st.stop_sequence = ti.last_seq)
+       coalesce(count(*) FILTER (WHERE NOT ti.is_loop AND st.stop_sequence = ti.last_stop_sequence)
                     >= 0.95 * nullif(count(*) FILTER (WHERE NOT ti.is_loop), 0), false),
-       coalesce(count(*) FILTER (WHERE NOT ti.is_loop AND st.stop_sequence = ti.first_seq)
+       coalesce(count(*) FILTER (WHERE NOT ti.is_loop AND st.stop_sequence = ti.first_stop_sequence)
                     >= 0.95 * nullif(count(*) FILTER (WHERE NOT ti.is_loop), 0), false),
        (r.route_type = 109 AND r.route_short_name IN ('S41', 'S42')) OR ti.headsign LIKE 'Ringbahn%',
        sum(ti.instances)
 FROM gtfs.stop_times st
-JOIN trip_info ti ON ti.trip_id = st.trip_id
+JOIN gtfs.trip_info ti ON ti.trip_id = st.trip_id
 JOIN gtfs.routes r ON r.route_id = ti.route_id
 JOIN gtfs.stops s ON s.stop_id = st.stop_id
 WHERE s.station_id IS NOT NULL

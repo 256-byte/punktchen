@@ -118,6 +118,22 @@ CREATE TABLE gtfs.service_dates (
     service_id   text NOT NULL
 );
 
+-- Per trip: service, direction key and first/last stop (§3.5).
+CREATE TABLE gtfs.trip_info (
+    trip_id             text NOT NULL,
+    service_id          text NOT NULL,
+    route_id            text NOT NULL,
+    direction_id        smallint,
+    -- trip_headsign, else the last stop's name: the direction key of pole_directions.
+    headsign            text NOT NULL,
+    first_stop_sequence integer NOT NULL,
+    last_stop_sequence  integer NOT NULL,
+    -- Starts and ends at the same station (§7 #11); NULL if an end has no station.
+    is_loop             boolean,
+    -- Service dates of the trip over the feed's validity.
+    instances           bigint NOT NULL
+);
+
 -- What leaves from each pole (§3.2).
 CREATE TABLE gtfs.pole_directions (
     stop_id          text NOT NULL,

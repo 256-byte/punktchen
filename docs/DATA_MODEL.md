@@ -39,7 +39,7 @@ Storage notes:
 - `arrival_time` / `departure_time` stored as **integer seconds since service-day start** (`arrival_secs`, `departure_secs`), because values like `25:10:00` exist. Keep the raw text column too.
 - `stops.geom geography(Point, 4326)` + GiST index.
 - Extra column `stops.in_scope boolean` (scope filter, §4).
-- Keys and indexes (`backend/db/gtfs/indexes.sql`, built after COPY): primary keys on routes, trips, stops, calendar, calendar_dates `(service_id, date)`, stop_times `(trip_id, stop_sequence)` (duplicates fail the import); indexes `stop_times(stop_id, departure_secs)`, `trips(service_id)`, `trips(route_id)`, `stops(parent_station)`, GiST on `stops.geom`. No foreign keys (dangling references are a sanity check, task 1.6).
+- Keys and indexes (`backend/db/gtfs/indexes.sql`, built after COPY): primary keys on routes, trips, stops, calendar, calendar_dates `(service_id, date)`, stop_times `(trip_id, stop_sequence)` (duplicates fail the import); indexes `stop_times(stop_id, departure_secs)`, `stop_times(departure_secs)` (schedule window, task 2.2), `trips(service_id)`, `trips(route_id)`, `stops(parent_station)`, GiST on `stops.geom`. No foreign keys (dangling references are a sanity check, task 1.6).
 
 ## 3. Derived tables (built after each import, schema `gtfs`)
 
@@ -102,6 +102,21 @@ The station of every pole, because most bus/tram poles have no `parent_station` 
 | `pole_count` | int | poles of the station, served or not |
 
 PK `station_id`, GiST on `geom`. Every pole (`location_type` 0/empty) also gets the column **`stops.station_id`** (decided in 1.5: a column, not a separate mapping table), indexed.
+
+### 3.5 `trip_info`
+One row per trip (PK `trip_id`). Kept after the import since task 2.2 (before: a temp table inside derived.sql): `pole_directions` is built from it, and the schedule window needs each trip's service and last stop without aggregating `stop_times` every minute.
+
+| column | type | notes |
+|---|---|---|
+| `trip_id` | text | |
+| `service_id`, `route_id`, `direction_id` | | copied from `trips` |
+| `headsign` | text | `trip_headsign`, else the last stop's name: the direction key of `pole_directions` |
+| `first_stop_sequence`, `last_stop_sequence` | integer | the last stop is an arrival, never a departure |
+| `is_loop` | bool | first and last stop in the same station (§7 #11); NULL if an end has no station |
+| `instances` | bigint | service dates of the trip over the feed's validity |
+
+### 3.6 Schedule window (task 2.2, not a table)
+A **departure** is a stop time where riders can board: at an in-scope pole, `pickup_type` ≠ 1, not the trip's last stop, on a service date its service runs. Absolute time = service day's noon − 12 h (Europe/Berlin) + `departure_secs`; on DST switch days this start is 23:00 (spring) or 01:00 (autumn) local time, so night times shift against the wall clock (`departures.ServiceDay`, tests in `serviceday_test.go`).
 
 ## 4. Scope
 
@@ -242,14 +257,18 @@ Evidence tool: `backend/internal/tools/gtfsexplore` (task 1.1, not shipped). Unl
 | 22 | **Derived tables (task 1.5), current feed.** `service_dates` 257,451 rows (whole validity); `pole_directions` 125,215 (7,066 terminal, 7,933 origin, 1,525 ring); `stations` 13,431 in the whole VBB area, 3,914 in scope, 3,881 of them with at least one direction. Build time on the dev PC: COPY ~10 s, keys/indexes + ANALYZE ~20–60 s, derived tables ~55–70 s; whole import 1.5–2.7 min, peak Go memory 18–22 MB. Wedding subset fixture (`backend/testdata/gtfs/vbb-wedding-800m.zip`, 2.7 MB): 17 stations, 13,394 trips, 343,256 stop_times; it contains every trip of the GTFS-RT fixtures. | LoadRealFeed, TestWeddingSubset | 2026-11-09 |
 | 23 | **Nearby query (task 1.8)** `NearbyPoles` (`backend/db/queries/nearby.sql`): served, in-scope poles in a circle, grouped by station, nearest station first. "Wedding 500 m" (52.5427, 13.3660): 23 poles in 7 stations; S+U Wedding is **one** station with its 6 served poles (U `::1`/`::2`, S `:1:50`/`:1:51`, bus `::3`/`::4`; unserved `::5`/`::6`/`::8` left out); S Wedding/Martha-Ndumbe-Platz separate at 293 m. Speed on the full feed (GiST `stops_geom_idx` + `pole_directions_stop_idx`, no seq scan): median **2.8 ms** via pgx (prepared, warm); Alexanderplatz 1000 m (densest, max radius) 119 poles, 11.9 ms; the very first call after start ~90 ms (planning + cold cache). **Same name, two stations:** "U Reinickendorfer Str." is `de:11000:900008104` (bus) and `de:11000:900008102` (U-Bahn + bus), 200 m apart — DHID splits them, so the API will list both; how to present same-name neighbours is a Phase 2/3 UI question. | NearbyPoles on the dev DB (EXPLAIN ANALYZE) and in TestImportRealFeed / TestNearbyPolesWedding | 2026-11-09 |
 
+| 24 | **Schedule window (task 2.2).** Feed of 2026-11-08 (282,294 trips, 6,247,945 stop_times): 17:00 + 92 min → **88,665** boardable departures at in-scope poles; a 1-minute slice ~900; 00:15 + 92 min → 23,170. In the Wedding subset **all** 1,629 departures between 00:15 and 01:45 on a Tuesday belong to Monday's service day (coded 24:15–25:45): VBB's night network lives on the previous service day, so the window must always ask yesterday too. Loader = plain SQL definition (NOT EXISTS later stop, service day noon − 12 h in SQL) on the Wedding subset, both windows. Speed: dev DB 92-min window ~0.5 s, night window ~0.15 s, 1-minute slice ~70 ms; in the fresh test container right after the import 1.3 s / 1.0 s / 170 ms. | TestLoadWindowWedding, TestImportRealFeed, EXPLAIN ANALYZE on the dev DB | 2026-11-09 |
+
 All Phase 1 **(verify)** items are answered. Fixtures: `backend/testdata/gtfsrt/` and `backend/testdata/gtfs/` (READMEs there).
 
 ## 8. Go in-memory types (reference)
 
+The schedule window (task 2.2) returns `departures.Departure`: trip, service day, pole, stop sequence, route, direction, headsign, stop headsign and scheduled time. The snapshot departure below adds line, mode and the realtime fields (2.3/2.4).
+
 ```go
 type Departure struct {
     TripID       string
-    ServiceDate  civil.Date      // or time.Time at midnight Berlin
+    ServiceDate  ServiceDay      // {Year, Month, Day}, departures/serviceday.go
     StopID       string
     RouteID      string
     Line         string
