@@ -36,6 +36,21 @@ func (e DepartureSource) Valid() bool {
 	}
 }
 
+// Defines values for ImportStartedStatus.
+const (
+	ImportStartedStatusStarted ImportStartedStatus = "started"
+)
+
+// Valid indicates whether the value is a known member of the ImportStartedStatus enum.
+func (e ImportStartedStatus) Valid() bool {
+	switch e {
+	case ImportStartedStatusStarted:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LayerId.
 const (
 	LayerIdTransit LayerId = "transit"
@@ -197,7 +212,7 @@ type Direction struct {
 type Error struct {
 	Error struct {
 		// Code Machine-readable code. Known values: `invalid_argument`,
-		// `not_found`, `not_implemented`, `internal`, `unavailable`.
+		// `not_found`, `not_implemented`, `conflict`, `internal`, `unavailable`.
 		//
 		//
 		// Examples: invalid_argument
@@ -212,6 +227,14 @@ type Error struct {
 
 // Health defines model for Health.
 type Health struct {
+	// ScheduleCheckedAt When the schedule was last confirmed current (an import succeeded or
+	// found the feed unchanged). Null before the first import. Older than
+	// 3 days → `degraded`.
+	//
+	//
+	// Examples: 2026-11-09T03:30:12+01:00
+	ScheduleCheckedAt *time.Time `json:"scheduleCheckedAt,omitempty"`
+
 	// Status `ok`: data is fresh. `degraded`: data is served but stale (e.g.
 	// realtime feed older than 2 min). `down`: no data can be served.
 	Status Status `json:"status"`
@@ -226,6 +249,14 @@ type Health struct {
 	// Examples: dev
 	Version string `json:"version"`
 }
+
+// ImportStarted defines model for ImportStarted.
+type ImportStarted struct {
+	Status ImportStartedStatus `json:"status"`
+}
+
+// ImportStartedStatus defines model for ImportStarted.Status.
+type ImportStartedStatus string
 
 // LatLng defines model for LatLng.
 type LatLng struct {
@@ -401,6 +432,9 @@ type GetStationParams struct {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// TriggerImport Start a GTFS import now (development only)
+	// (POST /internal/import)
+	TriggerImport(w http.ResponseWriter, r *http.Request)
 	// GetHealth Service status and freshness
 	// (GET /v1/health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -423,6 +457,20 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// TriggerImport operation middleware
+func (siw *ServerInterfaceWrapper) TriggerImport(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TriggerImport(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetHealth operation middleware
 func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Request) {
@@ -719,6 +767,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/layers", wrapper.ListLayers)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/nearby", wrapper.GetNearby)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/stations/{stationId}", wrapper.GetStation)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/internal/import", wrapper.TriggerImport)
 
 	return m
 }
@@ -734,6 +783,72 @@ type NotModifiedResponseHeaders struct {
 }
 type NotModifiedResponse struct {
 	Headers NotModifiedResponseHeaders
+}
+
+type TriggerImportRequestObject struct {
+}
+
+type TriggerImportResponseObject interface {
+	VisitTriggerImportResponse(w http.ResponseWriter) error
+}
+
+type TriggerImport202JSONResponse ImportStarted
+
+func (response TriggerImport202JSONResponse) VisitTriggerImportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TriggerImport404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response TriggerImport404JSONResponse) VisitTriggerImportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TriggerImport409JSONResponse Error
+
+func (response TriggerImport409JSONResponse) VisitTriggerImportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TriggerImportdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response TriggerImportdefaultJSONResponse) VisitTriggerImportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetHealthRequestObject struct {
@@ -969,6 +1084,9 @@ func (response GetStationdefaultJSONResponse) VisitGetStationResponse(w http.Res
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// TriggerImport Start a GTFS import now (development only)
+	// (POST /internal/import)
+	TriggerImport(ctx context.Context, request TriggerImportRequestObject) (TriggerImportResponseObject, error)
 	// GetHealth Service status and freshness
 	// (GET /v1/health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
@@ -1020,6 +1138,30 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// TriggerImport operation middleware
+func (sh *strictHandler) TriggerImport(w http.ResponseWriter, r *http.Request) {
+	var request TriggerImportRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TriggerImport(ctx, request.(TriggerImportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TriggerImport")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TriggerImportResponseObject); ok {
+		if err := validResponse.VisitTriggerImportResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // GetHealth operation middleware

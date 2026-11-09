@@ -119,7 +119,7 @@ PK `station_id`, GiST on `geom`. Every pole (`location_type` 0/empty) also gets 
 | GET | `/v1/layers` | available layers + metadata |
 | GET | `/v1/nearby?lat&lng&radius=500&layers=transit` | features around a point, grouped by layer |
 | GET | `/v1/stations/{stationId}` | one transit station with all poles and more departures (sheet) |
-| POST | `/internal/import` | dev-only manual import trigger (`LIVESTOP_DEV=true`) |
+| POST | `/internal/import` | dev-only: start a GTFS import (`LIVESTOP_DEV=true`, else 404); 202 at once, 409 while one runs |
 
 Rules: `radius` 100–1000 (default 500). `layers` comma-separated, default `transit`. Unknown layer → 400. All times ISO-8601 with offset, Europe/Berlin.
 

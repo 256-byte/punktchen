@@ -34,6 +34,18 @@ func TestNewLoggerWritesJSONAndFiltersLevel(t *testing.T) {
 	}
 }
 
+func TestNewLoggerWritesDurationsAsText(t *testing.T) {
+	var buf bytes.Buffer
+	NewLogger(&buf, slog.LevelInfo).Info("done", "duration", 158*time.Second)
+	var rec map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &rec); err != nil {
+		t.Fatal(err)
+	}
+	if rec["duration"] != "2m38s" {
+		t.Fatalf("duration = %v, want \"2m38s\"", rec["duration"])
+	}
+}
+
 func TestMetricsHandler(t *testing.T) {
 	srv := httptest.NewServer(MetricsHandler(NewMetricsRegistry()))
 	defer srv.Close()

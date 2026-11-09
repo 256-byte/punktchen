@@ -41,7 +41,7 @@ All backend parts live in **one binary** (modular monolith, ADR-0002). Package b
 
 - **Source:** current VBB GTFS (stop-pole precision), URL in config (`LIVESTOP_GTFS_URL`). Default: `https://unternehmen.vbb.de/gtfs`, the link on VBB's open-data page (https://unternehmen.vbb.de/digitale-services/datensaetze/, "Aktualisierung: 2x wöchentlich"; `https://www.vbb.de/gtfs` serves the same file). It is the feed the GTFS-RT trip ids refer to; the older "gtfs-mastscharf" file is not kept up to date (DATA_MODEL §7 #15).
 - **Size:** ~85 MB zipped, ~650 MB unzipped. `stop_times.txt` dominates (~5.8 M rows).
-- **Schedule:** once a day (default 03:30 Europe/Berlin) + on startup if no data.
+- **Schedule** (`static.Scheduler`, task 1.7): daily at `LIVESTOP_GTFS_IMPORT_TIME` (default 03:30 Europe/Berlin, wall clock kept across DST), at startup if there is no live schema, 1 h after a failed run (never later than the next daily run), and on `POST /internal/import` (dev only, answers 202 at once; 409 while running). A run blocked by the advisory lock counts as `busy`, not as a failure.
 - **Change detection:** conditional GET with `ETag` / `Last-Modified` when the server sends them; the default URL sends neither, so the zip is downloaded and its **SHA-256** compared with the last successful import in `meta.feed_imports`. Unchanged → `skipped`.
 - **Import (ADR-0004):**
   1. Stream zip → CSV readers (no full extraction to RAM).
@@ -117,10 +117,10 @@ type Provider interface {
 ### 3.7 Observability
 
 - Logs: `log/slog` JSON, one line per request, plus component logs with `component=` attribute.
-- Metrics (Prometheus): `livestop_gtfsrt_feed_age_seconds`, `livestop_gtfsrt_poll_total{result}`, `livestop_rt_match_ratio`, `livestop_snapshot_build_seconds`, `livestop_snapshot_version`, `livestop_import_duration_seconds`, `livestop_import_last_success_timestamp`, `livestop_http_request_duration_seconds{route,status}`, `livestop_cache_hits_total{result}`.
+- Metrics (Prometheus): `livestop_gtfsrt_feed_age_seconds`, `livestop_gtfsrt_poll_total{result}`, `livestop_rt_match_ratio`, `livestop_snapshot_build_seconds`, `livestop_snapshot_version`, `livestop_import_runs_total{trigger,result}`, `livestop_import_duration_seconds{result}`, `livestop_import_last_success_timestamp_seconds`, `livestop_http_request_duration_seconds{route,status}`, `livestop_cache_hits_total{result}`.
 - `/v1/health`: `ok` | `degraded` (RT feed older than 2 min by `header.timestamp`, or schedule older than 3 days) | `down` (no schedule data).
   - Always HTTP 200 while the process runs; the body carries the status. The Docker healthcheck (`livestop healthcheck`) is therefore a pure liveness check and does not restart the container during e.g. a long first import.
-  - Phase 0: `down` if the database is unreachable, else `ok`. Freshness rules are added with the importer (Phase 1) and the realtime poller (Phase 4).
+  - Rules so far: `down` if the database is unreachable or there is no live schedule (`gtfs` schema); `degraded` if the schedule was not confirmed current (import `succeeded` or `skipped`) in the last 72 h; the body carries `scheduleCheckedAt`. Realtime freshness comes with the poller (Phase 4).
 
 ## 4. Mobile architecture
 

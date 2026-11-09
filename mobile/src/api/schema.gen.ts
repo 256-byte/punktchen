@@ -80,6 +80,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start a GTFS import now (development only)
+         * @description Only enabled when the server runs with `LIVESTOP_DEV=true`; otherwise
+         *     it answers 404. Starts the import in the background and returns at
+         *     once: a full import takes minutes. The outcome is in the logs, in the
+         *     `livestop_import_*` metrics and in `meta.feed_imports`. Not for apps.
+         */
+        post: operations["triggerImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -126,6 +149,18 @@ export interface components {
             version: string;
             /** @description Server time. Clients may use it to detect clock skew. */
             time: components["schemas"]["Timestamp"];
+            /**
+             * Format: date-time
+             * @description When the schedule was last confirmed current (an import succeeded or
+             *     found the feed unchanged). Null before the first import. Older than
+             *     3 days → `degraded`.
+             * @example 2026-11-09T03:30:12+01:00
+             */
+            scheduleCheckedAt?: string | null;
+        };
+        ImportStarted: {
+            /** @enum {string} */
+            status: "started";
         };
         /**
          * @description Identifier of a map layer. More values are added with new layers.
@@ -443,6 +478,37 @@ export interface operations {
             };
             304: components["responses"]["NotModified"];
             404: components["responses"]["NotFound"];
+            default: components["responses"]["Error"];
+        };
+    };
+    triggerImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Import started. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportStarted"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            /** @description An import is already running. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             default: components["responses"]["Error"];
         };
     };
