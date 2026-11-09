@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 4 — Realtime (Phase 3 done 2026-11-09)
-- **Next task:** 4.1 GTFS-RT poller (4.0 waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
+- **Next task:** 4.2 Parser → trip-instance state (4.0 waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -44,7 +44,7 @@
 | 3 | 3.6 Station sheet | done | Tap marker → whole station; idle directions last (decision 2026-11-09); poles titled from VBB descriptions (new `Pole.description`); iPhone: sheet opens, sections correct (user) |
 | 3 | 3.7 Attribution | done | "Data: VBB (CC BY 4.0)" from `meta.attribution`: map bottom right, end of the station sheet |
 | 4 | 4.0 Realtime coverage check | in progress | Monday evening + Sunday night measured (~87 % of running trips have a real delay, U-Bahn 80–100 %); Tuesday morning and noon samples pending |
-| 4 | 4.1 GTFS-RT poller | todo | |
+| 4 | 4.1 GTFS-RT poller | done | `realtime.Poller`: 15 s, ≥ 10 s between requests, ETag/304, gzip, backoff to 2 min, Retry-After; wired in 4.4 |
 | 4 | 4.2 Parser → trip-instance state | todo | |
 | 4 | 4.3 Merge rules | todo | |
 | 4 | 4.4 Snapshot rebuild on RT change, health | todo | |
@@ -95,6 +95,14 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 4.1
+- Done: `backend/internal/transit/realtime`: `Poller` (`Run`/`Poll`) with `If-None-Match` from the last 200, gzip through net/http's transparent decompression, 20 s per-request timeout, 64 MB cap, User-Agent required (the server's `livestop/<version> (+repo URL)`), interval ≥ 10 s enforced at construction and a 10 s gap before every request (also after `Retry-After`), exponential backoff 15 s → 2 min on errors/rejected feeds, reset on success. Changed feeds go unparsed to a `Handler`; a handler error drops the ETag. `Metrics`: `livestop_gtfsrt_poll_total{result}` (all four results exported from the start).
+- Found: net/http replays an idempotent GET once when a reused keep-alive connection is closed before the answer, so one poll can send two requests (seen in the test with a dropped connection). Kept keep-alive (no TLS handshake every 10 s); the 10 s gap (6/min) leaves room under the 7/min limit. Documented in the code and ARCHITECTURE §3.3.
+- Not wired into the server yet: started in 4.4 together with the state it feeds, so the dev setup does not fetch ~9 MB per feed change for nothing.
+- Tests (acceptance: fake server): 304 path (ETag kept and sent, handler not called, 10 s gaps), gzip, error/backoff path with `Run` (500, 502, 504, 503, 503 → waits 15 s, 30 s, 1 min, 2 min, 2 min, 2 min, then 304 → 15 s; errors never reach the handler; ETag kept), Retry-After 45 s, handler error drops the ETag and backs off, size cap, timeout, config checks (no URL/UA/handler, interval < 10 s), metrics. Coverage 95.8 %. Race-clean (Docker), golangci-lint 0 issues.
+- New deps: none.
+- Next: 4.2 parser → trip-instance state (and 4.0's daytime samples on 2026-11-10).
 
 ### 2026-11-09 — task 4.0 (in progress)
 - Done so far: `gtfsexplore coverage` (new): per GTFS-RT sample, the trips scheduled to run at the feed's header time (imported schedule in the Compose db, routes serving an in-scope pole) against the feed's TripUpdates; realtime = an arrival/departure delay or `TripUpdate.delay` (DATA_MODEL §7 #18). Also: share of stop time updates with a delay / a delay ≠ 0, running trips with a delay ≠ 0, cancelled, TripUpdates for trips not running now, and how many TripUpdate trip_ids are in the imported schedule. Unit tests (`coverage_test.go`). Tool User-Agent now names the repository (provider asks for an informative one, PLAN 4.1). CLAUDE.md §5: record + coverage commands.
