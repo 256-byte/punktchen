@@ -157,9 +157,6 @@ func TestLoadWindow(t *testing.T) {
 		if w.From.Location() != berlin || w.ScheduleID == 0 {
 			t.Errorf("window %v / id %d", w.From, w.ScheduleID)
 		}
-		if got := w.ByStop(); len(got) != 1 || len(got[alpha]) != 2 {
-			t.Errorf("ByStop %v", got)
-		}
 	})
 
 	t.Run("half-open windows add up", func(t *testing.T) {

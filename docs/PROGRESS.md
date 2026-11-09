@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 2 — Schedule-based API (started 2026-11-09)
-- **Next task:** 2.3 snapshot
+- **Next task:** 2.4 transit provider
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -32,7 +32,7 @@
 | 1 | 1.8 Nearby query | done | Wedding 500 m: median 2.8 ms on the full feed |
 | 2 | 2.1 Layer registry | done | Failing layer → `down`, others still served; race-clean (Docker) |
 | 2 | 2.2 Schedule window loader | done | Range loader `[from, to)`; new derived table `trip_info` + index `stop_times(departure_secs)` |
-| 2 | 2.3 Snapshot | todo | |
+| 2 | 2.3 Snapshot | done | Builder moves the window by the new minute only; race-clean (Docker). Found: no re-import after a layout change (fixed in PR #15) |
 | 2 | 2.4 Transit provider | todo | |
 | 2 | 2.5 API handlers | todo | |
 | 2 | 2.6 Spot check vs. VBB | todo | |
@@ -75,6 +75,20 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 2.3
+- Done:
+  - `departures.Snapshot`: immutable, `Version`, `GeneratedAt`, `ScheduleID`, `From`/`To`; departures in one array grouped by pole (counting sort, stable), `Departures(stopID)` returns a capped slice so a reader's `append` cannot reach another pole; `Len()`, `Stops()`.
+  - `departures.Builder`: window `[now − 2 min, now + 90 min)`, refreshed every minute. It keeps the departures it has and loads only the new part; full load at startup, on `Reload` (the importer calls it after a changed import), when the new part comes from another `ScheduleID`, and when the clock jumped. Publishes with `atomic.Pointer`; `Current()` never blocks. A failed refresh keeps the last snapshot; the next one continues where the last good window ended.
+  - Version = Unix ms at process start, +1 per snapshot: monotonic across restarts too, so an ETag from before a restart cannot match new data (ARCHITECTURE §3.4).
+  - Metrics `livestop_snapshot_build_seconds{load}`, `livestop_snapshot_version`, `livestop_snapshot_departures`, `livestop_snapshot_refresh_failures_total`.
+  - `cmd/server`: builder runs next to the import scheduler (`runBackground` helper stops both before the pool closes).
+  - Removed `Window.ByStop()` (replaced by the snapshot). Docs: ARCHITECTURE §3.2, §3.4, §3.7; DATA_MODEL §8 now shows the real types.
+- Tests: unit with a fake loader — first refresh loads the whole window; same second → no new snapshot; moving window loads only `[old.To, new.To)` and equals a full load (steps 1 s … 89 min); new `ScheduleID` → whole window; `Reload` and clock jumps (+3 h, −2 h, −1 s) → whole window; failures keep the snapshot and recovery continues from the last good window; `ErrNoSchedule`; versions above the start time and above the previous process after a restart; old snapshots unchanged after 20 refreshes and a schedule change, `append` on a pole slice harmless; `Run` (first refresh, `Reload`, stop). **PLAN criterion:** `TestBuilderConcurrentReads` (8 readers, 300 refreshes incl. schedule changes) — `go test -race -count=3` clean in `golang:1.27.3` (Docker). Integration `TestBuilderWedding`: window moved 76 times from 23:30 across midnight equals a full load at every step (2,121 → 1,361 departures); a new import moves the snapshot to the new schedule. vet, golangci-lint 0 issues, all backend tests green.
+- Found: **re-import missing after a layout change.** The dev DB's live schedule was imported before 2.2, so it had no `trip_info`; the feed was unchanged (same SHA-256), so the importer skipped it and the builder failed every minute (`relation "gtfs.trip_info" does not exist`). Fixed separately (branch `fix/reimport-on-layout-change`, PR #15: layout stamp on the schema forces a re-import).
+- Manual check (Docker Compose, dev DB after the re-import, 2026-11-09 11:33 Berlin): first snapshot at startup with 81,705 departures at 8,470 poles in 1.68 s (cold container); one minute later an incremental refresh in 0.18 s (81,745 departures), version +1 (1794220416760 → …761 = start time in Unix ms), 0 failures. Metrics visible on `:9090/metrics`.
+- New deps (+ why): none.
+- Next: 2.4 transit provider.
 
 ### 2026-11-09 — fix: re-import after a layout change
 - Found during 2.3: the dev DB's live schedule was imported before 2.2 (no `trip_info`). The feed was unchanged (same SHA-256), so every import was `skipped` and the departures loader failed with `relation "gtfs.trip_info" does not exist`. The same would happen after every change to `db/gtfs/*.sql`, and after a lost live schema while `meta.feed_imports` still lists the feed.

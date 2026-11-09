@@ -56,9 +56,9 @@ All backend parts live in **one binary** (modular monolith, ADR-0002). Package b
 
 ### 3.2 `transit/departures` — schedule window
 
-- Every 60 s, load all scheduled departures for **in-scope stops** in `[now - 2 min, now + 90 min]` from Postgres.
+- Every 60 s, the snapshot builder (task 2.3, `departures.Builder`) moves its window to `[now − 2 min, now + 90 min)` (scheduled departures at **in-scope stops**). It drops the departures that fell out at the start and loads only the new part at the end (~1 min, ~70 ms on the full feed). The whole window is loaded at startup, after an import (the importer calls `Reload`; a changed `ScheduleID` on the new part triggers the same), and when the clock jumped. A failed refresh keeps the last snapshot.
 - Must handle: service days (`calendar` + `calendar_dates`), times ≥ 24:00:00 (trip belongs to the previous service day), DST (GTFS times are relative to "noon minus 12h" of the service day).
-- Result: `map[stopID][]ScheduledDeparture` sorted by time.
+- Result: departures grouped by pole (`Snapshot.Departures(stopID)`), each list sorted by time.
 - `departures.Loader.Load(ctx, from, to)` (task 2.2) loads any half-open window `[from, to)`; adjacent windows never share a departure, so the refresh can load just the new minute instead of the whole window.
   - Go splits the window into one seconds range per service day that can reach it: service day start = noon − 12 h in Europe/Berlin, looking back as many days as the feed's largest stop time needs (`max(departure_secs)`, VBB 31:17:00 → yesterday).
   - One SQL query per service day (`ScheduledDepartures`): `stop_times` by `departure_secs` index, joined with `trip_info` and `service_dates` of that day, in-scope poles only. Left out: the trip's last stop (arrival only) and `pickup_type = 1`.
@@ -89,8 +89,8 @@ Every time either the schedule window or the RT state changes:
    - stops **before** the first update → keep schedule.
    - `SKIPPED` stop → remove that departure.
 3. Set `source = realtime | scheduled` per departure. VBB fills events without realtime data from the schedule (`time` without `delay`), so only events with `delay` count as `realtime` (DATA_MODEL §7 #18). `stop_id`s that are bare station numbers match by `stop_sequence`.
-4. Build an immutable `Snapshot{Version, GeneratedAt, RealtimeFeedTime, ByStop}` and publish with `atomic.Pointer[Snapshot]` (ADR-0005). Readers are lock-free.
-5. `Version` increments monotonically; it is part of cache keys and ETags.
+4. Build an immutable `Snapshot{Version, GeneratedAt, ScheduleID, From, To, departures by pole}` and publish with `atomic.Pointer[Snapshot]` (ADR-0005). Readers are lock-free. All departures sit in one array grouped by pole; each pole gets a capped slice of it, so a reader cannot change another pole by appending. `RealtimeFeedTime` comes with Phase 4 (task 4.4).
+5. `Version` increments monotonically; it is part of cache keys and ETags. It starts at the Unix time in milliseconds when the process starts, so it also keeps increasing across restarts and an ETag from before a restart cannot match new data. Until Phase 4 a new snapshot is published once a minute (the window moves).
 
 ### 3.5 `layer` — generic provider system (ADR-0008)
 
@@ -128,7 +128,7 @@ type Provider interface {
 ### 3.7 Observability
 
 - Logs: `log/slog` JSON, one line per request, plus component logs with `component=` attribute.
-- Metrics (Prometheus): `livestop_gtfsrt_feed_age_seconds`, `livestop_gtfsrt_poll_total{result}`, `livestop_rt_match_ratio`, `livestop_snapshot_build_seconds`, `livestop_snapshot_version`, `livestop_import_runs_total{trigger,result}`, `livestop_import_duration_seconds{result}`, `livestop_import_last_success_timestamp_seconds`, `livestop_http_request_duration_seconds{route,status}`, `livestop_cache_hits_total{result}`.
+- Metrics (Prometheus): `livestop_gtfsrt_feed_age_seconds`, `livestop_gtfsrt_poll_total{result}`, `livestop_rt_match_ratio`, `livestop_snapshot_build_seconds{load}`, `livestop_snapshot_version`, `livestop_snapshot_departures`, `livestop_snapshot_refresh_failures_total`, `livestop_import_runs_total{trigger,result}`, `livestop_import_duration_seconds{result}`, `livestop_import_last_success_timestamp_seconds`, `livestop_http_request_duration_seconds{route,status}`, `livestop_cache_hits_total{result}`.
 - `/v1/health`: `ok` | `degraded` (RT feed older than 2 min by `header.timestamp`, or schedule older than 3 days) | `down` (no schedule data).
   - Always HTTP 200 while the process runs; the body carries the status. The Docker healthcheck (`livestop healthcheck`) is therefore a pure liveness check and does not restart the container during e.g. a long first import.
   - Rules so far: `down` if the database is unreachable or there is no live schedule (`gtfs` schema); `degraded` if the schedule was not confirmed current (import `succeeded` or `skipped`) in the last 72 h; the body carries `scheduleCheckedAt`. Realtime freshness comes with the poller (Phase 4).
