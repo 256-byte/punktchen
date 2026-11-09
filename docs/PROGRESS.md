@@ -4,8 +4,8 @@
 
 ## Current status
 
-- **Active phase:** Phase 2 — Schedule-based API (started 2026-11-09)
-- **Next task:** 2.6 spot check vs. VBB
+- **Active phase:** Phase 3 — Mobile MVP (Phase 2 done 2026-11-09)
+- **Next task:** 3.1 `src/core` (time, countdown, labels, staleness, fetch policy)
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -35,7 +35,14 @@
 | 2 | 2.3 Snapshot | done | Builder moves the window by the new minute only; race-clean (Docker). Found: no re-import after a layout change (fixed in PR #15) |
 | 2 | 2.4 Transit provider | done | Golden JSON for Wedding; directions merged + trimmed (174 → 51 at Wedding); colours incl. VBB list |
 | 2 | 2.5 API handlers | done | Contract tests validate every response against openapi.yaml (kin-openapi); ETag/cell stay for Phase 5 |
-| 2 | 2.6 Spot check vs. VBB | todo | |
+| 2 | 2.6 Spot check vs. VBB | done | 5 stations, 69 directions: all scheduled times match fahrinfo.vbb.de |
+| 3 | 3.1 `src/core` | todo | |
+| 3 | 3.2 API client + `useNearby` | todo | |
+| 3 | 3.3 Location | todo | |
+| 3 | 3.4 Map screen | todo | |
+| 3 | 3.5 Transit layer markers | todo | |
+| 3 | 3.6 Station sheet | todo | |
+| 3 | 3.7 Attribution | todo | |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
 
@@ -66,6 +73,7 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 | 1 | Server for deployment | user | later |
 | 2 | Alert sources: format/terms of VBB Verkehrsmeldungen | Claude Code (research) | Phase 8 |
 | 3 | Final app name | user | Phase 7 |
+| 4 | Lines suspended for weeks (e.g. RE at Alexanderplatz until 2026-12-13) are listed with an empty departure list. Keep (rider sees the line exists), or list a direction only if it runs within the next N days? | user | Phase 3 (3.5 markers) |
 
 ## Session log
 
@@ -77,6 +85,26 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 2.6
+- Done: manual spot check of `/v1/stations/{id}` (dev DB, live feed sha256 `d9625924…`, files of 2026-11-05; snapshot 13:06) against VBB's official departure board (https://fahrinfo.vbb.de/webapp, tab "Abfahrten", Monday 2026-11-09 ~13:08–13:15). VBB shows the scheduled time with the delay separately (`13:10 +2 Minuten`), so scheduled times compare directly. Compared every departure both lists show (ours: up to 10 per direction within the 92-min window).
+
+  | Station | Modes checked | Directions | Result |
+  |---|---|---|---|
+  | S+U Wedding (`de:11000:900009104`) | S15, S41/S42 Ring, U6, bus 120/147 | 10 | all times match |
+  | S+U Alexanderplatz Bhf (`de:11000:900100003`) | S3, S5, S7, S9, U2, U5, U8; no regional today | 19 | all times match |
+  | U Eberswalder Str. (`de:11000:900110006`) | U2, tram M10, replacement buses M1/12 | 8 | all times match |
+  | S Wannsee Bhf (`de:11000:900053301`) | RE1, RE7, RB21, RB37, S1, S7, 8 bus lines, ferry F10 | 23 | all times match |
+  | U Hermannplatz/Sonnenallee (`de:11000:900078105`) | bus M29, M41, 171, 194 | 9 | all times match |
+
+  **69 directions, 0 scheduled-time differences.** Also matched: U6 north ends at U Kurt-Schumacher-Platz today (VBB too), S42 13:23/13:28 exist in the schedule (VBB: cancelled, realtime).
+- Differences that are not times (DATA_MODEL §7 #27):
+  - Lines suspended for weeks are listed with an empty departure list (the "most frequent direction" fallback of §3.2): RE2/RE7/RB14/RB23 at Alexanderplatz (feed: no stop there until 2026-12-13), trams M1/12 at Eberswalder Str. (replacement buses run). VBB does not list them. → open question #4.
+  - Headsigns: RE1 "Hauptbahnhof" (VBB: "Magdeburg, Hauptbahnhof") and 114 "S Wannsee Bhf" (loop; VBB: "Heckeshorn") come from the GTFS `trip_headsign` itself; 147 "S Ostbahnhof" (VBB adds "via S+U Hauptbahnhof").
+  - VBB's board for a station also lists nearby stops (Alexanderplatz/Gontardstr. trams, S Wedding/Martha-Ndumbe-Platz bus M27/247, U Hermannplatz U7/U8); we keep them as separate stations (DHID, §7 #4, #23). Long-distance trains (e.g. 1321 at Wannsee) are not in the VBB GTFS.
+- Tests: manual (this check); no code changed.
+- New deps (+ why): none.
+- Next: Phase 2 done. Phase 3 (mobile MVP) starts with 3.1 `src/core`.
 
 ### 2026-11-09 — task 2.5
 - Done:
