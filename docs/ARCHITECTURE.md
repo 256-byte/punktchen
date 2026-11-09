@@ -206,7 +206,11 @@ interface MapLayer<TFeature> {
 
 The map screen iterates over enabled layers; it does not know what a "departure" is.
 
-Built in task 3.4 (`src/layers/registry.ts`, `src/layers/index.ts`) with `id`, `select`, `key` and `Marker` (no `now` yet); `now` comes with the 1 s ticker (3.5), `Sheet` with the station sheet (3.6), `refresh` with the fetch policy (5.4). `defineLayer<T>()` hides a layer's feature type in the list (`AnyMapLayer`): the screen only hands a layer its own features. The transit layer draws one plain pin per station until the pole markers (3.5).
+Built in task 3.4 (`src/layers/registry.ts`, `src/layers/index.ts`) with `id`, `select`, `key` and `Marker`; `Sheet` comes with the station sheet (3.6), `refresh` with the fetch policy (5.4). `defineLayer<T>()` hides a layer's feature type in the list (`AnyMapLayer`): the screen only hands a layer its own features.
+
+`now` is not a prop (task 3.5): a prop would re-render the map screen and every marker each second. Components read it from the clock store (`src/state/clock.ts`) with `useNow(select)`, which re-renders only when the selected value changes. One `setInterval` (1 s) ticks the store while the map is shown, plus a tick when the app returns to the foreground; "now" includes the server clock offset of the last `/v1/nearby` answer (ADR-0007).
+
+Transit layer (task 3.5, `src/layers/transit`): one feature per **pole** (`{ station, pole }`), drawn by `PoleMarker`: up to 4 rows (line badge, headsign, countdown to the next running departure, "—" when none is left), then "+N more". Badge colour = API `color`, else a per-mode default (`MODE_COLORS` in `src/core/directions.ts`; tram/bus/ferry from VBB's generic rows); badge text white unless white has < 3:1 contrast. Its accessibility label reads station and rows.
 
 Map screen (`src/ui/MapScreen.tsx`, task 3.4):
 - Opens centred on the position (`initialRegion`, 500 m around it) and follows the device position until the user drags the map (`onPanDrag`; `isGesture` of `onRegionChangeComplete` is Google Maps only). In "map center" mode the camera never moves by itself.
@@ -217,8 +221,8 @@ Map screen (`src/ui/MapScreen.tsx`, task 3.4):
 
 ### 4.5 Map performance rules
 
-- Re-render markers only when the **displayed minute** changes, not every second.
-- `react-native-maps` custom markers: keep `tracksViewChanges` false except right after content changes.
+- Re-render markers only when the **displayed minute** changes, not every second. (`PoleMarker` selects its labels from the clock store; tested with a React Profiler: no render for 59 ticks, one when a label changes.)
+- `react-native-maps` custom markers: keep `tracksViewChanges` false except right after content changes (`PoleMarker`: on for 500 ms after its rows or labels change; only Google Maps uses it, Apple Maps ignores it).
 - Cluster / hide poles at low zoom; show at most next departure per direction on the marker; the rest in the sheet.
 
 ### 4.6 Tooling and tests

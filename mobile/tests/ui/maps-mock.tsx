@@ -1,5 +1,5 @@
 // Stand-in for react-native-maps (jest.mock factory): MapView records its
-// props and camera calls; Marker renders its title as text.
+// props and camera calls; Marker renders its title and children.
 import { jest } from '@jest/globals';
 import { forwardRef, type ReactNode, useImperativeHandle } from 'react';
 import { Text, View } from 'react-native';
@@ -24,8 +24,22 @@ const MapView = forwardRef<unknown, Props>(function MapView(props, ref) {
   return <View testID="map">{props.children}</View>;
 });
 
-function Marker({ title }: { title?: string }) {
-  return <Text>pin {title}</Text>;
+/** Renders its children; tracksViewChanges is readable from the host view's props. */
+function Marker({
+  title,
+  tracksViewChanges,
+  children,
+}: {
+  title?: string;
+  tracksViewChanges?: boolean;
+  children?: ReactNode;
+}) {
+  return (
+    <View testID="marker" {...{ tracksViewChanges }}>
+      {title ? <Text>pin {title}</Text> : null}
+      {children}
+    </View>
+  );
 }
 
 export const mapsMock = { __esModule: true, default: MapView, Marker };

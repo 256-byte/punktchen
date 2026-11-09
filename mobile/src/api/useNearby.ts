@@ -43,5 +43,9 @@ export function useNearby(client: ApiClient | null, params: NearbyParams | null)
     placeholderData: keepPreviousData,
     retry: false,
     staleTime: MAX_DATA_AGE_MS,
+    // Interim until the fetch policy is wired (5.4): refresh every 30 s, so
+    // countdowns keep their next departures. JS timers do not run while the
+    // app is in the background.
+    refetchInterval: MAX_DATA_AGE_MS,
   });
 }

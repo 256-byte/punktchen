@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 3 — Mobile MVP (Phase 2 done 2026-11-09)
-- **Next task:** 3.5 Transit layer markers (next departure per direction, 1 s ticker, minute-level re-render)
+- **Next task:** 3.6 Station sheet (`@gorhom/bottom-sheet`, all poles/directions/next departures)
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -38,9 +38,9 @@
 | 2 | 2.6 Spot check vs. VBB | done | 5 stations, 69 directions: all scheduled times match fahrinfo.vbb.de |
 | 3 | 3.1 `src/core` | done | time, departures, staleness, geo, fetch policy; coverage 100 % (gate 90 % in `npm test`) |
 | 3 | 3.2 API client + `useNearby` | done | 304 keeps the same response object, new `checkedAt`; backend sends ETags from 5.3 |
-| 3 | 3.3 Location | done | Denied → explanation + "Allow location"/"Open settings" + "Use map center"; fixes kept from 25 m moves; not yet tried on a phone |
-| 3 | 3.4 Map screen | done | Opens centred on the user, follows until a drag; layer registry with a plain station pin; request centre moves after > 150 m; not yet tried on a phone |
-| 3 | 3.5 Transit layer markers | todo | |
+| 3 | 3.3 Location | done | Denied → explanation + "Allow location"/"Open settings" + "Use map center"; fixes kept from 25 m moves; iPhone: prompt + map OK (user, 2026-11-09) |
+| 3 | 3.4 Map screen | done | Opens centred on the user, follows until a drag; layer registry with a plain station pin; request centre moves after > 150 m; iPhone: opens on the user, pins shown (user, 2026-11-09) |
+| 3 | 3.5 Transit layer markers | done | One marker per pole, up to 4 rows; labels re-render once a minute (Profiler test); iPhone: countdowns and "now" update correctly (user, 2026-11-09) |
 | 3 | 3.6 Station sheet | todo | |
 | 3 | 3.7 Attribution | todo | |
 
@@ -85,6 +85,15 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 3.5
+- Manual check of 3.3/3.4 by the user (iPhone, Expo Go): location prompt shown and granted, map (Apple Maps) opens at the user, station pins shown, no problems seen.
+- Done: `src/core/directions.ts` (pure: `MODE_COLORS` defaults, `badgeColor`, `textColorOn` (white unless < 3:1), `directionKey`, `markerDirections` (4 rows + "+N"), `nextLabels`), `src/state/clock.ts` (clock store, `useNow(select)`, `useClockTicker`: 1 s interval + tick on foreground, server clock offset), `src/layers/transit/PoleMarker.tsx` (one marker per pole: badge, headsign, countdown, "—" when nothing is left; `tracksViewChanges` for 500 ms after a change; accessibility label), transit layer now selects poles (`PoleFeature`). Map screen runs the ticker and passes the offset. The 3.4 placeholder `StationMarker.tsx` is removed. Interim: `useNearby` refetches every 30 s until the fetch policy is wired (5.4), so countdowns keep their departures.
+- Tests: Vitest `src/core/directions.test.ts` (13; core coverage 100 %). Jest `tests/ui/transit-markers.test.tsx` (7): rows/labels/"+1 more"/accessibility, countdown moves on to the next departure, **no re-render for 59 ticks, exactly one when a label changes** (React Profiler), `tracksViewChanges` on/off, one marker per pole, ticker with offset. Map screen tests use poles now. Typecheck, lint pass.
+- Found: minutes are rounded down, so a departure at 14:33 shows "3 min" only at 14:30:00 sharp and "2 min" from 14:30:01; labels change just after the whole minute.
+- Manual check (user, iPhone, Expo Go, an S1 station in south-west Berlin): all directions of the pole in one marker, one row each (Wannsee, Zehlendorf, Frohnau, Oranienburg), countdowns count down each minute, "now" shows correctly, no jank seen. Acceptance met.
+- New deps: none.
+- Next: 3.6 station sheet.
 
 ### 2026-11-09 — task 3.4
 - Done: `src/layers/registry.ts` (`MapLayer` with id/select/key/Marker, `defineLayer`), `src/layers/transit` (selects stations, plain pin per station until 3.5), `src/layers/index.ts` (`mapLayers`), `src/ui/MapScreen.tsx` (react-native-maps: opens centred on the position, follows the device until a drag, reports its centre to the store, `/v1/nearby` around a request centre, backend-missing and error cards), home screen = location gate → map. Core: `regionAround` (geo), `nextRequestCenter` (fetch policy: moves after > 150 m). `useNearby` accepts a null client (backend not configured → no request).
