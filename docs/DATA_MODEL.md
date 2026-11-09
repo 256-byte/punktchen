@@ -216,6 +216,16 @@ Rules: `radius` 100–1000 (default 500). `layers` comma-separated, default `tra
 
 `{ "error": { "code": "invalid_argument", "message": "radius must be between 100 and 1000" } }` with matching HTTP status.
 
+| Status | `code` | When |
+|---|---|---|
+| 400 | `invalid_argument` | bad or missing parameters (all problems in one message, e.g. `lat must be between -90 and 90; radius must be between 100 and 1000`), unknown or repeated layer |
+| 404 | `not_found` | unknown path; station with no served pole in scope |
+| 409 | `conflict` | `/internal/import` while an import runs |
+| 500 | `internal` | unexpected error (details only in the log) |
+| 503 | `unavailable` | station sheet before the first departures snapshot |
+
+`/v1/nearby` does not fail when a layer has no data: 200, the layer is `down` in `meta.layers` and missing from `layers` (task 2.5).
+
 ### 5.4 Caching headers
 
 - `ETag` on every `/v1/nearby` and `/v1/stations/*` response; `304` on match.
