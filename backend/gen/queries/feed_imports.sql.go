@@ -7,7 +7,39 @@ package queries
 
 import (
 	"context"
+	"encoding/json"
 )
+
+const finishFeedImport = `-- name: FinishFeedImport :execrows
+UPDATE meta.feed_imports
+SET status      = $1,
+    finished_at = now(),
+    row_counts  = $2,
+    error       = $3
+WHERE id = $4
+  AND status = 'running'
+`
+
+type FinishFeedImportParams struct {
+	Status    string
+	RowCounts json.RawMessage
+	Error     *string
+	ID        int64
+}
+
+// Closes a running attempt. Affects 0 rows if it was already finished.
+func (q *Queries) FinishFeedImport(ctx context.Context, arg FinishFeedImportParams) (int64, error) {
+	result, err := q.db.Exec(ctx, finishFeedImport,
+		arg.Status,
+		arg.RowCounts,
+		arg.Error,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
 
 const lastSuccessfulFeedImport = `-- name: LastSuccessfulFeedImport :one
 SELECT id, source, url, etag, last_modified, sha256, started_at, finished_at, status, row_counts, error
@@ -37,4 +69,55 @@ func (q *Queries) LastSuccessfulFeedImport(ctx context.Context, source string) (
 		&i.Error,
 	)
 	return i, err
+}
+
+const recordFeedDownload = `-- name: RecordFeedDownload :execrows
+UPDATE meta.feed_imports
+SET etag          = $1,
+    last_modified = $2,
+    sha256        = $3
+WHERE id = $4
+  AND status = 'running'
+`
+
+type RecordFeedDownloadParams struct {
+	Etag         *string
+	LastModified *string
+	SHA256       *string
+	ID           int64
+}
+
+// Stores the validators as received and the hash of the downloaded file
+// (hash NULL after 304 Not Modified: nothing was downloaded).
+func (q *Queries) RecordFeedDownload(ctx context.Context, arg RecordFeedDownloadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, recordFeedDownload,
+		arg.Etag,
+		arg.LastModified,
+		arg.SHA256,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const startFeedImport = `-- name: StartFeedImport :one
+INSERT INTO meta.feed_imports (source, url, status)
+VALUES ($1, $2, 'running')
+RETURNING id
+`
+
+type StartFeedImportParams struct {
+	Source string
+	URL    string
+}
+
+// Opens an attempt before anything is downloaded, so failed downloads are
+// logged too.
+func (q *Queries) StartFeedImport(ctx context.Context, arg StartFeedImportParams) (int64, error) {
+	row := q.db.QueryRow(ctx, startFeedImport, arg.Source, arg.URL)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }

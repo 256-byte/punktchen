@@ -107,6 +107,8 @@ docker compose down                          # stop; data stays in volume livest
 go -C backend vet ./...
 go -C backend test ./...                     # unit + integration tests (starts PostGIS containers)
 go -C backend test -short ./...              # unit tests only, no Docker
+$env:LIVESTOP_LIVE_TESTS='1'; go -C backend test -run Live ./...; Remove-Item Env:LIVESTOP_LIVE_TESTS
+                                             # tests against real VBB servers (downloads ~170 MB); never in CI
 docker run --rm -v "${PWD}\backend:/app" -v golangci-cache:/root/.cache -w /app golangci/golangci-lint:v2.15.0 golangci-lint run ./...
                                              # lint: same version as CI, config backend/.golangci.yml (incl. gofmt)
 
