@@ -1,0 +1,112 @@
+== vbb-20261108T225938Z-wedding.pb
+feed time 2026-11-08T22:59:40Z, stats {TripUpdates:484 Kept:484 Duplicates:0 Deleted:0 NoTripKey:0 Unsupported:0}
+trips 484 (canceled 0, realtime 57), by service day: 2026-11-08=76 2026-11-09=408
+stop updates 7577 (stop_sequence 7558, with delay 1349, skipped 15, no data 4)
+trip 295886395 2026-11-08 route 28571_109 canceled=false delay=- updated 2026-11-08T22:59:39Z
+  seq   0 de:11000:900007102:1:51    arr 23:53:54/- dep 23:53:00/-
+  seq   1 de:11000:900009104:1:51    arr 23:55:00/- dep 23:56:00/-
+  seq   2 de:11000:900003200:5:58    arr 23:59:00/- dep 23:59:42/-
+trip 310886899 2026-11-08 route 17526_400 canceled=false delay=- updated 2026-11-08T22:08:38Z
+  seq   0 de:11000:900062202::2      arr 23:04:30/- dep 23:04:00/+0s
+  seq   1 de:11000:900062203::2      arr 23:05:00/+0s dep 23:05:00/+0s
+  seq   2 de:11000:900061101::2      arr 23:07:00/+0s dep 23:07:00/+0s
+  seq   3 de:11000:900061102::2      arr 23:08:00/+0s dep 23:08:00/+0s
+  seq   4 de:11000:900044202::2      arr 23:09:00/+0s dep 23:09:00/+0s
+  seq   5 de:11000:900044201::3      arr 23:11:00/+0s dep 23:11:00/+0s
+  seq   6 de:11000:900043201::1      arr 23:13:00/+0s dep 23:13:00/+0s
+  seq   7 de:11000:900042101::4      arr 23:14:00/+0s dep 23:14:00/+0s
+  seq   8 de:11000:900023203::4      arr 23:15:00/+0s dep 23:15:00/+0s
+  seq   9 de:11000:900023201::4      arr 23:17:00/+0s dep 23:17:00/+0s
+  seq  10 de:11000:900003101::2      arr 23:19:00/+0s dep 23:19:00/+0s
+  seq  11 de:11000:900003104::2      arr 23:20:00/+0s dep 23:20:00/+0s
+  seq  12 de:11000:900002201::2      arr 23:22:00/+0s dep 23:22:00/+0s
+  seq  13 de:11000:900001201::2      arr 23:23:00/+0s dep 23:23:00/+0s
+  seq  14 de:11000:900009101::2      arr 23:24:00/+0s dep 23:24:00/+0s
+  seq  15 de:11000:900009102::4      arr 23:26:00/+0s dep 23:26:00/+0s
+  seq  16 de:11000:900009201::2      arr 23:27:00/+0s dep 23:27:00/+0s
+  seq  17 de:11000:900009202::4      arr 23:28:00/+0s dep 23:28:30/-
+== vbb-20261108T225953Z-wedding.pb
+feed time 2026-11-08T22:59:44Z, stats {TripUpdates:486 Kept:486 Duplicates:0 Deleted:0 NoTripKey:0 Unsupported:0}
+trips 486 (canceled 0, realtime 57), by service day: 2026-11-08=76 2026-11-09=410
+stop updates 7633 (stop_sequence 7614, with delay 1349, skipped 15, no data 4)
+trip 295886395 2026-11-08 route 28571_109 canceled=false delay=- updated 2026-11-08T22:59:39Z
+  seq   0 de:11000:900007102:1:51    arr 23:53:54/- dep 23:53:00/-
+  seq   1 de:11000:900009104:1:51    arr 23:55:00/- dep 23:56:00/-
+  seq   2 de:11000:900003200:5:58    arr 23:59:00/- dep 23:59:42/-
+trip 310886899 2026-11-08 route 17526_400 canceled=false delay=- updated 2026-11-08T22:08:38Z
+  seq   0 de:11000:900062202::2      arr 23:04:30/- dep 23:04:00/+0s
+  seq   1 de:11000:900062203::2      arr 23:05:00/+0s dep 23:05:00/+0s
+  seq   2 de:11000:900061101::2      arr 23:07:00/+0s dep 23:07:00/+0s
+  seq   3 de:11000:900061102::2      arr 23:08:00/+0s dep 23:08:00/+0s
+  seq   4 de:11000:900044202::2      arr 23:09:00/+0s dep 23:09:00/+0s
+  seq   5 de:11000:900044201::3      arr 23:11:00/+0s dep 23:11:00/+0s
+  seq   6 de:11000:900043201::1      arr 23:13:00/+0s dep 23:13:00/+0s
+  seq   7 de:11000:900042101::4      arr 23:14:00/+0s dep 23:14:00/+0s
+  seq   8 de:11000:900023203::4      arr 23:15:00/+0s dep 23:15:00/+0s
+  seq   9 de:11000:900023201::4      arr 23:17:00/+0s dep 23:17:00/+0s
+  seq  10 de:11000:900003101::2      arr 23:19:00/+0s dep 23:19:00/+0s
+  seq  11 de:11000:900003104::2      arr 23:20:00/+0s dep 23:20:00/+0s
+  seq  12 de:11000:900002201::2      arr 23:22:00/+0s dep 23:22:00/+0s
+  seq  13 de:11000:900001201::2      arr 23:23:00/+0s dep 23:23:00/+0s
+  seq  14 de:11000:900009101::2      arr 23:24:00/+0s dep 23:24:00/+0s
+  seq  15 de:11000:900009102::4      arr 23:26:00/+0s dep 23:26:00/+0s
+  seq  16 de:11000:900009201::2      arr 23:27:00/+0s dep 23:27:00/+0s
+  seq  17 de:11000:900009202::4      arr 23:28:00/+0s dep 23:28:30/-
+== vbb-20261108T230009Z-wedding.pb
+feed time 2026-11-08T23:00:06Z, stats {TripUpdates:488 Kept:488 Duplicates:0 Deleted:0 NoTripKey:0 Unsupported:0}
+trips 488 (canceled 0, realtime 59), by service day: 2026-11-08=78 2026-11-09=410
+stop updates 7684 (stop_sequence 7664, with delay 1399, skipped 15, no data 4)
+trip 295886395 2026-11-08 route 28571_109 canceled=false delay=- updated 2026-11-08T22:59:39Z
+  seq   0 de:11000:900007102:1:51    arr 23:53:54/- dep 23:53:00/-
+  seq   1 de:11000:900009104:1:51    arr 23:55:00/- dep 23:56:00/-
+  seq   2 de:11000:900003200:5:58    arr 23:59:00/- dep 23:59:42/-
+trip 310886899 2026-11-08 route 17526_400 canceled=false delay=- updated 2026-11-08T22:08:38Z
+  seq   0 de:11000:900062202::2      arr 23:04:30/- dep 23:04:00/+0s
+  seq   1 de:11000:900062203::2      arr 23:05:00/+0s dep 23:05:00/+0s
+  seq   2 de:11000:900061101::2      arr 23:07:00/+0s dep 23:07:00/+0s
+  seq   3 de:11000:900061102::2      arr 23:08:00/+0s dep 23:08:00/+0s
+  seq   4 de:11000:900044202::2      arr 23:09:00/+0s dep 23:09:00/+0s
+  seq   5 de:11000:900044201::3      arr 23:11:00/+0s dep 23:11:00/+0s
+  seq   6 de:11000:900043201::1      arr 23:13:00/+0s dep 23:13:00/+0s
+  seq   7 de:11000:900042101::4      arr 23:14:00/+0s dep 23:14:00/+0s
+  seq   8 de:11000:900023203::4      arr 23:15:00/+0s dep 23:15:00/+0s
+  seq   9 de:11000:900023201::4      arr 23:17:00/+0s dep 23:17:00/+0s
+  seq  10 de:11000:900003101::2      arr 23:19:00/+0s dep 23:19:00/+0s
+  seq  11 de:11000:900003104::2      arr 23:20:00/+0s dep 23:20:00/+0s
+  seq  12 de:11000:900002201::2      arr 23:22:00/+0s dep 23:22:00/+0s
+  seq  13 de:11000:900001201::2      arr 23:23:00/+0s dep 23:23:00/+0s
+  seq  14 de:11000:900009101::2      arr 23:24:00/+0s dep 23:24:00/+0s
+  seq  15 de:11000:900009102::4      arr 23:26:00/+0s dep 23:26:00/+0s
+  seq  16 de:11000:900009201::2      arr 23:27:00/+0s dep 23:27:00/+0s
+  seq  17 de:11000:900009202::4      arr 23:28:00/+0s dep 23:28:30/-
+== vbb-20261108T230040Z-wedding.pb
+feed time 2026-11-08T23:00:36Z, stats {TripUpdates:488 Kept:488 Duplicates:0 Deleted:0 NoTripKey:0 Unsupported:0}
+trips 488 (canceled 0, realtime 59), by service day: 2026-11-08=78 2026-11-09=410
+stop updates 7684 (stop_sequence 7664, with delay 1383, skipped 15, no data 4)
+trip 295886395 2026-11-08 route 28571_109 canceled=false delay=- updated 2026-11-08T22:59:39Z
+  seq   0 de:11000:900007102:1:51    arr 23:53:54/- dep 23:53:00/-
+  seq   1 de:11000:900009104:1:51    arr 23:55:00/- dep 23:56:00/-
+  seq   2 de:11000:900003200:5:58    arr 23:59:00/- dep 23:59:42/-
+trip 310886899 2026-11-08 route 17526_400 canceled=false delay=- updated 2026-11-08T22:08:38Z
+  seq   0 de:11000:900062202::2      arr 23:04:30/- dep 23:04:00/+0s
+  seq   1 de:11000:900062203::2      arr 23:05:00/+0s dep 23:05:00/+0s
+  seq   2 de:11000:900061101::2      arr 23:07:00/+0s dep 23:07:00/+0s
+  seq   3 de:11000:900061102::2      arr 23:08:00/+0s dep 23:08:00/+0s
+  seq   4 de:11000:900044202::2      arr 23:09:00/+0s dep 23:09:00/+0s
+  seq   5 de:11000:900044201::3      arr 23:11:00/+0s dep 23:11:00/+0s
+  seq   6 de:11000:900043201::1      arr 23:13:00/+0s dep 23:13:00/+0s
+  seq   7 de:11000:900042101::4      arr 23:14:00/+0s dep 23:14:00/+0s
+  seq   8 de:11000:900023203::4      arr 23:15:00/+0s dep 23:15:00/+0s
+  seq   9 de:11000:900023201::4      arr 23:17:00/+0s dep 23:17:00/+0s
+  seq  10 de:11000:900003101::2      arr 23:19:00/+0s dep 23:19:00/+0s
+  seq  11 de:11000:900003104::2      arr 23:20:00/+0s dep 23:20:00/+0s
+  seq  12 de:11000:900002201::2      arr 23:22:00/+0s dep 23:22:00/+0s
+  seq  13 de:11000:900001201::2      arr 23:23:00/+0s dep 23:23:00/+0s
+  seq  14 de:11000:900009101::2      arr 23:24:00/+0s dep 23:24:00/+0s
+  seq  15 de:11000:900009102::4      arr 23:26:00/+0s dep 23:26:00/+0s
+  seq  16 de:11000:900009201::2      arr 23:27:00/+0s dep 23:27:00/+0s
+  seq  17 de:11000:900009202::4      arr 23:28:00/+0s dep 23:28:30/-
+== vbb-empty-stale.pb
+feed time 2026-10-30T19:04:09Z, stats {TripUpdates:0 Kept:0 Duplicates:0 Deleted:0 NoTripKey:0 Unsupported:0}
+trips 0 (canceled 0, realtime 0), by service day:
+stop updates 0 (stop_sequence 0, with delay 0, skipped 0, no data 0)

@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 4 — Realtime (Phase 3 done 2026-11-09)
-- **Next task:** 4.2 Parser → trip-instance state (4.0 waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
+- **Next task:** 4.3 Merge rules (4.0 waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -45,7 +45,7 @@
 | 3 | 3.7 Attribution | done | "Data: VBB (CC BY 4.0)" from `meta.attribution`: map bottom right, end of the station sheet |
 | 4 | 4.0 Realtime coverage check | in progress | Monday evening + Sunday night measured (~87 % of running trips have a real delay, U-Bahn 80–100 %); Tuesday morning and noon samples pending |
 | 4 | 4.1 GTFS-RT poller | done | `realtime.Poller`: 15 s, ≥ 10 s between requests, ETag/304, gzip, backoff to 2 min, Retry-After; wired in 4.4 |
-| 4 | 4.2 Parser → trip-instance state | todo | |
+| 4 | 4.2 Parser → trip-instance state | done | `realtime.Parse` + `Store`: key (trip_id, start_date), latest wins, empty feed keeps the state; golden on the recorded feeds |
 | 4 | 4.3 Merge rules | todo | |
 | 4 | 4.4 Snapshot rebuild on RT change, health | todo | |
 | 4 | 4.5 Mobile: delay, realtime indicator, cancelled | todo | |
@@ -95,6 +95,13 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 4.2
+- Done: `realtime.Parse` (FeedMessage → immutable `State` keyed by `TripKey{trip_id, service day of start_date}`; per stop update sequence/stop_id/SKIPPED/NO_DATA/arrival/departure with time and delay; latest of a trip instance wins by TripUpdate.timestamp; skips is_deleted, bad keys, ADDED/UNSCHEDULED/DUPLICATED/DELETED trips and counts them in `ParseStats`; errors for undecodable, DIFFERENTIAL or timestamp-less feeds). `realtime.Store`: `Apply` (the poller's `Handler`) → applied / no_data (no trip updates: keep the state) / outdated (header.timestamp not newer); `Current()` lock-free via `atomic.Pointer`. `TripUpdate.Realtime()` = trip delay or any event delay.
+- Data facts (DATA_MODEL §7 #29): trip_id, start_date and TripUpdate.timestamp always set, no duplicate trip instances, only SCHEDULED/CANCELED, stop_sequence increasing (missing on 1.2 %), one feed covers today and tomorrow (19:46: 4,183 + 4,358 TripUpdates), some first stops arrive after they depart.
+- Tests (acceptance: golden on recorded feeds incl. `vbb-empty-stale.pb`): `testdata/parse.golden.txt` (summary + first/last trip of each fixture, 8 KB; `-update` rewrites it); synthetic feed for every rule (duplicates, cancelled with trip delay, bare station stop_id without sequence, SKIPPED, NO_DATA, deleted/added/bad keys, errors); start_date parsing; store sequence on the fixtures: applied, applied, empty-stale → no_data (state kept), applied, older → outdated, same header time → outdated, garbage → error (state kept). Coverage 96.5 %, race-clean (Docker), golangci-lint 0 issues.
+- New deps: none.
+- Next: 4.3 merge rules (and 4.0's daytime samples on 2026-11-10).
 
 ### 2026-11-09 — task 4.1
 - Done: `backend/internal/transit/realtime`: `Poller` (`Run`/`Poll`) with `If-None-Match` from the last 200, gzip through net/http's transparent decompression, 20 s per-request timeout, 64 MB cap, User-Agent required (the server's `livestop/<version> (+repo URL)`), interval ≥ 10 s enforced at construction and a 10 s gap before every request (also after `Retry-After`), exponential backoff 15 s → 2 min on errors/rejected feeds, reset on success. Changed feeds go unparsed to a `Handler`; a handler error drops the ETag. `Metrics`: `livestop_gtfsrt_poll_total{result}` (all four results exported from the start).
