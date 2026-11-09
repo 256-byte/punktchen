@@ -287,7 +287,10 @@ type LayerInfo struct {
 
 // LayerMeta Freshness of one layer in this response.
 type LayerMeta struct {
-	// RealtimeAgeSeconds Age of the realtime data. Only for live layers; null if no realtime data yet.
+	// RealtimeAgeSeconds Age of the realtime data merged into this answer, by the feed's own
+	// timestamp (header.timestamp), not by when it was fetched. Only for
+	// live layers; null if no realtime data yet. Over 120 → `degraded`;
+	// realtime older than 5 min is not merged (schedule only).
 	RealtimeAgeSeconds *int32 `json:"realtimeAgeSeconds,omitempty"`
 
 	// Status `ok`: data is fresh. `degraded`: data is served but stale (e.g.

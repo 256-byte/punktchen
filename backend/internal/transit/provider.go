@@ -35,6 +35,10 @@ const (
 // a few window refreshes in a row failed.
 const DefaultStaleAfter = 3 * departures.DefaultRefreshEvery
 
+// DefaultRealtimeStaleAfter: with realtime, health turns degraded when the
+// feed merged into the snapshot is older (by header.timestamp; task 4.4).
+const DefaultRealtimeStaleAfter = 2 * time.Minute
+
 var (
 	// ErrNoDepartures: no departures snapshot yet (before the first import
 	// or while the database is unreachable at startup).
@@ -54,13 +58,33 @@ type Provider struct {
 	snaps      Snapshots
 	now        func() time.Time
 	staleAfter time.Duration
+	// rtStaleAfter > 0: realtime is expected; its age counts for health.
+	rtStaleAfter time.Duration
+}
+
+// Option configures a Provider.
+type Option func(*Provider)
+
+// WithClock replaces the clock health uses (tests).
+func WithClock(now func() time.Time) Option {
+	return func(p *Provider) { p.now = now }
+}
+
+// WithRealtime makes realtime part of health: degraded without realtime data
+// or when the merged feed is older than staleAfter.
+func WithRealtime(staleAfter time.Duration) Option {
+	return func(p *Provider) { p.rtStaleAfter = staleAfter }
 }
 
 var _ layer.Provider = (*Provider)(nil)
 
 // NewProvider returns the transit layer over the live schedule and snapshots.
-func NewProvider(pool *pgxpool.Pool, snaps Snapshots) *Provider {
-	return &Provider{q: queries.New(pool), snaps: snaps, now: time.Now, staleAfter: DefaultStaleAfter}
+func NewProvider(pool *pgxpool.Pool, snaps Snapshots, opts ...Option) *Provider {
+	p := &Provider{q: queries.New(pool), snaps: snaps, now: time.Now, staleAfter: DefaultStaleAfter}
+	for _, o := range opts {
+		o(p)
+	}
+	return p
 }
 
 // Info describes the layer.
@@ -77,17 +101,31 @@ func (p *Provider) Version() uint64 {
 }
 
 // Health is down without a snapshot and degraded when the snapshot is
-// older than staleAfter. Realtime age comes with Phase 4.
+// older than staleAfter. With realtime it is also degraded without realtime
+// data or when the merged feed is older than rtStaleAfter; RealtimeAge is
+// set whenever the snapshot has realtime data. The schedule is served in
+// all those cases.
 func (p *Provider) Health() layer.Health {
 	s := p.snaps.Current()
 	if s == nil {
 		return layer.Health{Status: layer.StatusDown, LastError: ErrNoDepartures.Error()}
 	}
-	if age := p.now().Sub(s.GeneratedAt); age > p.staleAfter {
-		return layer.Health{Status: layer.StatusDegraded,
-			LastError: fmt.Sprintf("departures not refreshed for %s", age.Round(time.Second))}
+	now := p.now()
+	h := layer.Health{Status: layer.StatusOK}
+	if !s.RealtimeFeedTime.IsZero() {
+		age := max(now.Sub(s.RealtimeFeedTime), 0)
+		h.RealtimeAge = &age
 	}
-	return layer.Health{Status: layer.StatusOK}
+	switch age := now.Sub(s.GeneratedAt); {
+	case age > p.staleAfter:
+		h.Status, h.LastError = layer.StatusDegraded, fmt.Sprintf("departures not refreshed for %s", age.Round(time.Second))
+	case p.rtStaleAfter <= 0:
+	case h.RealtimeAge == nil:
+		h.Status, h.LastError = layer.StatusDegraded, "no realtime data yet; schedule only"
+	case *h.RealtimeAge > p.rtStaleAfter:
+		h.Status, h.LastError = layer.StatusDegraded, fmt.Sprintf("realtime feed %s old", h.RealtimeAge.Round(time.Second))
+	}
+	return h
 }
 
 // Nearby returns the stations with served poles within the radius, nearest

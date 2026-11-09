@@ -190,8 +190,8 @@ func TestBuilderRefresh(t *testing.T) {
 		t.Fatalf("published %+v", s1)
 	}
 	checkSnapshot(t, s1, inWindow(sched, from, to))
-	if s1.Len() != 184 || s1.Stops() != 3 {
-		t.Errorf("Len %d Stops %d, want 184 and 3", s1.Len(), s1.Stops())
+	if s1.Len() != 240 || s1.Stops() != 3 { // 120 min window (30 back, 90 ahead), 3 poles every 90 s
+		t.Errorf("Len %d Stops %d, want 240 and 3", s1.Len(), s1.Stops())
 	}
 
 	t.Run("same window publishes nothing", func(t *testing.T) {

@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"sync/atomic"
 	"time"
+
+	"github.com/256-byte/punktchen/backend/internal/transit/departures"
 )
 
 // Outcome of applying a feed to the Store.
@@ -25,13 +27,20 @@ const (
 // readers call Current without locks. Only one goroutine (the poller)
 // applies feeds.
 type Store struct {
-	cur atomic.Pointer[State]
-	log *slog.Logger
+	cur     atomic.Pointer[State]
+	log     *slog.Logger
+	onApply func()
 }
 
 // NewStore returns an empty store.
 func NewStore(log *slog.Logger) *Store {
 	return &Store{log: log}
+}
+
+// OnApply sets a function called after each applied feed (the snapshot
+// builder's RealtimeChanged). Set it before the poller starts.
+func (s *Store) OnApply(f func()) {
+	s.onApply = f
 }
 
 // Current returns the state of the last applied feed, nil before the first.
@@ -66,5 +75,33 @@ func (s *Store) apply(f Feed) (Outcome, error) {
 	s.log.Debug("gtfs-rt feed applied", append(attrs,
 		"trips", stats.Kept, "duplicates", stats.Duplicates, "deleted", stats.Deleted,
 		"no_trip_key", stats.NoTripKey, "unsupported", stats.Unsupported)...)
+	if s.onApply != nil {
+		s.onApply()
+	}
 	return Applied, nil
+}
+
+// DefaultMaxAge: realtime data older than this (by header.timestamp) is not
+// merged any more. Old predictions shown as live mislead more than the
+// schedule; health turns degraded earlier, at 2 min (task 4.4).
+const DefaultMaxAge = 5 * time.Minute
+
+// Merger returns the snapshot builder's RealtimeFunc: the current state
+// merged into the window's departures, unless there is none or it is older
+// than maxAge at now. It always reports the state's feed time, so health
+// shows how old it is.
+func (s *Store) Merger(maxAge time.Duration) departures.RealtimeFunc {
+	return func(deps []departures.Departure, now time.Time) ([]departures.Departure, time.Time) {
+		st := s.Current()
+		if st == nil {
+			return deps, time.Time{}
+		}
+		if now.Sub(st.FeedTime) > maxAge {
+			return deps, st.FeedTime
+		}
+		merged, stats := Merge(deps, st)
+		s.log.Debug("realtime merged", "departures", stats.Departures, "with_trip", stats.WithTrip,
+			"realtime", stats.Realtime, "propagated", stats.Propagated, "cancelled", stats.Cancelled, "skipped", stats.Skipped)
+		return merged, st.FeedTime
+	}
 }

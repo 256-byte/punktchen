@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 4 — Realtime (Phase 3 done 2026-11-09)
-- **Next task:** 4.4 Snapshot rebuild on RT change, health (4.0 waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
+- **Next task:** 4.5 Mobile: delay, realtime indicator, cancelled style (4.0 waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -47,7 +47,7 @@
 | 4 | 4.1 GTFS-RT poller | done | `realtime.Poller`: 15 s, ≥ 10 s between requests, ETag/304, gzip, backoff to 2 min, Retry-After; wired in 4.4 |
 | 4 | 4.2 Parser → trip-instance state | done | `realtime.Parse` + `Store`: key (trip_id, start_date), latest wins, empty feed keeps the state; golden on the recorded feeds |
 | 4 | 4.3 Merge rules | done | `realtime.Merge`: match by sequence then stop_id, delay from the departure event, propagation, cancel, skip; checked on the recorded Wedding feed |
-| 4 | 4.4 Snapshot rebuild on RT change, health | todo | |
+| 4 | 4.4 Snapshot rebuild on RT change, health | done | Poller + store wired; snapshot merges realtime, republishes per feed; degraded > 2 min, schedule-only > 5 min; live check: 19 of 52 departures realtime at Wedding |
 | 4 | 4.5 Mobile: delay, realtime indicator, cancelled | todo | |
 | 4 | 4.6 Match ratio metric | todo | |
 
@@ -95,6 +95,18 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 4.4
+- Done:
+  - `departures`: `BuilderConfig.Realtime` (`RealtimeFunc`) merges realtime into every snapshot; `RealtimeChanged()`/`Republish()` publish the same window with new realtime data without the database; `Snapshot.RealtimeFeedTime`; each pole sorted by `Predicted()`. Window look-back 2 → 30 min so a late vehicle stays listed (delays up to 42 min, DATA_MODEL §7 #18).
+  - `realtime`: `Store.OnApply` (→ `Builder.RealtimeChanged`), `Store.Merger(DefaultMaxAge = 5 min)` (older states are not merged, feed time still reported), `RegisterFeedAge` → `livestop_gtfsrt_feed_age_seconds`.
+  - `transit`: departures filtered and ordered by predicted time (a late one stays until it leaves); API departures get `predicted`, `delaySeconds`, `source: realtime`, `cancelled`. `WithRealtime(2 min)`: health degraded without realtime data or with a feed older than 2 min; `RealtimeAge` from the snapshot → `realtimeAgeSeconds`. `WithClock` for tests.
+  - `/v1/health`: degraded when the transit layer is not ok. Contract: descriptions of `/v1/health` and `realtimeAgeSeconds` (regenerated Go + TS).
+  - `cmd/server`: poller (15 s) → store → builder; the server now polls VBB (the only place, CLAUDE.md rule 7).
+- Tests (acceptance): `realtime.TestPipelineHealth` — fake upstream → poller → store → builder → transit health: no feed → degraded; fresh feed → ok, age 5 s, departure realtime; upstream killed (503) 3 min → degraded, schedule served, realtime still merged; 6 min → degraded, schedule only; upstream back → ok; stale empty feed → ok at once, degraded after 2 min, schedule served. Also: builder republish (no DB load, version +1, order by predicted, older snapshot unchanged, `Run` reacts to `RealtimeChanged`), `Store.OnApply` only on applied feeds, `Merger` age limit, feed-age gauge, `buildPole` with a late/early/cancelled/left departure, provider health table, `/v1/health` degraded by transit. All backend tests, race (Docker, repo mounted for the contract test) and golangci-lint pass.
+- Live check (dev stack, Monday 21:35): `/v1/health` ok; `realtimeAgeSeconds` 30; Wedding 300 m: 19 of 52 departures realtime (e.g. bus 147 +10 min, M27 +3 min, U6 +1 min).
+- New deps: none.
+- Next: 4.5 mobile delay/realtime/cancelled display (and 4.0's daytime samples on 2026-11-10).
 
 ### 2026-11-09 — task 4.3
 - Done: `departures.Departure` gets `Delay`, `Realtime`, `Cancelled` and `Predicted()`. `realtime.Merge(deps, state) ([]Departure, MergeStats)` applies ARCHITECTURE §3.4 per trip instance: cancelled trips, stop matching by stop_sequence then a unique stop_id, delay from the departure event else arrival, schedule-filled events and NO_DATA stay schedule, SKIPPED removed, propagation from the last earlier update with a delay, TripUpdate.delay before the first update. Returns a new slice; input unchanged. Lives in `realtime` (it already depends on `departures`; the other way round would be an import cycle) — noted in ARCHITECTURE §3.4, which now also says why sequence comes before stop_id (loops).
