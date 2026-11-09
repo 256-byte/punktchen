@@ -84,6 +84,8 @@ CREATE TABLE gtfs.stops (
     platform_code       text,
     -- Not from the CSV: set after loading from LIVESTOP_SCOPE_BBOX (DATA_MODEL §4).
     in_scope            boolean NOT NULL DEFAULT false,
+    -- Not from the CSV: the station of a pole (DATA_MODEL §3.4), set by derived.sql.
+    station_id          text DEFAULT NULL,
     geom                geography(Point, 4326)
         GENERATED ALWAYS AS (geography(ST_SetSRID(ST_MakePoint(stop_lon, stop_lat), 4326))) STORED
 );
@@ -106,4 +108,43 @@ CREATE TABLE gtfs.calendar_dates (
     date           date NOT NULL,
     -- 1 = service added, 2 = service removed.
     exception_type smallint NOT NULL
+);
+
+-- Derived tables (DATA_MODEL §3), filled by derived.sql after loading.
+
+-- Every date on which a service runs, over the feed's whole validity (§3.1).
+CREATE TABLE gtfs.service_dates (
+    service_date date NOT NULL,
+    service_id   text NOT NULL
+);
+
+-- What leaves from each pole (§3.2).
+CREATE TABLE gtfs.pole_directions (
+    stop_id          text NOT NULL,
+    station_id       text NOT NULL,
+    route_id         text NOT NULL,
+    line             text,
+    -- sbahn | ubahn | tram | bus | ferry | regional | other (§6).
+    mode             text NOT NULL,
+    direction_id     smallint,
+    -- trip_headsign: the grouping key.
+    headsign         text NOT NULL,
+    -- What riders see at this pole: the most common stop_headsign, else headsign (§7 #21).
+    display_headsign text NOT NULL,
+    is_terminal      boolean NOT NULL,
+    is_origin        boolean NOT NULL,
+    is_ring          boolean NOT NULL,
+    -- Trip instances (trip × service date) over the feed's validity; for ordering.
+    trip_count       bigint NOT NULL
+);
+
+-- One row per station, also for stations that exist only as a DHID prefix (§3.4).
+CREATE TABLE gtfs.stations (
+    station_id text NOT NULL,
+    name       text,
+    geom       geography(Point, 4326),
+    -- Modes of all directions at its poles, sorted; empty if no pole is served.
+    modes      text[] NOT NULL,
+    in_scope   boolean NOT NULL,
+    pole_count integer NOT NULL
 );

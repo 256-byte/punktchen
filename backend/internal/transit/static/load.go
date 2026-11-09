@@ -30,13 +30,8 @@ func toStaging(sql string) string {
 	return strings.ReplaceAll(sql, "gtfs.", StagingSchema+".")
 }
 
-// stationKeySQL is the station of the stops row "s" (DATA_MODEL §3.4):
-// parent_station, else the DHID prefix de:<AGS>:<station>, else the stop.
-const stationKeySQL = `CASE
-	WHEN s.parent_station IS NOT NULL THEN s.parent_station
-	WHEN s.stop_id LIKE 'de:%:%' THEN split_part(s.stop_id, ':', 1) || ':' || split_part(s.stop_id, ':', 2) || ':' || split_part(s.stop_id, ':', 3)
-	ELSE s.stop_id
-END`
+// derivedTables are built by db/gtfs/derived.sql after loading.
+var derivedTables = []string{"service_dates", "pole_directions", "stations"}
 
 // Loader streams the CSV files of a GTFS zip into the staging schema.
 type Loader struct {
@@ -123,25 +118,57 @@ func (l *Loader) finish(ctx context.Context, tx pgx.Tx, res *LoadResult) error {
 		  AND EXISTS (SELECT 1 FROM `+StagingSchema+`.stops p WHERE p.parent_station = st.stop_id AND p.in_scope)`); err != nil {
 		return fmt.Errorf("scope stations: %w", err)
 	}
-	if err := tx.QueryRow(ctx, `SELECT count(*), count(DISTINCT `+stationKeySQL+`)
-		FROM `+StagingSchema+`.stops s
-		WHERE s.in_scope AND coalesce(s.location_type, 0) = 0`).Scan(&res.InScopePoles, &res.InScopeStations); err != nil {
-		return fmt.Errorf("count scope: %w", err)
-	}
-
-	// More memory per index build than the 64 MB default; only for this tx.
-	if _, err := tx.Exec(ctx, `SET LOCAL maintenance_work_mem = '256MB'`); err != nil {
+	// More memory per index build and sort than the defaults; only for this tx.
+	if _, err := tx.Exec(ctx, `SET LOCAL maintenance_work_mem = '256MB'; SET LOCAL work_mem = '64MB'`); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, toStaging(db.GTFSIndexes)); err != nil {
 		return fmt.Errorf("keys and indexes: %w", err)
 	}
-	for _, spec := range tables {
-		if _, err := tx.Exec(ctx, `ANALYZE `+pgx.Identifier{StagingSchema, spec.table}.Sanitize()); err != nil {
-			return fmt.Errorf("analyze %s: %w", spec.table, err)
-		}
+	// Statistics first, so the derived-table queries get good plans.
+	if err := analyze(ctx, tx, loadedTables()); err != nil {
+		return err
 	}
 	l.log.Info("gtfs staging indexed", "duration", time.Since(t0).Round(time.Millisecond))
+
+	t1 := time.Now()
+	if _, err := tx.Exec(ctx, toStaging(db.GTFSDerived)); err != nil {
+		return fmt.Errorf("derived tables: %w", err)
+	}
+	if err := analyze(ctx, tx, derivedTables); err != nil {
+		return err
+	}
+	for _, table := range derivedTables {
+		var n int64
+		if err := tx.QueryRow(ctx, `SELECT count(*) FROM `+pgx.Identifier{StagingSchema, table}.Sanitize()).Scan(&n); err != nil {
+			return fmt.Errorf("count %s: %w", table, err)
+		}
+		res.Rows[table] = n
+	}
+	if err := tx.QueryRow(ctx, `SELECT
+			(SELECT count(*) FROM `+StagingSchema+`.stops WHERE in_scope AND coalesce(location_type, 0) = 0),
+			(SELECT count(*) FROM `+StagingSchema+`.stations WHERE in_scope)`).Scan(&res.InScopePoles, &res.InScopeStations); err != nil {
+		return fmt.Errorf("count scope: %w", err)
+	}
+	l.log.Info("gtfs derived tables built", "duration", time.Since(t1).Round(time.Millisecond),
+		"service_dates", res.Rows["service_dates"], "pole_directions", res.Rows["pole_directions"], "stations", res.Rows["stations"])
+	return nil
+}
+
+func loadedTables() []string {
+	names := make([]string, len(tables))
+	for i, spec := range tables {
+		names[i] = spec.table
+	}
+	return names
+}
+
+func analyze(ctx context.Context, tx pgx.Tx, names []string) error {
+	for _, name := range names {
+		if _, err := tx.Exec(ctx, `ANALYZE `+pgx.Identifier{StagingSchema, name}.Sanitize()); err != nil {
+			return fmt.Errorf("analyze %s: %w", name, err)
+		}
+	}
 	return nil
 }
 

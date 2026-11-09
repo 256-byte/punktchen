@@ -41,6 +41,21 @@ type GtfsCalendarDate struct {
 	ExceptionType int16
 }
 
+type GtfsPoleDirection struct {
+	StopID          string
+	StationID       string
+	RouteID         string
+	Line            *string
+	Mode            string
+	DirectionID     *int16
+	Headsign        string
+	DisplayHeadsign string
+	IsTerminal      bool
+	IsOrigin        bool
+	IsRing          bool
+	TripCount       int64
+}
+
 type GtfsRoute struct {
 	RouteID        string
 	AgencyID       *string
@@ -52,6 +67,20 @@ type GtfsRoute struct {
 	RouteColor     *string
 	RouteTextColor *string
 	RouteSortOrder *int32
+}
+
+type GtfsServiceDate struct {
+	ServiceDate pgtype.Date
+	ServiceID   string
+}
+
+type GtfsStation struct {
+	StationID string
+	Name      *string
+	Geom      interface{}
+	Modes     []string
+	InScope   bool
+	PoleCount int32
 }
 
 type GtfsStop struct {
@@ -70,6 +99,7 @@ type GtfsStop struct {
 	LevelID            *string
 	PlatformCode       *string
 	InScope            bool
+	StationID          *string
 	Geom               interface{}
 }
 

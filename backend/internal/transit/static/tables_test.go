@@ -90,8 +90,15 @@ func TestSpecsMatchSchemaFile(t *testing.T) {
 			ddlCols[m[1]] = append(ddlCols[m[1]], strings.Fields(line)[0])
 		}
 	}
-	if len(ddlCols) != len(tables) {
-		t.Fatalf("schema.sql has %d tables, tables.go %d", len(ddlCols), len(tables))
+	var ddlTables []string
+	for name := range ddlCols {
+		ddlTables = append(ddlTables, name)
+	}
+	slices.Sort(ddlTables)
+	want := append(loadedTables(), derivedTables...)
+	slices.Sort(want)
+	if !slices.Equal(ddlTables, want) {
+		t.Fatalf("schema.sql tables %v, want loaded + derived %v", ddlTables, want)
 	}
 	for _, spec := range tables {
 		if got, want := spec.dbColumns(), ddlCols[spec.table]; !slices.Equal(got, want) {

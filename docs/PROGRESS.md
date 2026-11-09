@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 1 — Static GTFS (started 2026-11-08 with the user's OK while 0.9 is blocked)
-- **Next task:** 1.5
+- **Next task:** 1.6
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -26,7 +26,7 @@
 | 1 | 1.2 Downloader | done | Changed zip stays `running` until the importer (1.3) closes it |
 | 1 | 1.3 Streaming import | done | Full VBB feed in ~9 s, peak Go memory 18 MB |
 | 1 | 1.4 Indexes + in_scope | done | 10,841 poles / 3,914 stations in scope (2,974 in Berlin) |
-| 1 | 1.5 Derived tables | todo | Now includes `stations` + real Wedding subset fixture |
+| 1 | 1.5 Derived tables | done | `service_dates` now covers the whole feed (no daily rebuild) |
 | 1 | 1.6 Sanity checks + swap | todo | |
 | 1 | 1.7 Scheduler | todo | |
 | 1 | 1.8 Nearby query | todo | |
@@ -68,6 +68,19 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 1.5
+- Done:
+  - `db/gtfs/derived.sql` (embedded as `db.GTFSDerived`), run after keys/indexes and `ANALYZE` in the import transaction: `stops.station_id` (parent / DHID prefix / pole), `service_dates`, temp `trip_info` (ends, loop flag, instances), `pole_directions` (mode mapping, terminal/origin by the 95 % rule on non-loop trips, `is_ring`, `display_headsign`, `trip_count`), `stations` (name + location from the `location_type=1` row or the poles, sorted modes, in_scope, pole_count), with their keys/indexes. Tables declared in `schema.sql`, so sqlc knows them.
+  - In-scope station count now comes from `stations` (the Go copy of the grouping rule is gone; the rule lives once, in SQL).
+  - `gtfsexplore subset`: real-data fixture `testdata/gtfs/vbb-wedding-800m.zip` (2.7 MB) with README.
+  - DATA_MODEL §3.1/§3.2/§3.4 updated, §7 #8 (32 trips without headsign), #21 (stop_headsign), #22 (numbers).
+- Decisions (no ADR, data model only): `service_dates` covers the feed's whole validity instead of `[today−1, today+7]` rebuilt daily (~257 k rows; deterministic imports; 1.7 no longer needs a daily rebuild). `trip_count` = trip instances over the validity. `display_headsign` added because 72 % of stop headsigns differ from the trip headsign. `stops.station_id` column instead of a mapping table.
+- Found: 32 trips without `trip_headsign` broke the NOT NULL `headsign` on the real feed → last stop's name, as the GTFS reference suggests.
+- Tests: hand-written rules feed (service dates incl. added/removed dates; terminal/origin; 95 % rule 19/20 vs 9/10; loop bus and ring S41 not terminal; every mode mapping; display headsign 2 of 3; empty headsign; trip after midnight; station name/centroid/modes/unserved). Wedding subset: bus poles `::3`–`::8` → `de:11000:900009104`, modes bus/sbahn/ubahn, Martha-Ndumbe-Platz separate, U6 through, S41/S42 ring, **all GTFS-RT fixture trips present**. Real feed: see §7 #22. vet, golangci-lint 0 issues.
+- New deps (+ why): none.
+- Performance note: derived tables take ~1 min on the dev PC (the `pole_directions` aggregation over 5.8 M stop times); fine for a daily import, revisit if imports become frequent.
+- Next: 1.6 sanity checks + atomic schema swap.
 
 ### 2026-11-09 — task 1.4
 - Done:

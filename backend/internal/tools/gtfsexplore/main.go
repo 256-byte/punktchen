@@ -7,6 +7,7 @@
 //	go run ./internal/tools/gtfsexplore record              # 5 GTFS-RT samples, 15 s apart → data/gtfsrt/
 //	go run ./internal/tools/gtfsexplore rt data/gtfsrt/*.pb # report on RT samples vs. static feed
 //	go run ./internal/tools/gtfsexplore trim data/gtfsrt/*.pb # small fixtures → testdata/gtfsrt/
+//	go run ./internal/tools/gtfsexplore subset              # static fixture around U Wedding → testdata/gtfs/
 //
 // Downloaded data stays in data/ (git-ignored, CLAUDE.md rule 11). Findings
 // go to docs/DATA_MODEL.md §7.
@@ -76,6 +77,14 @@ func main() {
 		zipPath := fs.String("zip", defaultZip, "static GTFS zip")
 		_ = fs.Parse(args)
 		err = reportRealtime(out, *zipPath, fs.Args())
+	case "subset":
+		zipPath := fs.String("zip", defaultZip, "static GTFS zip")
+		dst := fs.String("out", "testdata/gtfs/vbb-wedding-800m.zip", "output zip")
+		lat := fs.Float64("lat", 52.5427, "center latitude (default: U Wedding)")
+		lon := fs.Float64("lon", 13.3660, "center longitude")
+		radius := fs.Float64("radius", 800, "radius in meters")
+		_ = fs.Parse(args)
+		err = subset(out, *zipPath, *dst, *lat, *lon, *radius)
 	case "trim":
 		zipPath := fs.String("zip", defaultZip, "static GTFS zip")
 		dst := fs.String("out", "testdata/gtfsrt", "fixture directory")
@@ -95,6 +104,6 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: gtfsexplore download|static|stops|record|rt|trim [flags] [files]")
+	fmt.Fprintln(os.Stderr, "usage: gtfsexplore download|static|stops|subset|record|rt|trim [flags] [files]")
 	os.Exit(2)
 }
