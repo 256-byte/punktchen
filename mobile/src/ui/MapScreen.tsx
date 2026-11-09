@@ -16,6 +16,7 @@ import type { AnyMapLayer } from '@/layers/registry';
 import { type ClockStore, clockStore, useClockTicker } from '@/state/clock';
 import { locationStore, type LocationStore } from '@/state/location';
 
+import { MapAttribution } from './Attribution';
 import { BackendStatus } from './BackendStatus';
 import { DevPlacePicker } from './DevPlacePicker';
 
@@ -103,6 +104,7 @@ export function MapScreen({
           <LayerMarkers layers={layers} response={nearby.data.response} onSelect={setSelected} />
         ) : null}
       </MapView>
+      <MapAttribution lines={nearby.data?.response.meta.attribution ?? []} />
       {devTools ? <DevPlacePicker store={store} /> : null}
       {client === null ? (
         <View style={styles.status}>

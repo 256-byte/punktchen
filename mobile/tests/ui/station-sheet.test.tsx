@@ -146,6 +146,8 @@ describe('StationSheet', () => {
     const texts = screen.getAllByText(/./).map((t) => String(t.props.children));
     expect(texts.indexOf('No departures soon')).toBeGreaterThan(texts.indexOf('S Jungfernheide'));
     expect(texts.indexOf('Nauen')).toBeGreaterThan(texts.indexOf('No departures soon'));
+    // Data attribution at the very end of the sheet.
+    expect(texts[texts.length - 1]).toBe('Data: VBB (CC BY 4.0)');
   });
 
   it('shows what /v1/nearby had without a backend', async () => {

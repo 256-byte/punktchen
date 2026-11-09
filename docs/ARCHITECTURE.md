@@ -220,6 +220,7 @@ Map screen (`src/ui/MapScreen.tsx`, task 3.4):
 - Reports its centre to the location store on every `onRegionChangeComplete`, so "map center" mode looks where the map is.
 - Requests `/v1/nearby` for a request centre that moves only after > 150 m (`nextRequestCenter`), so small moves and pans reuse one query (and its ETag).
 - Without a configured backend it shows `BackendStatus`; a failed request shows the message with "Try again".
+- Data attribution (task 3.7, §6): `meta.attribution` of the shown answer, bottom right on the map (Apple Maps' "Legal" is bottom left) and at the end of the station sheet (`src/ui/Attribution.tsx`).
 - Developer tool (development builds only, `__DEV__`): "Dev: place" (`src/ui/DevPlacePicker.tsx`) jumps to one of the spot-check stations (task 2.6) or back to "My location". It uses the location store's `lookAt(place)`: map-centre mode at that place plus a `jump` the map follows once. iOS has no way for an app to fake the GPS position, so this is how other parts of Berlin are tested on a phone.
 - Expo Go has the native maps module (Apple Maps on iOS, Google Maps on Android). A development or store build for Android will need a Google Maps API key in `app.json` (not needed before Phase 7).
 
@@ -246,5 +247,5 @@ Map screen (`src/ui/MapScreen.tsx`, task 3.4):
 
 ## 6. Attribution & licences
 
-- VBB GTFS and GTFS-RT: CC BY 4.0 → show "Data: VBB (CC BY 4.0)" in the app (map overlay/about) and in API `meta.attribution`.
+- VBB GTFS and GTFS-RT: CC BY 4.0 → show "Data: VBB (CC BY 4.0)" in the app (map overlay/about) and in API `meta.attribution`. The app shows the API's text wherever it shows the data: map bottom right, end of the station sheet (task 3.7).
 - Map: Apple Maps (iOS) / Google Maps (Android) via `react-native-maps`. No cloud map IDs (keeps Google Maps native usage free).

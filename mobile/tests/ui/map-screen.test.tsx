@@ -171,6 +171,22 @@ describe('MapScreen layers', () => {
     expect(requests[0]?.searchParams.get('lat')).toBe('52.5427');
   });
 
+  it('shows the data attribution with the data (acceptance criterion 3.7)', async () => {
+    await renderMap(WEDDING);
+    expect(await screen.findByText('Data: VBB (CC BY 4.0)')).toBeOnTheScreen();
+  });
+
+  it('shows no attribution when there is nothing to attribute', async () => {
+    answer = () =>
+      new Response(JSON.stringify({ ...nearby(), meta: { ...nearby().meta, attribution: [] } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    await renderMap(WEDDING);
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect(screen.queryByText(/CC BY/)).toBeNull();
+  });
+
   it('requests again only after a move of more than 150 m', async () => {
     const { move } = await renderMap(WEDDING);
     await screen.findByText('S+U Wedding → Jungfernheide');

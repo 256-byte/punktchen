@@ -4,8 +4,8 @@
 
 ## Current status
 
-- **Active phase:** Phase 3 — Mobile MVP (Phase 2 done 2026-11-09)
-- **Next task:** 3.7 Attribution "Data: VBB (CC BY 4.0)" visible on the map
+- **Active phase:** Phase 4 — Realtime (Phase 3 done 2026-11-09)
+- **Next task:** 4.0 Realtime coverage check (share of trips with real `delay` per mode; decide on an extra source for BVG U-Bahn/tram)
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -42,7 +42,14 @@
 | 3 | 3.4 Map screen | done | Opens centred on the user, follows until a drag; layer registry with a plain station pin; request centre moves after > 150 m; iPhone: opens on the user, pins shown (user, 2026-11-09) |
 | 3 | 3.5 Transit layer markers | done | One marker per pole, up to 4 rows; labels re-render once a minute (Profiler test); iPhone: countdowns and "now" update correctly (user, 2026-11-09) |
 | 3 | 3.6 Station sheet | done | Tap marker → whole station; idle directions last (decision 2026-11-09); poles titled from VBB descriptions (new `Pole.description`); iPhone: sheet opens, sections correct (user) |
-| 3 | 3.7 Attribution | todo | |
+| 3 | 3.7 Attribution | done | "Data: VBB (CC BY 4.0)" from `meta.attribution`: map bottom right, end of the station sheet |
+| 4 | 4.0 Realtime coverage check | todo | |
+| 4 | 4.1 GTFS-RT poller | todo | |
+| 4 | 4.2 Parser → trip-instance state | todo | |
+| 4 | 4.3 Merge rules | todo | |
+| 4 | 4.4 Snapshot rebuild on RT change, health | todo | |
+| 4 | 4.5 Mobile: delay, realtime indicator, cancelled | todo | |
+| 4 | 4.6 Match ratio metric | todo | |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
 
@@ -87,6 +94,14 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 3.7
+- Done: `src/ui/Attribution.tsx`: `Attribution` renders the response's `meta.attribution` (nothing when it is empty) and `MapAttribution` places it on the map bottom right above the safe area (Apple Maps keeps its "Legal" link bottom left), not catching touches. Map screen shows it from `/v1/nearby`; the station sheet ends with the attribution of `/v1/stations/{id}`. Text comes from the API, so other layers bring their own (ADR-0008).
+- Tests: Jest: map shows "Data: VBB (CC BY 4.0)" with the data (acceptance), nothing for an empty list, sheet ends with it. `react-native-safe-area-context` uses the library's own Jest mock (`tests/ui/jest-setup.ts`). Typecheck, lint, all tests pass (Vitest 168, Jest 58).
+- Phase 3 done: 3.1–3.7 (3.3–3.6 checked on the iPhone by the user). Phase 4 rows added; next is 4.0 (realtime coverage check).
+- Not checked yet: the label on the phone (position next to Apple's "Legal", readability).
+- New deps: none.
+- Next: 4.0 realtime coverage check.
 
 ### 2026-11-09 — task 3.6
 - Done: tap a pole marker → bottom sheet with its station. `src/api/station.ts` (`fetchStation`, `useStation`: ETag revalidation, 30 s like useNearby); the 200/304/error handling of both endpoints moved to `src/api/revalidate.ts` (`Kept<T>`, `keepAnswer`). `src/core/sheet.ts` (pure: `sheetSignature` per direction, `sheetModel` → poles with running directions + idle list). `src/layers/transit/StationSheet.tsx` (header, "Platform N"/"Stop N" sections, next 3 departures, cancelled struck through, "No departures soon" at the bottom), `LineBadge.tsx` shared with the marker. Registry: `Marker` gets `onPress`, layers provide `Sheet`; `MapScreen` owns the `BottomSheet` (45 %/90 %, `enablePanDownToClose`). Root layout wrapped in `GestureHandlerRootView`.
