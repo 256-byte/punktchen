@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 1 — Static GTFS (started 2026-11-08 with the user's OK while 0.9 is blocked)
-- **Next task:** 1.7
+- **Next task:** 1.8
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -28,7 +28,7 @@
 | 1 | 1.4 Indexes + in_scope | done | 10,841 poles / 3,914 stations in scope (2,974 in Berlin) |
 | 1 | 1.5 Derived tables | done | `service_dates` now covers the whole feed (no daily rebuild) |
 | 1 | 1.6 Sanity checks + swap | done | 0 failed reads in ~4,000 during 6 swaps; real feed passes default limits |
-| 1 | 1.7 Scheduler | todo | |
+| 1 | 1.7 Scheduler | done | Dev DB now has the live schedule (startup import in Docker) |
 | 1 | 1.8 Nearby query | todo | |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
@@ -68,6 +68,21 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 1.7
+- Done:
+  - `static.Scheduler`: daily at `LIVESTOP_GTFS_IMPORT_TIME` (Berlin wall clock, DST-safe), at startup when the live schema is missing, 1 h after a failure (never past the next daily run), and on demand (`Trigger`, one queued request; `ErrImportRunning` while running). "Another process holds the lock" counts as `busy`, not as a failure. Clock and timers are injectable.
+  - `static.Metrics`: `livestop_import_runs_total{trigger,result}`, `livestop_import_duration_seconds{result}`, `livestop_import_last_success_timestamp_seconds` (renamed from ARCHITECTURE's `…_timestamp` to follow the Prometheus unit suffix rule).
+  - `static.Status`: live schema present + last `succeeded`/`skipped` time (new sqlc query `LastScheduleCheck`).
+  - Contract: `POST /internal/import` (tag `internal`, 202 `ImportStarted` / 404 unless `LIVESTOP_DEV=true` / 409 `conflict`), optional `Health.scheduleCheckedAt`, error code `conflict`. Go + TS regenerated.
+  - `/v1/health`: `down` without DB or without live schedule; `degraded` if the schedule was not confirmed in 72 h.
+  - `cmd/server`: wires downloader (User-Agent `livestop/<version> (+https://github.com/256-byte/punktchen)`), loader, importer, scheduler; the scheduler stops with the process and is awaited before the pool closes. `api.NewServer` now takes an `api.Config`.
+  - JSON logs write durations as text (`"2m38s"`), not nanoseconds.
+  - Docs: ARCHITECTURE §3.1 schedule, §3.7 metrics + health rules; DATA_MODEL §5.1; CLAUDE.md dev command.
+- Tests: scheduler unit tests with a fake clock (next daily slot incl. both DST days and exact-time edge; startup import only without data; scheduled run; retry after failure and never past the daily slot; busy is not a failure; manual trigger and conflict while running; stop on cancel); API tests (health down/degraded/ok, `scheduleCheckedAt` in Berlin time, trigger 404/202/409); `Status` before/after an import; logger durations. vet, golangci-lint 0 issues, mobile typecheck/lint/test green.
+- Manual check (acceptance) in Docker with `LIVESTOP_DEV=true` (root `.env`, git-ignored): empty dev DB → startup import ran automatically (158 s, 3,914 stations), health `down` during it and `ok` with `scheduleCheckedAt` after; `POST /internal/import` during the run → 409, afterwards → 202 and a `skipped` run (same sha256, 6 s); the daily 03:30 run happened to fire 13 s after the startup import → `skipped`; restart with data → no import, next run tomorrow 03:30. Metrics on :9090 show all three `livestop_import_*` series. Container memory peak 13.7 MiB during the import. `docker compose stop backend` during a manual import → clean stop in 12 ms, attempt closed as `failed` ("context canceled"), no row left `running`.
+- New deps (+ why): `github.com/kylelemons/godebug` (indirect, pulled in by `prometheus/testutil` for metric assertions in tests).
+- Next: 1.8 nearby-poles query.
 
 ### 2026-11-09 — task 1.6
 - Done:

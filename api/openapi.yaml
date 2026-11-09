@@ -27,6 +27,8 @@ tags:
   - name: system
   - name: layers
   - name: transit
+  - name: internal
+    description: Development tools, disabled in production.
 
 paths:
   /v1/health:
@@ -163,6 +165,34 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+  /internal/import:
+    post:
+      operationId: triggerImport
+      tags: [internal]
+      summary: Start a GTFS import now (development only)
+      description: |
+        Only enabled when the server runs with `LIVESTOP_DEV=true`; otherwise
+        it answers 404. Starts the import in the background and returns at
+        once: a full import takes minutes. The outcome is in the logs, in the
+        `livestop_import_*` metrics and in `meta.feed_imports`. Not for apps.
+      responses:
+        "202":
+          description: Import started.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportStarted"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: An import is already running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          $ref: "#/components/responses/Error"
+
 components:
   parameters:
     IfNoneMatch:
@@ -222,7 +252,7 @@ components:
               type: string
               description: |
                 Machine-readable code. Known values: `invalid_argument`,
-                `not_found`, `not_implemented`, `internal`, `unavailable`.
+                `not_found`, `not_implemented`, `conflict`, `internal`, `unavailable`.
               examples: [invalid_argument]
             message:
               type: string
@@ -267,6 +297,22 @@ components:
         time:
           $ref: "#/components/schemas/Timestamp"
           description: Server time. Clients may use it to detect clock skew.
+        scheduleCheckedAt:
+          type: [string, "null"]
+          format: date-time
+          description: |
+            When the schedule was last confirmed current (an import succeeded or
+            found the feed unchanged). Null before the first import. Older than
+            3 days → `degraded`.
+          examples: ["2026-11-09T03:30:12+01:00"]
+
+    ImportStarted:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [started]
 
     # ---------------------------------------------------------------- layers
     LayerId:

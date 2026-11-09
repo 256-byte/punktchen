@@ -129,8 +129,8 @@ npm --prefix mobile start                    # Expo dev server: scan QR with Exp
 npm --prefix mobile start -- --clear         # after npm install or a mobile/.env change (Metro cache)
 cd mobile; npx expo install <package>; cd .. # add an Expo/RN dependency with the SDK-matched version
 
-# --- dev-only (Phase 1.7, not implemented yet) ---
-curl.exe -X POST http://localhost:8080/internal/import   # trigger a GTFS import; disabled unless LIVESTOP_DEV=true
+# --- dev-only (needs LIVESTOP_DEV=true in .env) ---
+curl.exe -X POST http://localhost:8080/internal/import   # start a GTFS import now (202); follow it with: docker compose logs -f backend
 ```
 
 Notes:

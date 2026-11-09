@@ -93,7 +93,12 @@ func TestImporter(t *testing.T) {
 	ctx := context.Background()
 	pool := newTestDB(t)
 
+	status := NewStatus(pool, SourceGTFS)
+
 	t.Run("first import creates the live schema", func(t *testing.T) {
+		if st, err := status.ScheduleState(ctx); err != nil || st.HasData || st.CheckedAt != nil {
+			t.Fatalf("before any import: %+v, %v; want no data, never checked", st, err)
+		}
 		e := newImportEnv(t, pool, rulesFeed())
 		out, err := e.im.Run(ctx)
 		if err != nil {
@@ -111,6 +116,9 @@ func TestImporter(t *testing.T) {
 		counts := scalar[string](t, pool, `SELECT row_counts->>'in_scope_stations' FROM meta.feed_imports ORDER BY id DESC LIMIT 1`)
 		if counts == "" || counts == "0" {
 			t.Fatalf("row_counts.in_scope_stations = %q", counts)
+		}
+		if st, err := status.ScheduleState(ctx); err != nil || !st.HasData || st.CheckedAt == nil {
+			t.Fatalf("after import: %+v, %v; want data and a check time", st, err)
 		}
 	})
 

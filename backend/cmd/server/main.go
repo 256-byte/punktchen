@@ -27,6 +27,7 @@ import (
 	"github.com/256-byte/punktchen/backend/internal/api"
 	"github.com/256-byte/punktchen/backend/internal/config"
 	"github.com/256-byte/punktchen/backend/internal/platform"
+	"github.com/256-byte/punktchen/backend/internal/transit/static"
 )
 
 // version is set at build time: -ldflags "-X main.version=..."
@@ -84,7 +85,24 @@ func serve(ctx context.Context, log *slog.Logger, cfg config.Config) error {
 
 	metrics := platform.NewMetricsRegistry()
 
-	apiHandler := api.NewHandler(api.NewServer(version, pool, log.With("component", "api")))
+	// Static GTFS import (ARCHITECTURE §3.1): one scheduler per process; the
+	// advisory lock in Importer.Run guards against other processes.
+	importLog := log.With("component", "import")
+	il := static.NewImportLog(pool)
+	dl, err := static.NewDownloader(static.DownloaderConfig{URL: cfg.GTFSURL, UserAgent: userAgent()}, il, importLog)
+	if err != nil {
+		return err
+	}
+	importer := static.NewImporter(pool, dl, static.NewLoader(pool, cfg.ScopeBBox, importLog), il, static.DefaultSanityLimits, importLog)
+	status := static.NewStatus(pool, static.SourceGTFS)
+	scheduler := static.NewScheduler(static.SchedulerConfig{
+		Hour: cfg.GTFSImportTime.Hour, Minute: cfg.GTFSImportTime.Minute, Loc: platform.Berlin,
+	}, importer.Run, status.HasData, static.NewMetrics(metrics), importLog)
+
+	apiHandler := api.NewHandler(api.NewServer(api.Config{
+		Version: version, DB: pool, Schedule: status, Imports: scheduler, Dev: cfg.Dev,
+		Log: log.With("component", "api"),
+	}))
 	apiSrv, err := platform.Listen("api", cfg.HTTPAddr, apiHandler)
 	if err != nil {
 		return err
@@ -94,7 +112,26 @@ func serve(ctx context.Context, log *slog.Logger, cfg config.Config) error {
 		return errors.Join(err, apiSrv.Close())
 	}
 
+	// The scheduler stops with ctx; wait for it before the pool closes, so a
+	// running import can record its outcome.
+	schedCtx, stopScheduler := context.WithCancel(ctx)
+	schedDone := make(chan struct{})
+	go func() {
+		defer close(schedDone)
+		scheduler.Run(schedCtx)
+	}()
+	defer func() {
+		stopScheduler()
+		<-schedDone
+	}()
+
 	return platform.Serve(ctx, log, shutdownTimeout, apiSrv, metricsSrv)
+}
+
+// userAgent names the project to upstream servers, as VBB asks
+// (DATA_MODEL §7 #20). No personal contact data.
+func userAgent() string {
+	return "livestop/" + version + " (+https://github.com/256-byte/punktchen)"
 }
 
 // healthcheck calls the local health endpoint and fails on any non-200 answer.

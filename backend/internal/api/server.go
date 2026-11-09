@@ -7,35 +7,61 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/256-byte/punktchen/backend/gen/openapi"
 	"github.com/256-byte/punktchen/backend/internal/platform"
+	"github.com/256-byte/punktchen/backend/internal/transit/static"
 )
 
-// healthPingTimeout bounds the database check of /v1/health.
-const healthPingTimeout = time.Second
+const (
+	// healthTimeout bounds the database checks of /v1/health.
+	healthTimeout = time.Second
+	// scheduleMaxAge: an older confirmation makes health "degraded"
+	// (ARCHITECTURE §3.7). VBB publishes about twice a week.
+	scheduleMaxAge = 72 * time.Hour
+)
 
 // Pinger reports whether a dependency is reachable. *pgxpool.Pool fits.
 type Pinger interface {
 	Ping(ctx context.Context) error
 }
 
+// ScheduleSource tells whether schedule data exists and how fresh it is.
+type ScheduleSource interface {
+	ScheduleState(ctx context.Context) (static.ScheduleState, error)
+}
+
+// ImportTrigger starts an import in the background (static.Scheduler).
+type ImportTrigger interface {
+	Trigger() error
+}
+
+// Config holds the dependencies of the API.
+type Config struct {
+	Version  string
+	DB       Pinger
+	Schedule ScheduleSource
+	Imports  ImportTrigger // used only when Dev
+	Dev      bool          // LIVESTOP_DEV: enables /internal/*
+	Log      *slog.Logger
+}
+
 // Server implements openapi.StrictServerInterface.
 type Server struct {
-	version string
-	db      Pinger
-	log     *slog.Logger
-	now     func() time.Time
+	cfg Config
+	log *slog.Logger
+	now func() time.Time
 }
 
 var _ openapi.StrictServerInterface = (*Server)(nil)
 
 // NewServer returns the API implementation.
-func NewServer(version string, db Pinger, log *slog.Logger) *Server {
-	return &Server{version: version, db: db, log: log, now: time.Now}
+func NewServer(cfg Config) *Server {
+	return &Server{cfg: cfg, log: cfg.Log, now: time.Now}
 }
 
 // NewHandler wires the generated router to s. Parameter errors and unknown
@@ -63,24 +89,57 @@ func NewHandler(s *Server) http.Handler {
 	})
 }
 
-// GetHealth reports the service status.
-// Phase 0: "down" if the database is unreachable, else "ok". Schedule and
-// realtime freshness (ARCHITECTURE §3.7) are added with those components.
+// GetHealth reports the service status (ARCHITECTURE §3.7):
+// down if the database is unreachable or there is no schedule; degraded if
+// the schedule was not confirmed current in the last 3 days. Realtime
+// freshness is added with the poller (Phase 4).
 func (s *Server) GetHealth(ctx context.Context, _ openapi.GetHealthRequestObject) (openapi.GetHealthResponseObject, error) {
-	status := openapi.StatusOk
-
-	pingCtx, cancel := context.WithTimeout(ctx, healthPingTimeout)
-	defer cancel()
-	if err := s.db.Ping(pingCtx); err != nil {
-		s.log.Warn("health: database unreachable", "error", err.Error())
-		status = openapi.StatusDown
+	now := s.now()
+	resp := openapi.GetHealth200JSONResponse{
+		Status:  openapi.StatusOk,
+		Version: s.cfg.Version,
+		Time:    now.In(platform.Berlin).Truncate(time.Second),
 	}
 
-	return openapi.GetHealth200JSONResponse{
-		Status:  status,
-		Version: s.version,
-		Time:    s.now().In(platform.Berlin).Truncate(time.Second),
-	}, nil
+	ctx, cancel := context.WithTimeout(ctx, healthTimeout)
+	defer cancel()
+	if err := s.cfg.DB.Ping(ctx); err != nil {
+		s.log.Warn("health: database unreachable", "error", err.Error())
+		resp.Status = openapi.StatusDown
+		return resp, nil
+	}
+	st, err := s.cfg.Schedule.ScheduleState(ctx)
+	if err != nil {
+		s.log.Warn("health: schedule state unknown", "error", err.Error())
+		resp.Status = openapi.StatusDown
+		return resp, nil
+	}
+	if st.CheckedAt != nil {
+		at := st.CheckedAt.In(platform.Berlin).Truncate(time.Second)
+		resp.ScheduleCheckedAt = &at
+	}
+	switch {
+	case !st.HasData:
+		resp.Status = openapi.StatusDown
+	case st.CheckedAt == nil || now.Sub(*st.CheckedAt) > scheduleMaxAge:
+		resp.Status = openapi.StatusDegraded
+	}
+	return resp, nil
+}
+
+// TriggerImport starts a GTFS import in the background; dev only.
+func (s *Server) TriggerImport(context.Context, openapi.TriggerImportRequestObject) (openapi.TriggerImportResponseObject, error) {
+	if !s.cfg.Dev || s.cfg.Imports == nil {
+		return openapi.TriggerImport404JSONResponse{NotFoundJSONResponse: openapi.NotFoundJSONResponse(errorBody(codeNotFound, "no such endpoint"))}, nil
+	}
+	switch err := s.cfg.Imports.Trigger(); {
+	case errors.Is(err, static.ErrImportRunning):
+		return openapi.TriggerImport409JSONResponse(errorBody(codeConflict, "an import is already running")), nil
+	case err != nil:
+		return nil, err
+	}
+	s.log.Info("gtfs import triggered via /internal/import")
+	return openapi.TriggerImport202JSONResponse{Status: openapi.ImportStartedStatusStarted}, nil
 }
 
 // ListLayers is implemented in Phase 2 (task 2.5).
@@ -103,6 +162,7 @@ const (
 	codeInvalidArgument = "invalid_argument"
 	codeNotFound        = "not_found"
 	codeNotImplemented  = "not_implemented"
+	codeConflict        = "conflict"
 	codeInternal        = "internal"
 )
 

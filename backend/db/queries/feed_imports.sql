@@ -34,3 +34,13 @@ SET status      = sqlc.arg(status),
     error       = sqlc.narg(error)
 WHERE id = sqlc.arg(id)
   AND status = 'running';
+
+-- name: LastScheduleCheck :one
+-- When the schedule of a feed was last confirmed current: the newest attempt
+-- that imported it or found it unchanged (health, ARCHITECTURE §3.7).
+SELECT finished_at
+FROM meta.feed_imports
+WHERE source = $1
+  AND status IN ('succeeded', 'skipped')
+ORDER BY finished_at DESC
+LIMIT 1;

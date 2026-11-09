@@ -8,6 +8,7 @@ package queries
 import (
 	"context"
 	"encoding/json"
+	"time"
 )
 
 const finishFeedImport = `-- name: FinishFeedImport :execrows
@@ -39,6 +40,24 @@ func (q *Queries) FinishFeedImport(ctx context.Context, arg FinishFeedImportPara
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const lastScheduleCheck = `-- name: LastScheduleCheck :one
+SELECT finished_at
+FROM meta.feed_imports
+WHERE source = $1
+  AND status IN ('succeeded', 'skipped')
+ORDER BY finished_at DESC
+LIMIT 1
+`
+
+// When the schedule of a feed was last confirmed current: the newest attempt
+// that imported it or found it unchanged (health, ARCHITECTURE §3.7).
+func (q *Queries) LastScheduleCheck(ctx context.Context, source string) (*time.Time, error) {
+	row := q.db.QueryRow(ctx, lastScheduleCheck, source)
+	var finished_at *time.Time
+	err := row.Scan(&finished_at)
+	return finished_at, err
 }
 
 const lastSuccessfulFeedImport = `-- name: LastSuccessfulFeedImport :one
