@@ -32,3 +32,9 @@ var GTFSSchema string
 //
 //go:embed gtfs/indexes.sql
 var GTFSIndexes string
+
+// GTFSDerived builds the derived tables (stations, service_dates,
+// pole_directions) after GTFSIndexes; same rewrite rule.
+//
+//go:embed gtfs/derived.sql
+var GTFSDerived string

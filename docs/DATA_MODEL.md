@@ -43,15 +43,17 @@ Storage notes:
 
 ## 3. Derived tables (built after each import, schema `gtfs`)
 
+All derived tables are built by `backend/db/gtfs/derived.sql` in the import transaction (task 1.5). They depend only on the feed, never on the import date.
+
 ### 3.1 `service_dates`
-Expanded calendar for `[today - 1, today + 7]`.
+Every date on which a service runs, expanded over the feed's **whole validity** (PK `(service_date, service_id)`).
 
 | column | type |
 |---|---|
 | `service_date` | date |
 | `service_id` | text |
 
-Built from `calendar` (weekday + range) plus `calendar_dates` (1 = add, 2 = remove). Rebuilt daily even if the feed did not change.
+Built from `calendar` (weekday + range) plus `calendar_dates` (1 = add, 2 = remove). Changed in 1.5 from "`[today − 1, today + 7]`, rebuilt daily": the whole range is only ~257,000 rows (§7 #22), needs no daily rebuild and keeps imports deterministic.
 
 ### 3.2 `pole_directions`
 What leaves from each pole. Used for markers and for showing directions with no departure in the window.
@@ -59,16 +61,19 @@ What leaves from each pole. Used for markers and for showing directions with no 
 | column | type | notes |
 |---|---|---|
 | `stop_id` | text | pole |
-| `station_id` | text | from `stations` (§3.4): `parent_station`, else DHID prefix, else the pole itself (§7 #4) |
+| `station_id` | text | `stops.station_id` (§3.4) |
 | `route_id` | text | |
 | `line` | text | `route_short_name`, e.g. `U6`, `S1`, `M27` |
-| `mode` | text | mapped from `route_type`, §6 |
+| `mode` | text | mapped from `route_type`, §6 (the mapping lives in derived.sql) |
 | `direction_id` | smallint | always 0/1 in VBB data (§7 #8); nullable column anyway (optional in GTFS) |
-| `headsign` | text | e.g. `Alt-Tegel`, `Wannsee` |
-| `is_terminal` | bool | pole is the last stop for ≥ 95% of the **non-loop** trips of this (route, direction, headsign) |
-| `is_origin` | bool | pole is the first stop of those trips |
+| `headsign` | text | `trip_headsign` (last stop's name if empty), the grouping key, e.g. `U Alt-Tegel (Berlin)` |
+| `display_headsign` | text | what riders see at this pole: the most common `coalesce(stop_headsign, trip_headsign)` of the group (§7 #21) |
+| `is_terminal` | bool | pole is the last stop for ≥ 95% of the **non-loop** trips of this (route, direction, headsign) at this pole |
+| `is_origin` | bool | same with the first stop |
 | `is_ring` | bool | S-Bahn line S41/S42 or headsign starting with "Ringbahn" (§7 #11) |
-| `trip_count` | int | trips in the next 7 days, for ordering |
+| `trip_count` | bigint | trip instances (trip × service date) over the feed's validity, for ordering |
+
+One row per (pole, route, direction, headsign) that has stop times; unserved poles have none (§7 #12). Indexes on `stop_id` and `station_id`.
 
 Terminal rule for the UI: at a terminal pole, arrivals that end there are **not** shown as departures; only the opposite direction is shown.
 
@@ -91,10 +96,11 @@ The station of every pole, because most bus/tram poles have no `parent_station` 
 | `station_id` | text | `parent_station`, else the DHID prefix `de:<AGS>:<station>` of the pole id, else the pole id itself |
 | `name` | text | the `location_type=1` row's name if it exists, else the most frequent name among its poles |
 | `geom` | geography(Point, 4326) | the `location_type=1` row's coordinates if it exists, else the centroid of its poles |
-| `modes` | text[] | modes of all directions at its poles (from `pole_directions`) |
+| `modes` | text[] | distinct modes of all directions at its poles, sorted; `{}` if none is served |
 | `in_scope` | bool | any of its poles is in scope (§4) |
+| `pole_count` | int | poles of the station, served or not |
 
-Plus a mapping `stop_id → station_id` for every pole (column on `stops` or a small table; decided in 1.5).
+PK `station_id`, GiST on `geom`. Every pole (`location_type` 0/empty) also gets the column **`stops.station_id`** (decided in 1.5: a column, not a separate mapping table), indexed.
 
 ## 4. Scope
 
@@ -218,7 +224,7 @@ Evidence tool: `backend/internal/tools/gtfsexplore` (task 1.1, not shipped). Unl
 | 5 | **route_type values (verify #4).** 700 bus (1,061 routes / 190,077 trips), 3 bus (33 / 497), 900 tram (48 / 31,805), 109 S-Bahn (53 / 22,027), 400 U-Bahn (9 / 11,708), 100 regional (49 / 5,514), 106 regional (14 / 1,358), 1000 ferry (8 / 729). No 0, 1, 2, 4. `route_id` format `<n>_<route_type>`, e.g. `17521_400`. `route_type=109` also contains `RB31` and `RE10`. Tram short names include non-Berlin lines `1`–`6` (Potsdam, Cottbus, …) besides `M1`…`M17`, `12`…`99`. | static, routes.txt | 2026-11-08 |
 | 6 | **Rail replacement buses.** 25 `route_type=700` routes carry rail line names (S1 ×2, S2, S3, S3A, S3B, S41, S42, S46, S46A, S46X, S47, S5, S7, S75, S7A, S7B, S8, S9, S9A, S9X, U2, U5, U6). ⇒ mode comes from `route_type`, never from the line name; a "U6" direction can be a bus. | routes.txt | 2026-11-08 |
 | 7 | **route_color.** Set for U-Bahn 100 %, S-Bahn 87 %, regional 71–76 %, tram 37.5 %, bus 6 %, ferry 0 %. ⇒ API `color` is often null; the app needs per-mode default colors. VBB publishes official colors for regional, S- and U-Bahn lines separately (`linienfarben.zip` on the open-data page, CSV, April 2026), usable as override; nothing official for tram/bus. | static, open-data page | 2026-11-09 |
-| 8 | **direction_id (verify #6).** Set on 100 % of trips (0: 137,504, 1: 126,211). `trip_headsign` never empty. `trip_id` numeric (e.g. `310952817`), `service_id` small integers as text (e.g. `1010`). | static | 2026-11-08 |
+| 8 | **direction_id (verify #6).** Set on 100 % of trips (0: 137,504, 1: 126,211). `trip_headsign` empty on only 32 trips (filled with the last stop's name in `pole_directions`). `trip_id` numeric (e.g. `310952817`), `service_id` small integers as text (e.g. `1010`). | static | 2026-11-08 |
 | 9 | **platform_code (verify #7).** 6.5 % of all poles. By mode of the poles' trips: U-Bahn 99.0 % (396 poles), S-Bahn 54.3 % (451), regional 66–67 %, tram 10.4 %, bus 1.8 %, ferry 0 %. ⇒ `Pole.platform` is nullable; the UI needs a fallback label (e.g. direction headsign). | static | 2026-11-08 |
 | 10 | **Times past 24:00 (verify #8).** Max `departure_time` `31:17:00` (trip 310876822). 223,320 departures (3.8 %) ≥ 24:00, 30,448 ≥ 27:00, 689 ≥ 30:00; 8,921 trips *start* ≥ 24:00. No unparseable times. ⇒ the schedule window must include trips of the previous service day up to +31:17 h (use a margin, e.g. 32 h). `pickup_type`/`drop_off_type` mostly 0; 5,644 no-pickup and 3,328 no-drop-off stop times. | static | 2026-11-08 |
 | 11 | **Ring and loop lines (verify #5).** S41/S42 (`route_type=109`): full-circle trips start and end at S Beusselstr. with headsign **"Ringbahn S 41"** / **"Ringbahn S 42"** (909 / 1,062 trips, all `direction_id=0`); partial trips have normal station headsigns (e.g. "S Westend (Berlin)"). ⇒ `isRing` = S-Bahn line S41/S42, or headsign starting with "Ringbahn". 67 other lines (mostly buses, e.g. 365 "S Baumschulenweg") have loop trips (first station = last station, headsign = that station). ⇒ terminal/origin detection (§3.2) must treat loop trips separately, otherwise a loop's start pole is marked terminal and its departures are hidden. | static (loops section) | 2026-11-08 |
@@ -231,8 +237,10 @@ Evidence tool: `backend/internal/tools/gtfsexplore` (task 1.1, not shipped). Unl
 | 18 | **RT stop identity (verify #2).** `stop_id` always set: 98.7 % are static poles (`location_type=0`), never stations; 1.3 % are bare station numbers without DHID (e.g. `900220139` for poles `de:12069:900220139::1`/`::2`) → pole unknown, use `stop_sequence` (set on 98.7 %). Times are absolute: `arrival.time` / `departure.time` set on ~99.8 %, `delay` only on ~24 %. The feed's README explains it: each matched trip is merged with a TripUpdate built from the schedule, so **an event with `time` but no `delay` is schedule-filled, not realtime**. ⇒ a departure counts as `source=realtime` only if its event has `delay` (or a time that differs from the schedule); delay = time − scheduled. STU `schedule_relationship`: SCHEDULED 471,907, SKIPPED 6,015, NO_DATA 331. ~19 STUs per TripUpdate. Arrival delay: min −281 s, p10 −60 s, median 0, p90 +60 s, max +2,520 s. | rt | 2026-11-08 |
 | 19 | **RT coverage by mode.** Share of TripUpdates (5 samples, Sunday 23:59 UTC): S-Bahn 61 %, regional 18 %, bus 15 %, tram 3.5 %, U-Bahn 1.7 %. One more sample at 23:27 UTC: 6,866 TripUpdates, S-Bahn 47 %, bus 36 %, regional 13 %, tram 2.6 %, U-Bahn 1.4 %. The provider page states "limited data coverage since 2026-06-04". ⇒ for BVG U-Bahn and tram, scheduled-only departures are the normal case; with "realtime = has `delay`" (#18) the real share is lower still. Measure at daytime on a weekday before Phase 4. | rt, provider page | 2026-11-09 |
 | 20 | **GTFS-RT usage terms** (provider page https://production.gtfsrt.vbb.de/): rate limit **7 requests/minute since 2026-11-02** (was 60; "allows fetching every 10 seconds"); send `Accept-Encoding: gzip` or `zstd`; informative `User-Agent` with contact info required, generic ones may be blocked; Atom feed for downtime notices; CORS enabled; CC BY 4.0. | provider page | 2026-11-08 |
+| 21 | **stop_headsign.** Set on 40 % of stop_times (2,327,520 of 5,836,294). Of those, 28 % equal the trip headsign or drop its " (Berlin)" suffix ("U Hermannplatz/Urbanstr. (Berlin)" → "U Hermannplatz"); **72 % are a different text**: the intermediate destination shown on the vehicle at that stop (M27 to "Hadlichstr." shows "S+U Pankow") or a real name where the trip headsign is generic (trip "Berlin" → stop "Stralau"). ⇒ group directions by `trip_headsign` (stable), show `display_headsign` (most common stop headsign at the pole). In the derived table, 29,950 of 125,215 directions show a text other than their trip headsign. | awk over stop_times.txt + trips.txt; LoadRealFeed | 2026-11-09 |
+| 22 | **Derived tables (task 1.5), current feed.** `service_dates` 257,451 rows (whole validity); `pole_directions` 125,215 (7,066 terminal, 7,933 origin, 1,525 ring); `stations` 13,431 in the whole VBB area, 3,914 in scope, 3,881 of them with at least one direction. Build time on the dev PC: COPY ~10 s, keys/indexes + ANALYZE ~20–60 s, derived tables ~55–70 s; whole import 1.5–2.7 min, peak Go memory 18–22 MB. Wedding subset fixture (`backend/testdata/gtfs/vbb-wedding-800m.zip`, 2.7 MB): 17 stations, 13,394 trips, 343,256 stop_times; it contains every trip of the GTFS-RT fixtures. | LoadRealFeed, TestWeddingSubset | 2026-11-09 |
 
-All Phase 1 **(verify)** items are answered. Fixtures: `backend/testdata/gtfsrt/` (README there).
+All Phase 1 **(verify)** items are answered. Fixtures: `backend/testdata/gtfsrt/` and `backend/testdata/gtfs/` (READMEs there).
 
 ## 8. Go in-memory types (reference)
 

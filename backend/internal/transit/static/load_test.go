@@ -319,7 +319,7 @@ func TestLoadRealFeed(t *testing.T) {
 	// second DHID part; 11000 = Berlin) and by mode.
 	rows, err := pool.Query(context.Background(), `
 		WITH poles AS (
-			SELECT s.stop_id, `+stationKeySQL+` AS station
+			SELECT s.stop_id, s.station_id AS station
 			FROM gtfs_staging.stops s
 			WHERE s.in_scope AND coalesce(s.location_type, 0) = 0
 		)
@@ -348,6 +348,12 @@ func TestLoadRealFeed(t *testing.T) {
 			JOIN gtfs_staging.trips t ON t.trip_id = st.trip_id
 			JOIN gtfs_staging.routes r ON r.route_id = t.route_id
 			GROUP BY 1) x`))
+	t.Logf("pole_directions: %s", scalar[string](t, pool, `
+		SELECT format('%s rows, terminal %s, origin %s, ring %s, display <> headsign %s, in-scope stations with directions %s',
+			count(*), count(*) FILTER (WHERE is_terminal), count(*) FILTER (WHERE is_origin), count(*) FILTER (WHERE is_ring),
+			count(*) FILTER (WHERE display_headsign <> headsign),
+			(SELECT count(*) FROM gtfs_staging.stations WHERE in_scope AND modes <> '{}'))
+		FROM gtfs_staging.pole_directions`))
 	t.Logf("in-scope poles without any stop_times: %d", scalar[int64](t, pool, `
 		SELECT count(*) FROM gtfs_staging.stops s
 		WHERE s.in_scope AND coalesce(s.location_type, 0) = 0
