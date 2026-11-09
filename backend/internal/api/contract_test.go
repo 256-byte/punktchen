@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -55,9 +56,20 @@ func loadContract(t *testing.T) *contract {
 // headers, body) does not match the contract. It returns status and body.
 func (c *contract) get(t *testing.T, base, path string) (int, map[string]any) {
 	t.Helper()
+	status, _, body := c.getWith(t, base, path, nil)
+	return status, body
+}
+
+// getWith is get with request headers; it also returns the response
+// headers, and a nil body for an empty one (304).
+func (c *contract) getWith(t *testing.T, base, path string, header http.Header) (int, http.Header, map[string]any) {
+	t.Helper()
 	req, err := http.NewRequest(http.MethodGet, base+path, nil)
 	if err != nil {
 		t.Fatal(err)
+	}
+	for k, v := range header {
+		req.Header[k] = v
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -84,11 +96,14 @@ func (c *contract) get(t *testing.T, base, path string) (int, map[string]any) {
 		t.Errorf("GET %s → %d breaks the contract: %v\nbody: %.500s", path, resp.StatusCode, err, raw)
 	}
 
+	if len(raw) == 0 {
+		return resp.StatusCode, resp.Header, nil
+	}
 	var body map[string]any
 	if err := json.Unmarshal(raw, &body); err != nil {
 		t.Fatalf("GET %s: body is not JSON: %.200s", path, raw)
 	}
-	return resp.StatusCode, body
+	return resp.StatusCode, resp.Header, body
 }
 
 type noSnapshot struct{}
@@ -228,6 +243,26 @@ func TestContract(t *testing.T) {
 			t.Errorf("next cell north: %v, err %v", got.Meta.Cell, err)
 		}
 	})
+
+	// Task 5.3's acceptance on real data: the ETag of a 200 brings a 304
+	// with an empty body (both validated against the contract), for the map
+	// and the station sheet.
+	for _, path := range []string{"/v1/nearby?lat=52.5427&lng=13.366", "/v1/stations/de:11000:900009104"} {
+		t.Run("revalidate "+path, func(t *testing.T) {
+			status, h, _ := c.getWith(t, live, path, nil)
+			etag := h.Get("ETag")
+			if status != http.StatusOK || !strings.HasPrefix(etag, `W/"`) {
+				t.Fatalf("status %d, ETag %q", status, etag)
+			}
+			status, h, body := c.getWith(t, live, path, http.Header{"If-None-Match": {etag}})
+			if status != http.StatusNotModified || body != nil || h.Get("ETag") != etag {
+				t.Errorf("revalidation: status %d, ETag %q, body %v", status, h.Get("ETag"), body)
+			}
+			if status, _, _ := c.getWith(t, live, path, http.Header{"If-None-Match": {`W/"other"`}}); status != http.StatusOK {
+				t.Errorf("other ETag: status %d, want 200", status)
+			}
+		})
+	}
 
 	t.Run("the contract test catches violations", func(t *testing.T) {
 		// A response missing a required field must fail validation.

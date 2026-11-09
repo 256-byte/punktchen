@@ -78,7 +78,12 @@ func (s *Server) GetNearby(ctx context.Context, req openapi.GetNearbyRequestObje
 	cell := geo.CellAt(p.Lat, p.Lng)
 	radius = radiusBucket(radius)
 	key := nearbyKey(cell.Hash, radius, providerVersions(providers))
-	cached, _, err := s.nearby.get(ctx, key, func(ctx context.Context) built[*openapi.NearbyResponse] {
+	cc := cacheControl
+	// Same key as the client's answer: same data, no need to build (5.3).
+	if etag := etagOf(key); matchesETag(p.IfNoneMatch, etag) {
+		return openapi.GetNearby304Response{Headers: openapi.NotModifiedResponseHeaders{ETag: &etag}}, nil
+	}
+	cached, _, err := s.nearby.get(ctx, key, func(ctx context.Context) built[*nearbyAnswer] {
 		return s.buildNearby(ctx, cell, radius, ids)
 	})
 	switch {
@@ -88,20 +93,30 @@ func (s *Server) GetNearby(ctx context.Context, req openapi.GetNearbyRequestObje
 		return nil, err
 	}
 
-	body := *cached // shallow copy: the cached value stays as it is
+	body := cached.body // shallow copy: the cached value stays as it is
 	body.Meta.GeneratedAt = s.meta(nil).GeneratedAt
-	cc := cacheControl
-	return openapi.GetNearby200JSONResponse{Body: body, Headers: openapi.GetNearby200ResponseHeaders{CacheControl: &cc}}, nil
+	headers := openapi.GetNearby200ResponseHeaders{CacheControl: &cc}
+	if cached.etag != "" {
+		headers.ETag = &cached.etag
+	}
+	return openapi.GetNearby200JSONResponse{Body: body, Headers: headers}, nil
 }
 
-// buildNearby asks the layers for the cell and composes the answer (without
-// generatedAt). It is stored under the versions it was built from, unless a
-// layer failed.
-func (s *Server) buildNearby(ctx context.Context, cell geo.Cell, radius int32, ids []string) built[*openapi.NearbyResponse] {
+// nearbyAnswer is a cached /v1/nearby answer: the body without generatedAt
+// and its ETag (empty when a layer failed: such answers are not cached and
+// cannot be revalidated).
+type nearbyAnswer struct {
+	body openapi.NearbyResponse
+	etag string
+}
+
+// buildNearby asks the layers for the cell and composes the answer. It is
+// stored under the versions it was built from, unless a layer failed.
+func (s *Server) buildNearby(ctx context.Context, cell geo.Cell, radius int32, ids []string) built[*nearbyAnswer] {
 	q := layer.NearbyQuery{Center: layer.Location{Lat: cell.Lat, Lng: cell.Lng}, RadiusMeters: cell.SearchRadius(float64(radius))}
 	comp, err := s.cfg.Layers.Nearby(ctx, q, ids)
 	if err != nil {
-		return built[*openapi.NearbyResponse]{err: err}
+		return built[*nearbyAnswer]{err: err}
 	}
 
 	body := &openapi.NearbyResponse{Meta: s.meta(comp.Attribution)}
@@ -127,9 +142,10 @@ func (s *Server) buildNearby(ctx context.Context, cell geo.Cell, radius int32, i
 		body.Meta.Layers[l.Info.ID] = lm
 		versions = append(versions, layerVersion(l.Info.ID, l.Version))
 	}
-	out := built[*openapi.NearbyResponse]{val: body}
+	out := built[*nearbyAnswer]{val: &nearbyAnswer{body: *body}}
 	if ok {
 		out.key = nearbyKey(cell.Hash, radius, versions)
+		out.val.etag = etagOf(out.key)
 	}
 	return out
 }
@@ -213,13 +229,19 @@ func (s *Server) GetStation(ctx context.Context, req openapi.GetStationRequestOb
 	case err != nil:
 		return nil, err
 	}
+	// The station depends only on the snapshot version (ARCHITECTURE §3.5);
+	// a match saves the transfer, the station is small to build.
+	etag := etagOf(fmt.Sprintf("station|%s|%d", req.StationId, version))
+	if matchesETag(req.Params.IfNoneMatch, etag) {
+		return openapi.GetStation304Response{Headers: openapi.NotModifiedResponseHeaders{ETag: &etag}}, nil
+	}
 	info := s.cfg.Transit.Info()
 	meta := s.meta(info.Attribution)
 	meta.Layers[info.ID] = layerMeta(version, s.cfg.Transit.Health())
 	cc := cacheControl
 	return openapi.GetStation200JSONResponse{
 		Body:    openapi.StationResponse{Meta: meta, Station: *st},
-		Headers: openapi.GetStation200ResponseHeaders{CacheControl: &cc},
+		Headers: openapi.GetStation200ResponseHeaders{CacheControl: &cc, ETag: &etag},
 	}, nil
 }
 

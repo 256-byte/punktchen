@@ -67,7 +67,7 @@ type Server struct {
 	cfg    Config
 	log    *slog.Logger
 	now    func() time.Time
-	nearby *cellCache[*openapi.NearbyResponse]
+	nearby *cellCache[*nearbyAnswer]
 }
 
 var _ openapi.StrictServerInterface = (*Server)(nil)
@@ -81,12 +81,13 @@ func NewServer(cfg Config) *Server {
 		cfg.CacheTTL = DefaultCacheTTL
 	}
 	s := &Server{cfg: cfg, log: cfg.Log, now: time.Now}
-	s.nearby = newCellCache[*openapi.NearbyResponse](cfg.CacheEntries, cfg.CacheTTL, func() time.Time { return s.now() }, cfg.Metrics)
+	s.nearby = newCellCache[*nearbyAnswer](cfg.CacheEntries, cfg.CacheTTL, func() time.Time { return s.now() }, cfg.Metrics)
 	return s
 }
 
 // NewHandler wires the generated router to s. Parameter errors and unknown
-// paths answer with the contract's Error JSON.
+// paths answer with the contract's Error JSON; successful JSON is gzipped
+// for clients that accept it (task 5.3).
 func NewHandler(s *Server) http.Handler {
 	strict := openapi.NewStrictHandlerWithOptions(s, nil, openapi.StrictHTTPServerOptions{
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
@@ -102,12 +103,12 @@ func NewHandler(s *Server) http.Handler {
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, codeNotFound, "no such endpoint")
 	})
-	return openapi.HandlerWithOptions(strict, openapi.StdHTTPServerOptions{
+	return withGzip(openapi.HandlerWithOptions(strict, openapi.StdHTTPServerOptions{
 		BaseRouter: mux,
 		ErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
 			writeError(w, http.StatusBadRequest, codeInvalidArgument, err.Error())
 		},
-	})
+	}))
 }
 
 // GetHealth reports the service status (ARCHITECTURE §3.7):

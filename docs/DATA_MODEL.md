@@ -230,8 +230,9 @@ Rules: `radius` 100–1000 (default 500). `layers` comma-separated, default `tra
 
 ### 5.4 Caching headers
 
-- `ETag` on every `/v1/nearby` and `/v1/stations/*` response; `304` on match.
+- `ETag` (weak) on every `/v1/nearby` and `/v1/stations/*` response; `304` with empty body on match (task 5.3). A failed layer → no ETag.
 - `Cache-Control: no-cache` (clients must revalidate; ETag makes it cheap).
+- JSON bodies are gzip-compressed when the client sends `Accept-Encoding: gzip` (task 5.3).
 
 ## 6. Mode mapping (`route_type` → `mode`)
 

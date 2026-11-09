@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 5 — Traffic & cache (Phase 4 done except 4.0's final step; exception, see Decisions 2026-11-09)
-- **Next task:** 5.3 ETag/304 end-to-end, gzip; 4.0's final step in between (waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
+- **Next task:** 5.4 mobile fetch policy wired; 4.0's final step in between (waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -52,7 +52,7 @@
 | 4 | 4.6 Match ratio metric | done | `livestop_rt_match_ratio` over departures within ±15 min of now; observed 0.93 live (Monday 22:24), 0.91 on the Wedding fixture; whole-window ratio would be ~0.5 (DATA_MODEL §7 #31) |
 | 5 | 5.1 Geohash cell snapping + radius expansion | done | `/v1/nearby` answers for the precision-7 cell centre with radius + half diagonal (~90 m in Berlin); `meta.cell` set; two users 50 m apart in one cell get byte-identical responses (contract test on real data) |
 | 5 | 5.2 LRU cell cache, TTL, metrics | done | Key (cell, radius bucket, layer versions); LRU 1024, TTL 60 s; one build per key; load test: 1000 requests from one cell → 1 build (1 miss, 99 shared, 900 hits); generatedAt stays the response time |
-| 5 | 5.3 ETag/304 end-to-end, gzip | todo | |
+| 5 | 5.3 ETag/304 end-to-end, gzip | done | Weak ETags on nearby (cache key) and station (id + version); `curl` with `If-None-Match` → 304, 0 bytes (live); gzip 31.9 KB → 2.9 KB (Wedding) |
 | 5 | 5.4 Mobile fetch policy wired | todo | |
 | 5 | 5.5 Performance numbers in README | todo | |
 
@@ -101,6 +101,13 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 5.3
+- Done: `internal/api/etag.go` — `etagOf` (weak `W/"…"`, 128-bit sha256 hex; weak because `generatedAt` and gzip change the bytes), `matchesETag` (weak comparison, lists, `*`). `/v1/nearby`: ETag of the cache key, 304 before the cache lookup; the cached answer carries its ETag (the key it was built from); no ETag when a layer failed. `/v1/stations/{id}`: ETag of id + snapshot version, 304 after building (cheap; saves the transfer). `internal/api/gzip.go` — `withGzip` around the API handler: 2xx JSON gzipped when `Accept-Encoding` allows it (q-values parsed), pooled writers, `Vary: Accept-Encoding`; errors and 304s untouched. No contract change: ETag, `If-None-Match` and 304 were already in it; the app already revalidates (3.3).
+- Tests: ETag format and matching table, Accept-Encoding table (incl. q=0, `*`), gzip on/off (decompressed body equals the plain one), 400 and 304 not compressed, handler without Content-Type / without body; nearby: another user in the same cell revalidates → 304, empty body, no build; new version → 200 with a new ETag; failing layer → no ETag; station → 304. **Contract test on the Wedding fixture: 200 → ETag → `If-None-Match` → 304 with empty body, validated against `api/openapi.yaml`, for nearby and the station; another ETag → 200.** All backend tests, race (api, 2 runs), golangci-lint pass.
+- Live (dev stack, acceptance): `curl -H "If-None-Match: W/\"3c5b…\""` → **304, 0 bytes** (nearby and station); gzip: Wedding 500 m 31,902 → 2,885 bytes.
+- New deps: none.
+- Next: 5.4 mobile fetch policy.
 
 ### 2026-11-09 — task 5.2
 - Done: `internal/api/cache.go` — generic `cellCache` (LRU via `container/list`, TTL, one build per key, waiters share it and may give up on their own context; the build gets `context.WithoutCancel` + 10 s; a panicking build gives waiters an error, not a zero value). `GetNearby`: key from `Layers.Resolve` (new in the interface) + provider versions; radius rounded up to 100 m; the answer is stored under the versions it was built from and not stored when a layer failed. `Config.Metrics` / `CacheEntries` / `CacheTTL`; `cmd/server` passes the metrics registry.
