@@ -99,3 +99,14 @@ export function decideFetch(s: FetchState, now: number): FetchDecision {
       : Math.min(tooOldAt, last.earliestDepartureAt + DEPARTED_AFTER_MS);
   return { fetch: false, reason: 'fresh', until };
 }
+
+/**
+ * The point to request data for: stays put until the position moved more
+ * than 150 m from it, so small moves (and map pans) reuse one query and its
+ * ETag.
+ */
+export function nextRequestCenter(current: LatLng | null, position: LatLng): LatLng {
+  return current !== null && distanceMeters(current, position) <= MOVE_THRESHOLD_M
+    ? current
+    : position;
+}

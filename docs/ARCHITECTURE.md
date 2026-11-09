@@ -197,6 +197,7 @@ Never more often than every 10 s. On error: backoff 5 s → 10 s → 20 s → 60
 interface MapLayer<TFeature> {
   id: LayerId;                                  // "transit"
   select(response: NearbyResponse): TFeature[]; // pick this layer's features
+  key(feature: TFeature): string;               // stable React key
   Marker: React.ComponentType<{ feature: TFeature; now: number }>;
   Sheet: React.ComponentType<{ feature: TFeature; now: number }>;
   refresh: { minIntervalMs: number };
@@ -204,6 +205,15 @@ interface MapLayer<TFeature> {
 ```
 
 The map screen iterates over enabled layers; it does not know what a "departure" is.
+
+Built in task 3.4 (`src/layers/registry.ts`, `src/layers/index.ts`) with `id`, `select`, `key` and `Marker` (no `now` yet); `now` comes with the 1 s ticker (3.5), `Sheet` with the station sheet (3.6), `refresh` with the fetch policy (5.4). `defineLayer<T>()` hides a layer's feature type in the list (`AnyMapLayer`): the screen only hands a layer its own features. The transit layer draws one plain pin per station until the pole markers (3.5).
+
+Map screen (`src/ui/MapScreen.tsx`, task 3.4):
+- Opens centred on the position (`initialRegion`, 500 m around it) and follows the device position until the user drags the map (`onPanDrag`; `isGesture` of `onRegionChangeComplete` is Google Maps only). In "map center" mode the camera never moves by itself.
+- Reports its centre to the location store on every `onRegionChangeComplete`, so "map center" mode looks where the map is.
+- Requests `/v1/nearby` for a request centre that moves only after > 150 m (`nextRequestCenter`), so small moves and pans reuse one query (and its ETag).
+- Without a configured backend it shows `BackendStatus`; a failed request shows the message with "Try again".
+- Expo Go has the native maps module (Apple Maps on iOS, Google Maps on Android). A development or store build for Android will need a Google Maps API key in `app.json` (not needed before Phase 7).
 
 ### 4.5 Map performance rules
 

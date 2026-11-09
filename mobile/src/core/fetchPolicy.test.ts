@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { backoffMs, decideFetch, type FetchState } from './fetchPolicy';
+import { backoffMs, decideFetch, type FetchState, nextRequestCenter } from './fetchPolicy';
 import { MINUTE, SECOND } from './time';
 
 const t0 = Date.parse('2026-11-05T14:30:00+01:00');
@@ -187,5 +187,19 @@ describe('decideFetch', () => {
       const s = state({ last: null, lastAttemptAt: null, consecutiveErrors: 3 });
       expect(decideFetch(s, t0)).toEqual({ fetch: true, reason: 'initial' });
     });
+  });
+});
+
+describe('nextRequestCenter', () => {
+  it('starts at the position', () => {
+    expect(nextRequestCenter(null, wedding)).toBe(wedding);
+  });
+
+  it('stays put for moves up to 150 m', () => {
+    expect(nextRequestCenter(wedding, near)).toBe(wedding);
+  });
+
+  it('moves to the position after more than 150 m', () => {
+    expect(nextRequestCenter(wedding, far)).toBe(far);
   });
 });

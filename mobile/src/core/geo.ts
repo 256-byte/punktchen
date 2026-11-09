@@ -18,3 +18,28 @@ export function distanceMeters(a: LatLng, b: LatLng): number {
     Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
   return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
 }
+
+/** A map region in react-native-maps' shape (centre and span in degrees). */
+export interface Region {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+}
+
+/** Metres per degree of latitude. */
+const METERS_PER_DEGREE = (EARTH_RADIUS_M * Math.PI) / 180;
+
+/**
+ * The region centred on a point that shows at least radiusM in every
+ * direction (plus a 20 % margin), e.g. the /v1/nearby search circle.
+ */
+export function regionAround(center: LatLng, radiusM: number): Region {
+  const latitudeDelta = (2.4 * radiusM) / METERS_PER_DEGREE;
+  return {
+    latitude: center.lat,
+    longitude: center.lng,
+    latitudeDelta,
+    longitudeDelta: latitudeDelta / Math.cos(rad(center.lat)),
+  };
+}
