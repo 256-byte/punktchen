@@ -4,8 +4,8 @@
 
 ## Current status
 
-- **Active phase:** Phase 1 — Static GTFS: all tasks done (2026-11-09). Phase 2 starts when the user says so.
-- **Next task:** 2.1 (Phase 2 — Schedule-based API)
+- **Active phase:** Phase 2 — Schedule-based API (started 2026-11-09)
+- **Next task:** 2.2 schedule window loader
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -30,7 +30,7 @@
 | 1 | 1.6 Sanity checks + swap | done | 0 failed reads in ~4,000 during 6 swaps; real feed passes default limits |
 | 1 | 1.7 Scheduler | done | Dev DB now has the live schedule (startup import in Docker) |
 | 1 | 1.8 Nearby query | done | Wedding 500 m: median 2.8 ms on the full feed |
-| 2 | 2.1 Layer registry | todo | |
+| 2 | 2.1 Layer registry | done | Failing layer → `down`, others still served; race-clean (Docker) |
 | 2 | 2.2 Schedule window loader | todo | |
 | 2 | 2.3 Snapshot | todo | |
 | 2 | 2.4 Transit provider | todo | |
@@ -74,6 +74,17 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 2.1
+- Done:
+  - `internal/layer`: `Provider` (`Info`, `Nearby`, `Version`, `Health`), `NearbyQuery` with `Validate` (coordinate ranges, positive radius; the 100–1000 m product limit stays in the API), `Result{Version, Payload}`, `Health{Status, RealtimeAge, LastError}`, `Status` values matching the contract.
+  - `Registry`: rejects empty/duplicate ids; `Layers()` and `Resolve(ids)` in registration order, duplicates removed, all unknown ids named in one `ErrUnknownLayer`.
+  - `Registry.Nearby`: asks the requested layers concurrently and composes a `Composite` (per-layer version, health, payload, error + deduplicated attribution of the layers with data). A provider error or panic marks only that layer `down`; the request fails only for an invalid query, unknown layers or a cancelled context. The version is taken from the result, not read separately.
+  - The package has no OpenAPI import; payloads are opaque and mapped to typed fields by the API (2.5). ARCHITECTURE §3.5 updated to the real interface (`Info()` instead of `Layer()`, so `/v1/layers` gets name + attribution from the provider).
+  - Removed `backend/internal/layer/.gitkeep`. CLAUDE.md §5: how to run `-race` locally in Docker.
+- Tests: fake-provider unit tests — registration errors and order, `Resolve` dedupe/order/unknown ids, query validation (ranges, NaN, Inf, radius ≤ 0), two-layer composition (query passed through, unrequested layer not asked, result version wins, health copied, attribution deduplicated), failing and panicking layers → `down` while the healthy one is served, layers run concurrently (barrier test), invalid query / unknown layer / cancelled context. `go test -race -count=3` clean in `golang:1.27.3` (Docker). vet, golangci-lint 0 issues.
+- New deps (+ why): none.
+- Next: 2.2 schedule window loader.
 
 ### 2026-11-09 — task 1.8
 - Done:
