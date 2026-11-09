@@ -6,6 +6,7 @@ import type { ApiClient } from '@/api/client';
 import { useStation } from '@/api/station';
 import { poleTitle, type SheetPole, type SheetRow, sheetModel, sheetSignature } from '@/core/sheet';
 import { type ClockStore, clockStore, useNow } from '@/state/clock';
+import { Attribution } from '@/ui/Attribution';
 
 import type { PoleFeature } from './index';
 import { LineBadge } from './LineBadge';
@@ -62,6 +63,7 @@ export function StationSheet({
           ))}
         </View>
       ) : null}
+      <Attribution lines={query.data?.response.meta.attribution ?? []} />
     </BottomSheetScrollView>
   );
 }
