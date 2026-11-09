@@ -7,10 +7,12 @@ import {
   directionKey,
   type MarkerRow,
   markerRows,
-  nextLabels,
+  nextCells,
 } from '@/core/directions';
+import { cellDescription } from '@/core/realtime';
 import { type ClockStore, clockStore, useNow } from '@/state/clock';
 
+import { DepartureTime } from './DepartureTime';
 import type { PoleFeature } from './index';
 import { LineBadge } from './LineBadge';
 
@@ -19,10 +21,10 @@ export const TRACK_CHANGES_MS = 500;
 
 /**
  * A pole: one row per direction with an upcoming departure — line badge,
- * headsign, countdown (task 3.5). Directions with nothing coming are left
- * out (station sheet, 3.6); a pole with none draws no marker. Re-renders
- * when a label changes (about once a minute), not on every tick
- * (ARCHITECTURE §4.5).
+ * headsign, countdown (task 3.5) coloured live or timetable, with its
+ * delay (4.5). Directions with nothing coming are left out (station sheet,
+ * 3.6); a pole with none draws no marker. Re-renders when a cell changes
+ * (about once a minute), not on every tick (ARCHITECTURE §4.5).
  */
 export function PoleMarker({
   feature,
@@ -35,9 +37,9 @@ export function PoleMarker({
   clock?: ClockStore;
 }) {
   const directions = feature.pole.directions;
-  const labels = useNow((now) => nextLabels(directions, now), clock);
-  const { rows, more } = useMemo(() => markerRows(directions, labels), [directions, labels]);
-  const tracks = useTracksViewChanges(directions, labels);
+  const cells = useNow((now) => nextCells(directions, now), clock);
+  const { rows, more } = useMemo(() => markerRows(directions, cells), [directions, cells]);
+  const tracks = useTracksViewChanges(directions, cells);
 
   if (rows.length === 0) {
     return null;
@@ -59,20 +61,22 @@ export function PoleMarker({
   );
 }
 
-function Row({ row: { direction, label } }: { row: MarkerRow }) {
+function Row({ row: { direction, next } }: { row: MarkerRow }) {
   return (
     <View style={styles.row}>
       <LineBadge direction={direction} />
       <Text style={styles.headsign} numberOfLines={1}>
         {direction.headsign}
       </Text>
-      <Text style={styles.countdown}>{label}</Text>
+      <DepartureTime cell={next} style={styles.countdown} />
     </View>
   );
 }
 
 function accessibilityText(feature: PoleFeature, rows: MarkerRow[]) {
-  const parts = rows.map((r) => `${r.direction.line} to ${r.direction.headsign}: ${r.label}`);
+  const parts = rows.map(
+    (r) => `${r.direction.line} to ${r.direction.headsign}: ${cellDescription(r.next)}`,
+  );
   return [feature.station.name, ...parts].join('. ');
 }
 
@@ -81,8 +85,8 @@ function accessibilityText(feature: PoleFeature, rows: MarkerRow[]) {
  * it): on after the content changed, off again shortly after, so the map
  * does not redraw the marker every frame (ARCHITECTURE §4.5).
  */
-function useTracksViewChanges(directions: Direction[], labels: (string | null)[]): boolean {
-  const content = useMemo(() => ({ directions, labels }), [directions, labels]);
+function useTracksViewChanges(directions: Direction[], cells: (string | null)[]): boolean {
+  const content = useMemo(() => ({ directions, cells }), [directions, cells]);
   const [tracking, setTracking] = useState(true);
   const [seen, setSeen] = useState(content);
   if (seen !== content) {

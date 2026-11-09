@@ -54,7 +54,21 @@ function pole(
   return { id, location: { lat: 52.5427, lng: 13.366 }, platform, description, directions };
 }
 
-const S41 = direction('S41', 'Ringbahn S 41', [dep('14:32'), dep('14:37'), dep('14:42')], 'sbahn');
+const S41 = direction(
+  'S41',
+  'Ringbahn S 41',
+  [
+    dep('14:32'),
+    {
+      ...dep('14:37'),
+      predicted: '2026-11-05T14:40:00+01:00',
+      delaySeconds: 180,
+      source: 'realtime',
+    },
+    dep('14:42'),
+  ],
+  'sbahn',
+);
 const M27 = direction('M27', 'S Jungfernheide', [dep('14:33', true), dep('14:43')]);
 const RE2 = direction('RE2', 'Nauen', [], 'regional');
 
@@ -134,9 +148,12 @@ describe('StationSheet', () => {
     expect(screen.getByText('Platform 1')).toBeOnTheScreen();
     expect(screen.getByText('Müllerstraße ht. Lindower Straße')).toBeOnTheScreen(); // bus pole: VBB's description
     expect(screen.getByText('2 min')).toBeOnTheScreen(); // S41 14:32
+    expect(screen.getByLabelText('10 min, live, 3 min late')).toHaveTextContent('10 min +3'); // S41 14:37 → 14:40
     expect(screen.getByText('12 min')).toBeOnTheScreen();
-    expect(screen.getByLabelText('3 min, cancelled')).toBeOnTheScreen(); // M27 14:33
+    const cancelled = screen.getByLabelText('3 min, cancelled'); // M27 14:33
+    expect(cancelled).toHaveStyle({ textDecorationLine: 'line-through' });
     expect(screen.getByText('13 min')).toBeOnTheScreen();
+    expect(screen.getByText(/^Green: live/)).toBeOnTheScreen();
 
     // Nothing coming: once each, after all running directions, platform noted.
     expect(screen.getByText('No departures soon')).toBeOnTheScreen();

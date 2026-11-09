@@ -6,6 +6,7 @@ import type { NearbyResponse } from '@/api/nearby';
 import type { Departure } from '@/core/departures';
 import type { Direction } from '@/core/directions';
 import { type PoleFeature, transitLayer } from '@/layers/transit';
+import { LATE_RED, LIVE_GREEN } from '@/layers/transit/DepartureTime';
 import { PoleMarker, TRACK_CHANGES_MS } from '@/layers/transit/PoleMarker';
 import { type ClockStore, createClockStore, useClockTicker } from '@/state/clock';
 
@@ -99,8 +100,31 @@ describe('PoleMarker', () => {
     expect(screen.queryByText('—')).toBeNull();
     expect(screen.queryByText(/more$/)).toBeNull();
     expect(
-      screen.getByLabelText(/^S\+U Wedding\. M27 to S Jungfernheide: 3 min\. 247 to/),
+      screen.getByLabelText(/^S\+U Wedding\. M27 to S Jungfernheide: 3 min, timetable\. 247 to/),
     ).toBeOnTheScreen();
+  });
+
+  it('colours live countdowns and shows the delay of late ones (task 4.5)', async () => {
+    const live = (time: string, predicted: string, delaySeconds: number): Departure => ({
+      ...dep(time),
+      predicted: `2026-11-05T${predicted}:00+01:00`,
+      delaySeconds,
+      source: 'realtime',
+    });
+    const rt = feature([
+      direction('M27', 'S Jungfernheide', [live('14:33', '14:35', 120)]),
+      direction('120', 'U Leopoldplatz', [live('14:36', '14:36', 20)]),
+      direction('247', 'S Nordbahnhof', [dep('14:38')]),
+    ]);
+    await render(<PoleMarker feature={rt} clock={clock} />);
+
+    const late = screen.getByLabelText('5 min, live, 2 min late'); // by its predicted time
+    expect(late).toHaveTextContent('5 min +2');
+    expect(late).toHaveStyle({ color: LATE_RED });
+    expect(screen.getByLabelText('6 min, live, on time')).toHaveStyle({ color: LIVE_GREEN });
+    const timetable = screen.getByLabelText('8 min, timetable');
+    expect(timetable).toHaveTextContent('8 min');
+    expect(timetable).toHaveStyle({ color: '#111111' });
   });
 
   it('counts the running directions that do not fit', async () => {

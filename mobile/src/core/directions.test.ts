@@ -8,7 +8,7 @@ import {
   MARKER_ROWS,
   markerRows,
   MODE_COLORS,
-  nextLabels,
+  nextCells,
   textColorOn,
 } from './directions';
 
@@ -75,10 +75,14 @@ describe('directionKey', () => {
 
 describe('markerRows', () => {
   const six = Array.from({ length: 6 }, (_, i) => direction({ line: `M${i}` }));
+  const cell = (label: string) => `s\t${label}`;
 
   it(`shows up to ${MARKER_ROWS} running directions and counts the other running ones`, () => {
-    const { rows, more } = markerRows(six, ['1 min', null, '2 min', '3 min', '4 min', '5 min']);
-    expect(rows.map((r) => `${r.direction.line} ${r.label}`)).toEqual([
+    const { rows, more } = markerRows(
+      six,
+      ['1 min', null, '2 min', '3 min', '4 min', '5 min'].map((l) => l && cell(l)),
+    );
+    expect(rows.map((r) => `${r.direction.line} ${r.next.label}`)).toEqual([
       'M0 1 min',
       'M2 2 min',
       'M3 3 min',
@@ -88,25 +92,35 @@ describe('markerRows', () => {
   });
 
   it('leaves out directions with nothing coming', () => {
-    const { rows, more } = markerRows(six.slice(0, 3), [null, '14:52', null]);
-    expect(rows).toEqual([{ direction: six[1], label: '14:52' }]);
+    const { rows, more } = markerRows(six.slice(0, 3), [null, 'l+2\t14:52', null]);
+    expect(rows).toEqual([
+      { direction: six[1], next: { label: '14:52', state: 'late', delay: '+2' } },
+    ]);
     expect(more).toBe(0);
     expect(markerRows(six.slice(0, 2), [null, null])).toEqual({ rows: [], more: 0 });
     expect(markerRows([], [], 3)).toEqual({ rows: [], more: 0 });
   });
 });
 
-describe('nextLabels', () => {
-  it('labels the next running departure of each direction', () => {
-    const labels = nextLabels(
+describe('nextCells', () => {
+  it('encodes the next running departure of each direction', () => {
+    const late: Departure = {
+      ...dep('14:31'),
+      predicted: '2026-11-05T14:34:00+01:00',
+      delaySeconds: 180,
+      source: 'realtime',
+    };
+    const cells = nextCells(
       [
         direction({ departures: [dep('14:33'), dep('14:43')] }),
         direction({ departures: [dep('14:31', true), dep('15:45')] }), // cancelled skipped
         direction({ departures: [dep('14:20')] }), // left
         direction({ departures: [] }), // e.g. suspended
+        direction({ departures: [late, dep('14:33')] }), // ordered by predicted time
       ],
       now,
     );
-    expect(labels).toEqual(['3 min', '15:45', null, null]);
+    expect(cells).toEqual(['s\t3 min', 's\t15:45', null, null, 's\t3 min']);
+    expect(nextCells([direction({ departures: [late] })], now)).toEqual(['l+3\t4 min']);
   });
 });
