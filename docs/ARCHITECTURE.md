@@ -158,6 +158,14 @@ expo-location ──► location store (zustand) ──► fetch policy (core) �
                        global 1 s ticker ──► countdown (core) ──► layer markers + sheets
 ```
 
+`useNearby(client, params)` (`src/api/useNearby.ts`, task 3.2) is the TanStack Query hook for `/v1/nearby`:
+- Query key: the request with defaults filled in (`radius` 500, `layers` sorted), so one request has one cache entry and one ETag. `params` null (no position yet) sends nothing.
+- Each entry keeps `{ response, etag, checkedAt, clockOffsetMs }` (`src/api/nearby.ts`). A refetch sends the entry's ETag as `If-None-Match`; a `304` returns the same `response` object with a new `checkedAt`, so nothing that reads the response re-renders.
+- New parameters keep showing the previous area until their answer arrives (`keepPreviousData`, `isPlaceholderData`).
+- No retries and 30 s `staleTime`: when to fetch is the fetch policy's job (§4.2, wired in 5.4).
+- Arrays go out as `layers=a,b` (OpenAPI `style: form, explode: false`), set once in `createApiClient`.
+- To check in 5.3 on devices: iOS (`NSURLSession`) and Android (OkHttp) may answer a conditional request from their own HTTP cache; with an explicit `If-None-Match` they are expected to pass the `304` through.
+
 ### 4.2 Fetch policy (pure function in `src/core/fetchPolicy.ts`)
 
 Fetch only when the app is in the foreground **and** at least one is true:

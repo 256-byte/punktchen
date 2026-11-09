@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 3 — Mobile MVP (Phase 2 done 2026-11-09)
-- **Next task:** 3.2 API client (openapi-fetch) + `useNearby` with ETag/`If-None-Match`
+- **Next task:** 3.3 Location (permission flow, last known position, movement threshold)
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -37,7 +37,7 @@
 | 2 | 2.5 API handlers | done | Contract tests validate every response against openapi.yaml (kin-openapi); ETag/cell stay for Phase 5 |
 | 2 | 2.6 Spot check vs. VBB | done | 5 stations, 69 directions: all scheduled times match fahrinfo.vbb.de |
 | 3 | 3.1 `src/core` | done | time, departures, staleness, geo, fetch policy; coverage 100 % (gate 90 % in `npm test`) |
-| 3 | 3.2 API client + `useNearby` | todo | |
+| 3 | 3.2 API client + `useNearby` | done | 304 keeps the same response object, new `checkedAt`; backend sends ETags from 5.3 |
 | 3 | 3.3 Location | todo | |
 | 3 | 3.4 Map screen | todo | |
 | 3 | 3.5 Transit layer markers | todo | |
@@ -85,6 +85,13 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 3.2
+- Done: `src/api/nearby.ts` `fetchNearby` (sends `If-None-Match` from the kept answer; 304 → same `response`, new `checkedAt`; 200 → new data, ETag, device clock offset from `meta.generatedAt`; 304 without a kept answer and error bodies → `ApiError`). `src/api/useNearby.ts` hook (normalized query key, `skipToken` without params, `keepPreviousData`, no retries, 30 s `staleTime`). `createApiClient` now serializes arrays as `layers=a,b` like the contract (openapi-fetch's default would send `layers=a&layers=b`).
+- Tests: `tests/ui/use-nearby.test.tsx` (Jest, mocked fetch, 12 tests): URL and comma-separated layers, 200 keeps ETag/time/offset, 304 keeps the same response object and moves `checkedAt` (acceptance criterion), unexpected 304, error messages, query key defaults, hook refetch with 304 and 200, previous area shown while new params load (new key sends no ETag), no request without params, no retry. All mobile checks pass (Vitest 116, Jest 19, coverage gate).
+- Found: openapi-fetch returns a 304 as an error with an empty body, so `fetchNearby` checks the status first. In hook tests, TanStack Query re-renders only for result fields read before (tracked properties): read `data` before a refetch.
+- New deps: none.
+- Next: 3.3 location.
 
 ### 2026-11-09 — task 3.1
 - Done: pure functions in `mobile/src/core` (no React/RN/Expo imports):

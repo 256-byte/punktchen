@@ -23,6 +23,8 @@ export function createApiClient(baseUrl: string, options: ApiClientOptions = {})
   return createClient<paths>({
     baseUrl,
     fetch: (request) => fetchWithTimeout(baseFetch, request, timeoutMs),
+    // Arrays as in api/openapi.yaml (style form, explode false): layers=a,b.
+    querySerializer: { array: { style: 'form', explode: false } },
   });
 }
 
