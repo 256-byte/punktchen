@@ -4,8 +4,8 @@
 
 ## Current status
 
-- **Active phase:** Phase 4 — Realtime (Phase 3 done 2026-11-09)
-- **Next task:** 4.0 final step, the last open task of Phase 4 (waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
+- **Active phase:** Phase 5 — Traffic & cache (Phase 4 done except 4.0's final step; exception, see Decisions 2026-11-09)
+- **Next task:** 5.2 LRU cell cache; 4.0's final step in between (waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -50,6 +50,11 @@
 | 4 | 4.4 Snapshot rebuild on RT change, health | done | Poller + store wired; snapshot merges realtime, republishes per feed; degraded > 2 min, schedule-only > 5 min; live check: 19 of 52 departures realtime at Wedding |
 | 4 | 4.5 Mobile: delay, realtime indicator, cancelled | done | Live times green, late ones red with "+N", timetable black, cancelled struck through (marker + sheet); iPhone: new display seen working (user, 2026-11-09) |
 | 4 | 4.6 Match ratio metric | done | `livestop_rt_match_ratio` over departures within ±15 min of now; observed 0.93 live (Monday 22:24), 0.91 on the Wedding fixture; whole-window ratio would be ~0.5 (DATA_MODEL §7 #31) |
+| 5 | 5.1 Geohash cell snapping + radius expansion | done | `/v1/nearby` answers for the precision-7 cell centre with radius + half diagonal (~90 m in Berlin); `meta.cell` set; two users 50 m apart in one cell get byte-identical responses (contract test on real data) |
+| 5 | 5.2 LRU cell cache, TTL, metrics | todo | |
+| 5 | 5.3 ETag/304 end-to-end, gzip | todo | |
+| 5 | 5.4 Mobile fetch policy wired | todo | |
+| 5 | 5.5 Performance numbers in README | todo | |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
 
@@ -76,6 +81,7 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 | 2026-11-09 | Dev-only place picker on the map (not in PLAN, user request): test other parts of Berlin on a phone without faking the GPS | — (dev tool, ARCHITECTURE §4.4 map screen) |
 | 2026-11-09 | Map markers show only directions with an upcoming departure; a pole with none has no marker. Directions without one (night lines by day, rail replacement, suspended lines) are listed last in the station sheet (3.6) — user decision after seeing 72 of 151 directions empty around Alexanderplatz | — (ARCHITECTURE §4.4, DATA_MODEL §3.2) |
 | 2026-11-09 | Exception to "one task at a time": 4.1 starts while 4.0 waits for the Tuesday morning/noon samples (4.1 is needed whatever 4.0 decides). 4.0's tool and first numbers go in their own PR; the final numbers and decision follow in a small PR — user decision | — |
+| 2026-11-09 | Exception to "stay in the current phase": Phase 5 starts with 5.1 while 4.0's final step (daytime samples on 2026-11-10) is still open; 4.0 closes in its own small PR in between — user decision | — |
 
 ## Open questions
 
@@ -95,6 +101,14 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 5.1
+- Phase 5 started before 4.0's final step (user decision, see Decisions).
+- Done: `geo.CellAt` (geohash precision 7, `CellPrecision`): cell hash, centre and half diagonal (largest centre–corner distance, rounded up + 1 m for sphere vs. PostGIS spheroid); `Cell.SearchRadius(r)` = r + half diagonal; `geo.DistanceMeters` (haversine). `GetNearby` queries the layers at the cell centre with the search radius and sets `meta.cell`. Contract: `distanceMeters` is now from the cell centre; `cell` example fixed to a real hash (`u33dbjh` = S+U Wedding; the old example was made up). Regenerated Go + TS.
+- Numbers: a Berlin cell is ~153 m north–south × ~93 m east–west, half diagonal ~90 m, so radius 500 searches ~590 m around the centre. Wedding 500 m: 8 stations instead of 6 (ADR-0006 consequence: the client may filter by its own distance).
+- Tests: `geo` — Wedding hash and cell size; two points 50 m apart in one cell → same cell, the next cell north → another; 10,000 random Berlin points: every point within the half diagonal of its centre and a stop 500 m away within the search radius; haversine values. `api` — query goes to the cell centre with the grown radius, `meta.cell` set; **contract test on the Wedding fixture: two users 50 m apart get byte-identical responses that hold every station within 500 m of each exact point** (acceptance), a user in the next cell gets another cell. Live (dev stack): two points 44 m apart → `u33dbjj`, identical 31 KB answers. All backend tests, race (geo, api), golangci-lint, mobile typecheck pass.
+- New dep: `github.com/mmcloughlin/geohash` v0.10.0 (pure Go; chosen in ADR-0006, listed in the CLAUDE.md stack).
+- Next: 5.2 LRU cache keyed by `(layers, cell, radiusBucket, providerVersions)`.
 
 ### 2026-11-09 — task 4.6
 - Done: `realtime.MatchRatio` + `MatchWindow` (15 min); `Store.Merger(maxAge, *Metrics)` sets gauge `livestop_rt_match_ratio` after every merge (0 without a merged state); merge debug log carries `match_ratio`.

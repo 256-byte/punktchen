@@ -1,5 +1,5 @@
-// Package geo holds geographic helpers: the scope bounding box and, later,
-// geohash cells for the response cache.
+// Package geo holds geographic helpers: the scope bounding box and the
+// geohash cells /v1/nearby snaps requests to (ADR-0006).
 package geo
 
 import (

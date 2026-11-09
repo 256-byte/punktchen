@@ -215,7 +215,7 @@ export interface components {
             generatedAt: components["schemas"]["Timestamp"];
             /**
              * @description Cache cell (geohash) the request was snapped to. Only on /v1/nearby.
-             * @example u33dc9f
+             * @example u33dbjh
              */
             cell?: string;
             /**
@@ -266,7 +266,7 @@ export interface components {
             location: components["schemas"]["LatLng"];
             /**
              * Format: int32
-             * @description Distance from the query point. Only on /v1/nearby.
+             * @description Distance from the centre of the cache cell the request was snapped to (`meta.cell`, ADR-0006), not from the exact point. Only on /v1/nearby.
              */
             distanceMeters?: number;
             /**

@@ -359,7 +359,7 @@ type ResponseMeta struct {
 
 	// Cell Cache cell (geohash) the request was snapped to. Only on /v1/nearby.
 	//
-	// Examples: u33dc9f
+	// Examples: u33dbjh
 	Cell *string `json:"cell,omitempty"`
 
 	// GeneratedAt ISO-8601 with offset, Europe/Berlin.
@@ -373,7 +373,7 @@ type ResponseMeta struct {
 
 // Station A parent stop with its poles. A pole without parent is its own station.
 type Station struct {
-	// DistanceMeters Distance from the query point. Only on /v1/nearby.
+	// DistanceMeters Distance from the centre of the cache cell the request was snapped to (`meta.cell`, ADR-0006), not from the exact point. Only on /v1/nearby.
 	DistanceMeters *int32 `json:"distanceMeters,omitempty"`
 
 	// Id Examples: de:11000:900009104

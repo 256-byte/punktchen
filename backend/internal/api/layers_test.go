@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/256-byte/punktchen/backend/gen/openapi"
+	"github.com/256-byte/punktchen/backend/internal/geo"
 	"github.com/256-byte/punktchen/backend/internal/layer"
 	"github.com/256-byte/punktchen/backend/internal/transit"
 )
@@ -117,9 +118,11 @@ func TestNearbyParameters(t *testing.T) {
 		if resp.StatusCode != http.StatusOK || resp.Header.Get("Cache-Control") != "no-cache" {
 			t.Fatalf("status %d, Cache-Control %q", resp.StatusCode, resp.Header.Get("Cache-Control"))
 		}
+		// Snapped to the cell centre, radius grown by the half diagonal (ADR-0006).
+		cell := geo.CellAt(52.5427, 13.366)
 		q := fl.lastQuery(t)
-		if q.Center != (layer.Location{Lat: 52.5427, Lng: 13.366}) || q.RadiusMeters != 500 {
-			t.Errorf("query %+v, want the point with radius 500", q)
+		if q.Center != (layer.Location{Lat: cell.Lat, Lng: cell.Lng}) || q.RadiusMeters != 500+cell.HalfDiagonalMeters {
+			t.Errorf("query %+v, want the centre of %+v with radius 500 + half diagonal", q, cell)
 		}
 	})
 
@@ -127,7 +130,7 @@ func TestNearbyParameters(t *testing.T) {
 		if status, _, _ := get(t, srv.URL+"/v1/nearby?lat=52.5&lng=13.4&radius=1000&layers=transit"); status != http.StatusOK {
 			t.Fatalf("status %d", status)
 		}
-		if q := fl.lastQuery(t); q.RadiusMeters != 1000 {
+		if q := fl.lastQuery(t); q.RadiusMeters != geo.CellAt(52.5, 13.4).SearchRadius(1000) {
 			t.Errorf("radius %v", q.RadiusMeters)
 		}
 	})
@@ -163,8 +166,8 @@ func TestNearbyResponse(t *testing.T) {
 	if meta["generatedAt"] != "2026-11-05T14:32:00+01:00" || meta["attribution"].([]any)[0] != "Data: VBB (CC BY 4.0)" {
 		t.Errorf("meta %v", meta)
 	}
-	if _, ok := meta["cell"]; ok {
-		t.Error("cell before the cell cache (Phase 5)")
+	if meta["cell"] != "u33dbjh" {
+		t.Errorf("cell %v, want u33dbjh", meta["cell"])
 	}
 	lm := meta["layers"].(map[string]any)["transit"].(map[string]any)
 	if lm["version"] != float64(1794220416761) || lm["status"] != "ok" || lm["realtimeAgeSeconds"] != float64(11) {
