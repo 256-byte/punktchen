@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 1 — Static GTFS (started 2026-11-08 with the user's OK while 0.9 is blocked)
-- **Next task:** 1.4
+- **Next task:** 1.5
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -25,7 +25,7 @@
 | 1 | 1.1 Data exploration | done | DATA_MODEL §7 #1–#20; all (verify) items answered. Default GTFS URL and RT rate limit updated |
 | 1 | 1.2 Downloader | done | Changed zip stays `running` until the importer (1.3) closes it |
 | 1 | 1.3 Streaming import | done | Full VBB feed in ~9 s, peak Go memory 18 MB |
-| 1 | 1.4 Indexes + in_scope | todo | |
+| 1 | 1.4 Indexes + in_scope | done | 10,841 poles / 3,914 stations in scope (2,974 in Berlin) |
 | 1 | 1.5 Derived tables | todo | Now includes `stations` + real Wedding subset fixture |
 | 1 | 1.6 Sanity checks + swap | todo | |
 | 1 | 1.7 Scheduler | todo | |
@@ -68,6 +68,17 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 1.4
+- Done:
+  - `stops.in_scope boolean NOT NULL DEFAULT false` in `db/gtfs/schema.sql`.
+  - `db/gtfs/indexes.sql` (embedded as `db.GTFSIndexes`): primary keys on routes, trips, stops, calendar, calendar_dates, stop_times; indexes `stop_times(stop_id, departure_secs)`, `trips(service_id)`, `trips(route_id)`, `stops(parent_station)`, GiST `stops(geom)`. No foreign keys (1.6 reports dangling refs instead).
+  - `Loader.Load` now runs, in the same transaction after COPY: scope flags from `LIVESTOP_SCOPE_BBOX` (poles in the bbox; `location_type=1` stations with a pole in scope), counts of in-scope poles and stations, keys + indexes with `maintenance_work_mem = 256MB` (tx-local), `ANALYZE` of every table. Returns `LoadResult{Rows, InScopePoles, InScopeStations}`.
+  - `stationKeySQL`: the station grouping of DATA_MODEL §3.4 as one SQL expression, to be reused by the `stations` table in 1.5.
+- Tests: mini feed extended (Potsdam station + pole outside the bbox, entrance, non-DHID pole): flags per stop, 3 poles / 2 stations (parent and DHID-prefix poles grouped), all indexes present, `pg_stats` filled, duplicate `(trip_id, stop_sequence)` fails with `stop_times_pkey`; tables.go ↔ schema.sql check now skips DEFAULT columns. Real feed: 10,841 poles / 3,914 stations in scope, Berlin 2,974 stations; load 9 s + index/ANALYZE 23 s = 33 s, peak Go memory 22 MB. vet, golangci-lint 0 issues.
+- Data facts found: DATA_MODEL §7 #12 (scope numbers, per AGS and mode; 1,184 in-scope poles without any stop_times).
+- New deps (+ why): none.
+- Next: 1.5 derived tables (`stations`, `service_dates`, `pole_directions`) + Wedding subset fixture.
 
 ### 2026-11-09 — task 1.3
 - Done:

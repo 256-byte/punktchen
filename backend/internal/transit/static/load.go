@@ -17,35 +17,54 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/256-byte/punktchen/backend/db"
+	"github.com/256-byte/punktchen/backend/internal/geo"
 )
 
 // StagingSchema receives each import before the swap (ADR-0004).
 const StagingSchema = "gtfs_staging"
 
-// stagingDDL is db/gtfs/schema.sql for the staging schema.
-func stagingDDL() string {
-	ddl := strings.ReplaceAll(db.GTFSSchema, "CREATE SCHEMA gtfs;", "CREATE SCHEMA "+StagingSchema+";")
-	return strings.ReplaceAll(ddl, "gtfs.", StagingSchema+".")
+// toStaging rewrites SQL written for schema "gtfs" (db/gtfs/*.sql) to the
+// staging schema.
+func toStaging(sql string) string {
+	sql = strings.ReplaceAll(sql, "CREATE SCHEMA gtfs;", "CREATE SCHEMA "+StagingSchema+";")
+	return strings.ReplaceAll(sql, "gtfs.", StagingSchema+".")
 }
+
+// stationKeySQL is the station of the stops row "s" (DATA_MODEL §3.4):
+// parent_station, else the DHID prefix de:<AGS>:<station>, else the stop.
+const stationKeySQL = `CASE
+	WHEN s.parent_station IS NOT NULL THEN s.parent_station
+	WHEN s.stop_id LIKE 'de:%:%' THEN split_part(s.stop_id, ':', 1) || ':' || split_part(s.stop_id, ':', 2) || ':' || split_part(s.stop_id, ':', 3)
+	ELSE s.stop_id
+END`
 
 // Loader streams the CSV files of a GTFS zip into the staging schema.
 type Loader struct {
-	pool *pgxpool.Pool
-	log  *slog.Logger
+	pool  *pgxpool.Pool
+	scope geo.BBox
+	log   *slog.Logger
 }
 
-// NewLoader returns a Loader that writes through pool.
-func NewLoader(pool *pgxpool.Pool, log *slog.Logger) *Loader {
-	return &Loader{pool: pool, log: log}
+// NewLoader returns a Loader that writes through pool and flags stops inside
+// scope as in_scope (DATA_MODEL §4).
+func NewLoader(pool *pgxpool.Pool, scope geo.BBox, log *slog.Logger) *Loader {
+	return &Loader{pool: pool, scope: scope, log: log}
 }
 
-// Load recreates the staging schema and copies all tables of the zip into it,
-// in one transaction: on error the previous staging schema is left as it was.
-// It returns the number of rows per table.
+// LoadResult describes a loaded staging schema.
+type LoadResult struct {
+	Rows            map[string]int64 // per table
+	InScopePoles    int64
+	InScopeStations int64 // grouped as in DATA_MODEL §3.4
+}
+
+// Load recreates the staging schema from the zip in one transaction: create
+// tables, COPY every file, flag the scope, add keys and indexes, ANALYZE. On
+// error the previous staging schema is left as it was.
 //
 // Files are read straight from the zip (no extraction) and rows go to Postgres
 // with COPY, one row at a time, so memory use does not grow with file size.
-func (l *Loader) Load(ctx context.Context, zipPath string) (map[string]int64, error) {
+func (l *Loader) Load(ctx context.Context, zipPath string) (*LoadResult, error) {
 	start := time.Now()
 	z, err := zip.OpenReader(zipPath)
 	if err != nil {
@@ -62,25 +81,68 @@ func (l *Loader) Load(ctx context.Context, zipPath string) (map[string]int64, er
 	if _, err := tx.Exec(ctx, "DROP SCHEMA IF EXISTS "+StagingSchema+" CASCADE"); err != nil {
 		return nil, fmt.Errorf("drop %s: %w", StagingSchema, err)
 	}
-	if _, err := tx.Exec(ctx, stagingDDL()); err != nil {
+	if _, err := tx.Exec(ctx, toStaging(db.GTFSSchema)); err != nil {
 		return nil, fmt.Errorf("create %s: %w", StagingSchema, err)
 	}
 
-	counts := make(map[string]int64, len(tables))
+	res := &LoadResult{Rows: make(map[string]int64, len(tables))}
 	for _, spec := range tables {
 		t0 := time.Now()
 		n, err := copyTable(ctx, tx, &z.Reader, spec)
 		if err != nil {
 			return nil, err
 		}
-		counts[spec.table] = n
+		res.Rows[spec.table] = n
 		l.log.Info("gtfs table loaded", "table", spec.table, "rows", n, "duration", time.Since(t0).Round(time.Millisecond))
+	}
+
+	if err := l.finish(ctx, tx, res); err != nil {
+		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit %s: %w", StagingSchema, err)
 	}
-	l.log.Info("gtfs staging loaded", "duration", time.Since(start).Round(time.Millisecond))
-	return counts, nil
+	l.log.Info("gtfs staging loaded", "duration", time.Since(start).Round(time.Millisecond),
+		"in_scope_poles", res.InScopePoles, "in_scope_stations", res.InScopeStations)
+	return res, nil
+}
+
+// finish flags the scope, builds keys and indexes and refreshes statistics.
+func (l *Loader) finish(ctx context.Context, tx pgx.Tx, res *LoadResult) error {
+	t0 := time.Now()
+	b := l.scope
+	// A pole is in scope if it lies in the bbox; a station if any child pole does.
+	if _, err := tx.Exec(ctx, `UPDATE `+StagingSchema+`.stops SET in_scope = true
+		WHERE coalesce(location_type, 0) = 0
+		  AND stop_lon BETWEEN $1 AND $3 AND stop_lat BETWEEN $2 AND $4`,
+		b.MinLon, b.MinLat, b.MaxLon, b.MaxLat); err != nil {
+		return fmt.Errorf("scope poles: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `UPDATE `+StagingSchema+`.stops st SET in_scope = true
+		WHERE st.location_type = 1
+		  AND EXISTS (SELECT 1 FROM `+StagingSchema+`.stops p WHERE p.parent_station = st.stop_id AND p.in_scope)`); err != nil {
+		return fmt.Errorf("scope stations: %w", err)
+	}
+	if err := tx.QueryRow(ctx, `SELECT count(*), count(DISTINCT `+stationKeySQL+`)
+		FROM `+StagingSchema+`.stops s
+		WHERE s.in_scope AND coalesce(s.location_type, 0) = 0`).Scan(&res.InScopePoles, &res.InScopeStations); err != nil {
+		return fmt.Errorf("count scope: %w", err)
+	}
+
+	// More memory per index build than the 64 MB default; only for this tx.
+	if _, err := tx.Exec(ctx, `SET LOCAL maintenance_work_mem = '256MB'`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, toStaging(db.GTFSIndexes)); err != nil {
+		return fmt.Errorf("keys and indexes: %w", err)
+	}
+	for _, spec := range tables {
+		if _, err := tx.Exec(ctx, `ANALYZE `+pgx.Identifier{StagingSchema, spec.table}.Sanitize()); err != nil {
+			return fmt.Errorf("analyze %s: %w", spec.table, err)
+		}
+	}
+	l.log.Info("gtfs staging indexed", "duration", time.Since(t0).Round(time.Millisecond))
+	return nil
 }
 
 func copyTable(ctx context.Context, tx pgx.Tx, z *zip.Reader, spec tableSpec) (int64, error) {
