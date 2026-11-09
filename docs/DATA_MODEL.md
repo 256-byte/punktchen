@@ -286,6 +286,7 @@ Evidence tool: `backend/internal/tools/gtfsexplore` (task 1.1, not shipped). Unl
 | 26 | **Direction variants per pole.** `pole_directions` has a row per (route, direction_id, trip headsign), so one platform carries many variants: S+U Wedding S-Bahn platform 1 lists S41 "Ringbahn S 41" from 10+ trip headsigns, plus S41 to S Greifswalder Str./S Ostkreuz/S Treptower Park; U6 platform 2 has U Alt-Tegel, U Kurt-Schumacher-Platz and U Seestr.; bus poles have night variants (N6 to 4 destinations). Wedding subset, 500 m around U Wedding, Tue 2026-11-10 17:00: 174 rows at 23 poles, 121 distinct labels, **51** directions after the §3.2 rules (99 departures). That afternoon the U6 north of Wedding ran only to U Kurt-Schumacher-Platz in this feed (Alt-Tegel variant without departures). Full feed: Wedding 500 m 52 directions (26 KB JSON), Alexanderplatz 1000 m 27 stations / 297 directions (135 KB JSON uncompressed); transit `Nearby` median 4.5 ms / 12.1 ms. | TestProviderWeddingGolden (testdata/*.golden.json), TestImportRealFeed | 2026-11-09 |
 | 27 | **Spot check vs. VBB departure board (task 2.6).** 5 stations, 69 directions (S, U, tram, bus, regional, ferry), Monday 2026-11-09 13:06–14:38: **every scheduled time equals fahrinfo.vbb.de**. Not times: (a) lines suspended for weeks keep a direction with an empty list (§3.2 fallback): RE2/RE7/RB14/RB23 stop at S+U Alexanderplatz only from 2026-12-13 in this feed, trams M1/12 at U Eberswalder Str. replaced by buses; (b) some `trip_headsign`s are less precise than VBB's own board (RE1 "Hauptbahnhof" = Magdeburg Hbf, loop bus 114 "S Wannsee Bhf" vs "Heckeshorn"); (c) VBB's board merges nearby stops (Alexanderplatz/Gontardstr., S Wedding/Martha-Ndumbe-Platz) that DHID keeps apart. | browser: fahrinfo.vbb.de webapp vs `/v1/stations/{id}` on the dev DB | 2026-11-09 |
 | 28 | **Pole descriptions (`stop_desc`, task 3.6).** Served in-scope poles: `stop_desc` set on 99.6 % of bus poles and 100 % of tram, U-, S-Bahn, regional and ferry poles; `platform_code` only on 5.1 % of bus and 14.9 % of tram poles (99 % U-Bahn, 65 % S-Bahn). It says where the pole is: "Bushalt Müllerstraße ht. Lindower Straße" (ht. = hinter, also "hinter", "vor", "Richtung …"), "Tramsteig …", "S-Bahnsteig Gleis 1", "U Bahnsteig Gleis 2", "Bahnsteig Gleis 3", "Ersatzhalt …" (rail replacement stop). Prefixes of 9,628 served poles: Bushalt 7,634, Tramsteig 612, S-Bahnsteig 334, U Bahnsteig 322, Ersatzhalt 211, Bahnsteig 151, Tramhalt 140, plus ~20 spellings of combined bus/tram stops ("Tram- u. Bushalt", "Tram-/Bussteig", "Bus- u. Tramhalt", …), bus station bays "Bussteig A3", one "VERWEIST: Bushalt" and 43 empty. ⇒ API `Pole.description` (raw, trimmed); the app drops the bus/tram prefix for sheet titles (`poleTitle`), keeps rail and "Ersatzhalt" text. | psql on the dev DB (live feed of 2026-11-05) | 2026-11-09 |
+| 29 | **GTFS-RT TripUpdate fields (task 4.2).** Full feed Monday 2026-11-09 19:46 Berlin (8,541 TripUpdates) and the 4 Wedding fixtures: `trip_id`, `start_date` and `TripUpdate.timestamp` set on every TripUpdate; no trip instance `(trip_id, start_date)` twice in a feed; trip `schedule_relationship` only SCHEDULED (8,527) and CANCELED (14); `stop_sequence` strictly increasing within a TripUpdate, missing on 1.2 % of stop time updates (2,166 of 174,539); every feed `FULL_DATASET`. **One feed carries two service days:** at 19:46 on Monday 4,183 TripUpdates for 2026-11-09 and 4,358 for 2026-11-10 (tomorrow's trips, schedule-filled, no delays); at 23:59 on Sunday 76 for the 8th and 408 for the 9th (Wedding subset). ⇒ key realtime by `(trip_id, start_date)`. Some first stops have an arrival time after the departure time (U-Bahn trip 310886899: arrival 23:04:30, departure 23:04:00 with delay +0 s): use the departure event for departures. | probe on `data/gtfsrt/vbb-20261109T184616Z.pb` + fixtures; `realtime` parse golden | 2026-11-09 |
 
 All Phase 1 **(verify)** items are answered. Fixtures: `backend/testdata/gtfsrt/` and `backend/testdata/gtfs/` (READMEs there).
 
@@ -319,6 +320,27 @@ type Snapshot struct {
 
 Planned:
 - Line, mode and colour are per route (`route_id`). Task 2.4 decides where they are looked up.
+- `transit/realtime` (task 4.2): `Parse(body) (*State, ParseStats, error)` and `Store` (`Apply` is the poller's handler, `Current()` lock-free).
+
+```go
+type TripKey struct { TripID string; ServiceDate departures.ServiceDay } // start_date
+type Event struct { Time time.Time; Delay int32; HasDelay bool }      // realtime iff HasDelay (§7 #18)
+type StopUpdate struct {
+    Sequence int32 // NoSequence (-1) if none
+    StopID   string
+    Skipped, NoData bool
+    Arrival, Departure Event
+}
+type TripUpdate struct {
+    Key TripKey; RouteID string; Canceled bool
+    Delay int32; HasDelay bool // TripUpdate.delay
+    Updated time.Time          // TripUpdate.timestamp
+    Stops []StopUpdate         // feed order (increasing stop_sequence)
+}
+// Immutable once built; Trip(key), Len(), Keys().
+type State struct { FeedTime time.Time /* header.timestamp */; trips map[TripKey]*TripUpdate }
+```
+
 - Phase 4 adds the realtime fields: `Predicted *time.Time`, `DelaySeconds *int32`, `Source` (scheduled | realtime), `Cancelled`, and `Snapshot.RealtimeFeedTime` (`header.timestamp` of the last applied feed). Then the order inside a pole is by effective time (predicted, else scheduled).
 
 ## 9. Mobile core types (reference)
