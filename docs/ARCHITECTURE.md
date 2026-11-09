@@ -39,7 +39,7 @@ All backend parts live in **one binary** (modular monolith, ADR-0002). Package b
 
 ### 3.1 `transit/static` — GTFS schedule import
 
-- **Source:** current VBB GTFS (stop-pole precision), URL in config (`LIVESTOP_GTFS_URL`). Default: `https://www.vbb.de/gtfs`. It is the feed the GTFS-RT trip ids refer to; the older "mastscharf" download on unternehmen.vbb.de is not kept up to date (DATA_MODEL §7 #15).
+- **Source:** current VBB GTFS (stop-pole precision), URL in config (`LIVESTOP_GTFS_URL`). Default: `https://unternehmen.vbb.de/gtfs`, the link on VBB's open-data page (https://unternehmen.vbb.de/digitale-services/datensaetze/, "Aktualisierung: 2x wöchentlich"; `https://www.vbb.de/gtfs` serves the same file). It is the feed the GTFS-RT trip ids refer to; the older "gtfs-mastscharf" file is not kept up to date (DATA_MODEL §7 #15).
 - **Size:** ~85 MB zipped, ~650 MB unzipped. `stop_times.txt` dominates (~5.8 M rows).
 - **Schedule:** once a day (default 03:30 Europe/Berlin) + on startup if no data.
 - **Change detection:** conditional GET with `ETag` / `Last-Modified` when the server sends them; the default URL sends neither, so the zip is downloaded and its **SHA-256** compared with the last successful import in `meta.feed_imports`. Unchanged → `skipped`.
@@ -80,7 +80,7 @@ Every time either the schedule window or the RT state changes:
    - stops **after** the last update without own data → propagate the last known delay (GTFS-RT semantics).
    - stops **before** the first update → keep schedule.
    - `SKIPPED` stop → remove that departure.
-3. Set `source = realtime | scheduled` per departure.
+3. Set `source = realtime | scheduled` per departure. VBB fills events without realtime data from the schedule (`time` without `delay`), so only events with `delay` count as `realtime` (DATA_MODEL §7 #18). `stop_id`s that are bare station numbers match by `stop_sequence`.
 4. Build an immutable `Snapshot{Version, GeneratedAt, RealtimeFeedTime, ByStop}` and publish with `atomic.Pointer[Snapshot]` (ADR-0005). Readers are lock-free.
 5. `Version` increments monotonically; it is part of cache keys and ETags.
 
