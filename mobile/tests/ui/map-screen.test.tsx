@@ -48,7 +48,18 @@ function station(id: string, name: string) {
             headsign: `${name} → Jungfernheide`,
             isTerminal: false,
             isRing: false,
-            departures: [],
+            // Markers show directions with an upcoming departure only.
+            departures: [
+              {
+                tripId: '1',
+                serviceDate: '2026-11-05',
+                scheduled: new Date(Date.now() + 5 * 60_000).toISOString(),
+                predicted: null,
+                delaySeconds: null,
+                source: 'scheduled' as const,
+                cancelled: false,
+              },
+            ],
           },
         ],
       },

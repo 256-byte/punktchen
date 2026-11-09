@@ -86,19 +86,49 @@ describe('PoleMarker', () => {
     direction('142', 'S Ostbahnhof', [dep('14:40')]),
   ]);
 
-  it('shows line, headsign and countdown per direction, and counts the rest', async () => {
+  it('shows line, headsign and countdown of the running directions', async () => {
     await render(<PoleMarker feature={f} clock={clock} />);
     expect(screen.getByText('M27')).toBeOnTheScreen();
     expect(screen.getByText('S Jungfernheide')).toBeOnTheScreen();
     expect(screen.getByText('3 min')).toBeOnTheScreen();
     expect(screen.getByText('15:45')).toBeOnTheScreen(); // ≥ 60 min: clock time
-    expect(screen.getByText('—')).toBeOnTheScreen(); // nothing soon (night line)
     expect(screen.getByText('1 min')).toBeOnTheScreen();
-    expect(screen.queryByText('142')).toBeNull();
-    expect(screen.getByText('+1 more')).toBeOnTheScreen();
+    expect(screen.getByText('142')).toBeOnTheScreen(); // 4 running rows fit
+    expect(screen.queryByText('N20')).toBeNull(); // nothing soon (night line): sheet only
+    expect(screen.queryByText('—')).toBeNull();
+    expect(screen.queryByText(/more$/)).toBeNull();
     expect(
       screen.getByLabelText(/^S\+U Wedding\. M27 to S Jungfernheide: 3 min\. 247 to/),
     ).toBeOnTheScreen();
+  });
+
+  it('counts the running directions that do not fit', async () => {
+    const busy = feature([
+      ...f.pole.directions,
+      direction('N40', 'S Karlshorst', []),
+      direction('147', 'S Ostbahnhof', [dep('14:50')]),
+    ]);
+    await render(<PoleMarker feature={busy} clock={clock} />);
+    expect(screen.getByText('+1 more')).toBeOnTheScreen();
+    expect(screen.queryByText('N40')).toBeNull();
+  });
+
+  it('draws no marker for a pole with nothing coming', async () => {
+    const night = feature([direction('N20', 'S Oranienburger Str.', [])]);
+    await render(<PoleMarker feature={night} clock={clock} />);
+    expect(screen.queryByTestId('marker')).toBeNull();
+  });
+
+  it('drops a direction once its last departure has left', async () => {
+    const one = feature([
+      direction('120', 'U Leopoldplatz', [dep('14:31')]),
+      direction('M27', 'S Jungfernheide', [dep('14:40')]),
+    ]);
+    await render(<PoleMarker feature={one} clock={clock} />);
+    expect(screen.getByText('120')).toBeOnTheScreen();
+    await at(t0 + 2 * 60_000); // 14:31 has left
+    expect(screen.queryByText('120')).toBeNull();
+    expect(screen.getByText('M27')).toBeOnTheScreen();
   });
 
   it('counts down with the clock and moves on to the next departure', async () => {
