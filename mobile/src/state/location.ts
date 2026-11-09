@@ -22,6 +22,8 @@ export interface LocationState {
   fix: Fix | null;
   mode: LocationMode;
   mapCenter: LatLng;
+  /** The last place chosen with lookAt; the map moves there once per seq. */
+  jump: { center: LatLng; seq: number } | null;
   setPermission(permission: Permission): void;
   /** Keeps the fix only if acceptFix says so (movement threshold). */
   offerFix(fix: Fix): void;
@@ -30,6 +32,8 @@ export interface LocationState {
   /** Back to the device position (e.g. after granting the permission). */
   chooseDevice(): void;
   setMapCenter(center: LatLng): void;
+  /** Look around a chosen place (dev place picker): map-centre mode there, the map moves. */
+  lookAt(center: LatLng): void;
 }
 
 export function createLocationStore() {
@@ -38,11 +42,18 @@ export function createLocationStore() {
     fix: null,
     mode: 'device',
     mapCenter: BERLIN_CENTER,
+    jump: null,
     setPermission: (permission) => set({ permission }),
     offerFix: (fix) => set((s) => (acceptFix(s.fix, fix) ? { fix } : s)),
     chooseMapCenter: () => set({ mode: 'mapCenter' }),
     chooseDevice: () => set({ mode: 'device' }),
     setMapCenter: (mapCenter) => set({ mapCenter }),
+    lookAt: (center) =>
+      set((s) => ({
+        mode: 'mapCenter',
+        mapCenter: center,
+        jump: { center, seq: (s.jump?.seq ?? 0) + 1 },
+      })),
   }));
 }
 
