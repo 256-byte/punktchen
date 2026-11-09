@@ -66,6 +66,7 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 | 2026-11-09 | VBB line colour list committed and embedded (exception to CLAUDE.md rule 11, user-approved) | — (DATA_MODEL §7 #25) |
 | 2026-11-09 | API directions per pole: terminal out, same label merged, per line and direction of travel only the ones with departures (else the most frequent, empty) — user decision | — (DATA_MODEL §3.2) |
 | 2026-11-09 | Lines suspended for weeks (e.g. RE at Alexanderplatz until 2026-12-13) stay listed with an empty departure list; revisit after seeing it in the UI (3.5). A "runs within N days" filter would not hide them for good: it is evaluated against the calendar, so they come back on their own — user decision (former open question #4) | — (DATA_MODEL §3.2) |
+| 2026-11-09 | Dev-only place picker on the map (not in PLAN, user request): test other parts of Berlin on a phone without faking the GPS | — (dev tool, ARCHITECTURE §4.4 map screen) |
 
 ## Open questions
 
@@ -85,6 +86,13 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — dev place picker (between 3.5 and 3.6, user request)
+- Done: "Dev: place" button on the map in development builds (`__DEV__`): list with "My location" and the five spot-check stations (coordinates from the dev DB's `gtfs.stations`). Choosing a station calls the store's new `lookAt(place)` (map-centre mode there, `jump` the map animates to once); "My location" goes back to the device position and the map follows it again.
+- Why: iOS has no free way to fake the device position for an app (needs a Mac with Xcode, jailbreak, or paid PC tools); the app already had a map-centre mode.
+- Tests: Jest `tests/ui/dev-place-picker.test.tsx` (3): jump + request for the chosen station, back to the device, hidden outside development. Also: test `QueryClient`s now use `gcTime: Infinity` everywhere (the default 5 min GC timer kept Jest from exiting when one file runs alone). Typecheck, lint, all tests pass.
+- New deps: none.
+- Next: 3.6 station sheet.
 
 ### 2026-11-09 — task 3.5
 - Manual check of 3.3/3.4 by the user (iPhone, Expo Go): location prompt shown and granted, map (Apple Maps) opens at the user, station pins shown, no problems seen.

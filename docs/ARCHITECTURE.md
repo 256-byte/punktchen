@@ -217,6 +217,7 @@ Map screen (`src/ui/MapScreen.tsx`, task 3.4):
 - Reports its centre to the location store on every `onRegionChangeComplete`, so "map center" mode looks where the map is.
 - Requests `/v1/nearby` for a request centre that moves only after > 150 m (`nextRequestCenter`), so small moves and pans reuse one query (and its ETag).
 - Without a configured backend it shows `BackendStatus`; a failed request shows the message with "Try again".
+- Developer tool (development builds only, `__DEV__`): "Dev: place" (`src/ui/DevPlacePicker.tsx`) jumps to one of the spot-check stations (task 2.6) or back to "My location". It uses the location store's `lookAt(place)`: map-centre mode at that place plus a `jump` the map follows once. iOS has no way for an app to fake the GPS position, so this is how other parts of Berlin are tested on a phone.
 - Expo Go has the native maps module (Apple Maps on iOS, Google Maps on Android). A development or store build for Android will need a Google Maps API key in `app.json` (not needed before Phase 7).
 
 ### 4.5 Map performance rules

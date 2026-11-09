@@ -20,7 +20,9 @@ describe('HomeScreen', () => {
     fake.current = { status: 'granted', canAskAgain: true };
     fake.lastKnown = position(52.5427, 13.366, Date.now());
     await render(
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { gcTime: Infinity } } })}
+      >
         <HomeScreen />
       </QueryClientProvider>,
     );
