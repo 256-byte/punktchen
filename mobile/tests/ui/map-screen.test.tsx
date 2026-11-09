@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 
 import { createApiClient, type ApiClientOptions } from '@/api/client';
 import type { NearbyResponse } from '@/api/nearby';
+import { MIN_INTERVAL_MS } from '@/core/fetchPolicy';
 import type { LatLng } from '@/core/geo';
 import { regionAround } from '@/core/geo';
 import { transitLayer } from '@/layers/transit';
@@ -100,6 +101,10 @@ beforeEach(() => {
   map.animateToRegion.mockClear();
 });
 
+afterEach(() => {
+  jest.useRealTimers();
+});
+
 async function renderMap(
   position: LatLng,
   source: 'live' | 'lastKnown' | 'mapCenter' = 'live',
@@ -187,7 +192,8 @@ describe('MapScreen layers', () => {
     expect(screen.queryByText(/CC BY/)).toBeNull();
   });
 
-  it('requests again only after a move of more than 150 m', async () => {
+  it('requests again only after a move of more than 150 m, at most every 10 s', async () => {
+    jest.useFakeTimers(); // also moves Date.now, the fetch policy's clock
     const { move } = await renderMap(WEDDING);
     await screen.findByText('S+U Wedding → Jungfernheide');
 
@@ -196,6 +202,8 @@ describe('MapScreen layers', () => {
     expect(requests).toHaveLength(1);
 
     await move(north(200));
+    expect(requests).toHaveLength(1); // within 10 s of the first request
+    await act(async () => jest.advanceTimersByTime(MIN_INTERVAL_MS));
     await waitFor(() => expect(requests).toHaveLength(2));
     expect(Number(requests[1]?.searchParams.get('lat'))).toBeCloseTo(north(200).lat, 6);
   });
@@ -218,6 +226,7 @@ describe('MapScreen layers', () => {
   });
 
   it('shows a failed request and tries again', async () => {
+    jest.useFakeTimers();
     answer = () => new Response('', { status: 503 });
     await renderMap(WEDDING);
     expect(await screen.findByText('Could not load departures')).toBeOnTheScreen();
@@ -228,8 +237,11 @@ describe('MapScreen layers', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
+    expect(requests).toHaveLength(1); // "Try again" skips the backoff, not the 10 s floor
+    await act(async () => jest.advanceTimersByTime(MIN_INTERVAL_MS));
     expect(await screen.findByText('S+U Wedding → Jungfernheide')).toBeOnTheScreen();
+    expect(requests).toHaveLength(2);
     expect(screen.queryByText('Could not load departures')).toBeNull();
   });
 });

@@ -168,7 +168,7 @@ expo-location ──► location store (zustand) ──► fetch policy (core) �
 - Query key: the request with defaults filled in (`radius` 500, `layers` sorted), so one request has one cache entry and one ETag. `params` null (no position yet) sends nothing.
 - Each entry keeps `{ response, etag, checkedAt, clockOffsetMs }` (`Kept<T>`, `src/api/revalidate.ts`, shared with `useStation` for `/v1/stations/{id}` since 3.6). A refetch sends the entry's ETag as `If-None-Match`; a `304` returns the same `response` object with a new `checkedAt`, so nothing that reads the response re-renders.
 - New parameters keep showing the previous area until their answer arrives (`keepPreviousData`, `isPlaceholderData`).
-- No retries and 30 s `staleTime`: when to fetch is the fetch policy's job (§4.2, wired in 5.4).
+- No retries, `enabled: false`: the query never fetches on its own; the fetch policy decides (§4.2, wired in task 5.4).
 - Arrays go out as `layers=a,b` (OpenAPI `style: form, explode: false`), set once in `createApiClient`.
 - Path parameters are percent-encoded by openapi-fetch (`/v1/stations/de%3A11000%3A900009104`); the backend's `PathValue` decodes them (checked with curl, task 3.6).
 - To check in 5.3 on devices: iOS (`NSURLSession`) and Android (OkHttp) may answer a conditional request from their own HTTP cache; with an explicit `If-None-Match` they are expected to pass the `304` through.
@@ -190,6 +190,12 @@ Fetch only when the app is in the foreground **and** at least one is true:
 Never more often than every 10 s. On error: backoff 5 s → 10 s → 20 s → 60 s (cap), counted from the failed request; the 10 s floor still applies, so the first retry comes after 10 s. Pull to refresh skips the backoff, not the floor; no other trigger skips it. On `304`: keep data, update "last checked" time.
 
 `decideFetch(state, now)` returns fetch + reason (`initial`, `manual`, `retry`, `moved`, `departed`, `age`) or wait + reason + `until` (the time the answer can change without a new event, so the caller sets one timer instead of polling). "Earliest shown departure" is `earliestDepartureAt()` of the data right after the last successful request (task 3.1).
+
+Wired in task 5.4 (`src/core/fetchLoop.ts`, `useNearby`):
+- `createFetchLoop` runs `decideFetch` after every event — position (the request centre, which moves only after 150 m), foreground (AppState; anything but `background`), `refresh()`, a request that ended — and sets one timer for `until`; at most one request at a time. Clock, timers and the request are injected (pure TS, Vitest).
+- Intervals use the **device clock**. The server-corrected clock (ADR-0007) changes with a response; measuring "10 s since the last request" across that change blocked requests for as long as the correction (found with a test server whose time was 4 days off). Only `earliestDepartureAt` is computed in server time (device now + the answer's offset) and handed back in device time.
+- `useNearby` requests with `queryClient.fetchQuery` for the current key (same cache entry, 200 or 304). It reads nothing from the TanStack result during render: a read property becomes "tracked" and the hook then re-renders only when that property changes. The loop gets the latest key, clock and log through `useEffectEvent`; `refresh()` ("Try again") bumps a counter that an effect hands to the loop. The interim 30 s `refetchInterval` (3.5) is gone.
+- Dev log (development builds, Expo terminal): `[nearby] request (<reason>), N in the last minute` per request, `[nearby] failed (n in a row): …` per failure. Standing still: ~2 per minute (`age`, plus `departed` when a departure leaves earlier); never more than 6 (10 s floor).
 
 ### 4.3 Offline / staleness (pure functions in `src/core/staleness.ts`)
 

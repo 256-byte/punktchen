@@ -116,7 +116,7 @@ export function MapScreen({
           <Text style={styles.statusDetail}>{nearby.error.message}</Text>
           <Pressable
             accessibilityRole="button"
-            onPress={() => void nearby.refetch()}
+            onPress={nearby.refresh}
             disabled={nearby.isFetching}
             style={({ pressed }) => [
               styles.retry,

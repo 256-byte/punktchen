@@ -1,10 +1,13 @@
 // When to ask the backend for new data (ARCHITECTURE §4.2). A pure decision
-// over the current state; the caller (useNearby, wired in task 5.4) runs it
+// over the current state; fetchLoop.ts runs it for useNearby (task 5.4)
 // on every relevant event and again at `until`.
 
-import { DEPARTED_AFTER_MS, hasDeparted } from './departures';
+import type { components } from '../api/schema.gen';
+import { DEPARTED_AFTER_MS, type Departure, hasDeparted } from './departures';
 import { distanceMeters, type LatLng } from './geo';
 import { SECOND } from './time';
+
+type NearbyResponse = components['schemas']['NearbyResponse'];
 
 /** Refetch after moving this far from where the data was fetched. */
 export const MOVE_THRESHOLD_M = 150;
@@ -98,6 +101,20 @@ export function decideFetch(s: FetchState, now: number): FetchDecision {
       ? tooOldAt
       : Math.min(tooOldAt, last.earliestDepartureAt + DEPARTED_AFTER_MS);
   return { fetch: false, reason: 'fresh', until };
+}
+
+/**
+ * Every direction's departure list in a /v1/nearby answer (all layers that
+ * have departures: transit), for earliestDepartureAt().
+ */
+export function* nearbyDepartureLists(response: NearbyResponse): Generator<readonly Departure[]> {
+  for (const station of response.layers.transit?.features ?? []) {
+    for (const pole of station.poles) {
+      for (const direction of pole.directions) {
+        yield direction.departures;
+      }
+    }
+  }
 }
 
 /**
