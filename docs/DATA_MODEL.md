@@ -35,7 +35,8 @@ Only the columns we use are listed; import all columns of these files anyway (ch
 | `shapes` | import later (Phase 7+), not needed for departures |
 
 Storage notes:
-- `arrival_time` / `departure_time` stored as **integer seconds since service-day start** (`departure_secs`), because values like `25:10:00` exist. Keep the raw text column too.
+- DDL: `backend/db/gtfs/schema.sql` (read by sqlc; the importer runs it with `gtfs.` → `gtfs_staging.`). All GTFS-reference columns of these files are created; empty CSV values are NULL.
+- `arrival_time` / `departure_time` stored as **integer seconds since service-day start** (`arrival_secs`, `departure_secs`), because values like `25:10:00` exist. Keep the raw text column too.
 - `stops.geom geography(Point, 4326)` + GiST index.
 - Extra column `stops.in_scope boolean` (scope filter, §4).
 - Indexes: `stop_times(stop_id, departure_secs)`, `stop_times(trip_id, stop_sequence)`, `trips(service_id)`, `stops(parent_station)`, GiST on `stops.geom`.
