@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 4 — Realtime (Phase 3 done 2026-11-09)
-- **Next task:** 4.3 Merge rules (4.0 waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
+- **Next task:** 4.4 Snapshot rebuild on RT change, health (4.0 waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -46,7 +46,7 @@
 | 4 | 4.0 Realtime coverage check | in progress | Monday evening + Sunday night measured (~87 % of running trips have a real delay, U-Bahn 80–100 %); Tuesday morning and noon samples pending |
 | 4 | 4.1 GTFS-RT poller | done | `realtime.Poller`: 15 s, ≥ 10 s between requests, ETag/304, gzip, backoff to 2 min, Retry-After; wired in 4.4 |
 | 4 | 4.2 Parser → trip-instance state | done | `realtime.Parse` + `Store`: key (trip_id, start_date), latest wins, empty feed keeps the state; golden on the recorded feeds |
-| 4 | 4.3 Merge rules | todo | |
+| 4 | 4.3 Merge rules | done | `realtime.Merge`: match by sequence then stop_id, delay from the departure event, propagation, cancel, skip; checked on the recorded Wedding feed |
 | 4 | 4.4 Snapshot rebuild on RT change, health | todo | |
 | 4 | 4.5 Mobile: delay, realtime indicator, cancelled | todo | |
 | 4 | 4.6 Match ratio metric | todo | |
@@ -95,6 +95,13 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 4.3
+- Done: `departures.Departure` gets `Delay`, `Realtime`, `Cancelled` and `Predicted()`. `realtime.Merge(deps, state) ([]Departure, MergeStats)` applies ARCHITECTURE §3.4 per trip instance: cancelled trips, stop matching by stop_sequence then a unique stop_id, delay from the departure event else arrival, schedule-filled events and NO_DATA stay schedule, SKIPPED removed, propagation from the last earlier update with a delay, TripUpdate.delay before the first update. Returns a new slice; input unchanged. Lives in `realtime` (it already depends on `departures`; the other way round would be an import cycle) — noted in ARCHITECTURE §3.4, which now also says why sequence comes before stop_id (loops).
+- Tests (acceptance: table-driven per rule): `TestMerge` 15 cases (no update, own delays, departure vs arrival event, schedule-filled times, propagation, propagation stopped by a schedule-filled stop, NO_DATA, SKIPPED + propagation over it, cancelled, stop_id without sequence, bare station number with/without sequence, stop_id twice in a loop, other visit of the same pole, TripUpdate.delay); other service day not touched; no state → copy; `Predicted()`. Integration `TestMergeWeddingFixture` (Docker): real schedule + recorded feed, 0 sequence/pole mismatches (DATA_MODEL §7 #30). Coverage 97.4 %, all backend tests, race (Docker) and golangci-lint pass.
+- Data facts: §7 #30 (RT stop_sequence equals static; every stop has an update, so no propagation was needed).
+- New deps: none.
+- Next: 4.4 snapshot rebuild on RT change, `realtimeAgeSeconds`, health; wires the poller and store into the server (and 4.0's daytime samples on 2026-11-10).
 
 ### 2026-11-09 — task 4.2
 - Done: `realtime.Parse` (FeedMessage → immutable `State` keyed by `TripKey{trip_id, service day of start_date}`; per stop update sequence/stop_id/SKIPPED/NO_DATA/arrival/departure with time and delay; latest of a trip instance wins by TripUpdate.timestamp; skips is_deleted, bad keys, ADDED/UNSCHEDULED/DUPLICATED/DELETED trips and counts them in `ParseStats`; errors for undecodable, DIFFERENTIAL or timestamp-less feeds). `realtime.Store`: `Apply` (the poller's `Handler`) → applied / no_data (no trip updates: keep the state) / outdated (header.timestamp not newer); `Current()` lock-free via `atomic.Pointer`. `TripUpdate.Realtime()` = trip delay or any event delay.
