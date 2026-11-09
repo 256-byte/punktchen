@@ -46,15 +46,6 @@ type Window struct {
 	Departures []Departure
 }
 
-// ByStop groups the departures by pole, each list sorted by time.
-func (w *Window) ByStop() map[string][]Departure {
-	out := map[string][]Departure{}
-	for _, d := range w.Departures {
-		out[d.StopID] = append(out[d.StopID], d)
-	}
-	return out
-}
-
 // ErrNoSchedule: there is no live schedule yet (before the first import).
 var ErrNoSchedule = errors.New("departures: no live schedule")
 

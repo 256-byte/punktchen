@@ -27,6 +27,7 @@ import (
 	"github.com/256-byte/punktchen/backend/internal/api"
 	"github.com/256-byte/punktchen/backend/internal/config"
 	"github.com/256-byte/punktchen/backend/internal/platform"
+	"github.com/256-byte/punktchen/backend/internal/transit/departures"
 	"github.com/256-byte/punktchen/backend/internal/transit/static"
 )
 
@@ -94,10 +95,23 @@ func serve(ctx context.Context, log *slog.Logger, cfg config.Config) error {
 		return err
 	}
 	importer := static.NewImporter(pool, dl, static.NewLoader(pool, cfg.ScopeBBox, importLog), il, static.DefaultSanityLimits, importLog)
+
+	// Departures snapshot (ARCHITECTURE §3.2, §3.4): moves the window every
+	// minute and loads the whole window again after an import.
+	builder := departures.NewBuilder(departures.BuilderConfig{}, departures.NewLoader(pool),
+		departures.NewMetrics(metrics), log.With("component", "departures"))
+	runImport := func(ctx context.Context) (*static.Outcome, error) {
+		out, err := importer.Run(ctx)
+		if err == nil && out != nil && out.Changed {
+			builder.Reload()
+		}
+		return out, err
+	}
+
 	status := static.NewStatus(pool, static.SourceGTFS)
 	scheduler := static.NewScheduler(static.SchedulerConfig{
 		Hour: cfg.GTFSImportTime.Hour, Minute: cfg.GTFSImportTime.Minute, Loc: platform.Berlin,
-	}, importer.Run, status.Current, static.NewMetrics(metrics), importLog)
+	}, runImport, status.Current, static.NewMetrics(metrics), importLog)
 
 	apiHandler := api.NewHandler(api.NewServer(api.Config{
 		Version: version, DB: pool, Schedule: status, Imports: scheduler, Dev: cfg.Dev,
@@ -112,20 +126,27 @@ func serve(ctx context.Context, log *slog.Logger, cfg config.Config) error {
 		return errors.Join(err, apiSrv.Close())
 	}
 
-	// The scheduler stops with ctx; wait for it before the pool closes, so a
-	// running import can record its outcome.
-	schedCtx, stopScheduler := context.WithCancel(ctx)
-	schedDone := make(chan struct{})
-	go func() {
-		defer close(schedDone)
-		scheduler.Run(schedCtx)
-	}()
-	defer func() {
-		stopScheduler()
-		<-schedDone
-	}()
+	// Background loops stop with ctx; wait for them before the pool closes,
+	// so a running import can record its outcome.
+	defer runBackground(ctx, scheduler.Run)()
+	defer runBackground(ctx, builder.Run)()
 
 	return platform.Serve(ctx, log, shutdownTimeout, apiSrv, metricsSrv)
+}
+
+// runBackground runs fn in a goroutine. The returned stop cancels fn's
+// context and waits for fn to return.
+func runBackground(ctx context.Context, fn func(context.Context)) (stop func()) {
+	ctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		fn(ctx)
+	}()
+	return func() {
+		cancel()
+		<-done
+	}
 }
 
 // userAgent names the project to upstream servers, as VBB asks

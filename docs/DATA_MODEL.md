@@ -263,32 +263,35 @@ All Phase 1 **(verify)** items are answered. Fixtures: `backend/testdata/gtfsrt/
 
 ## 8. Go in-memory types (reference)
 
-The schedule window (task 2.2) returns `departures.Departure`: trip, service day, pole, stop sequence, route, direction, headsign, stop headsign and scheduled time. The snapshot departure below adds line, mode and the realtime fields (2.3/2.4).
+`transit/departures` (tasks 2.2, 2.3). The loader returns a `Window`; the builder publishes a `Snapshot`.
 
 ```go
 type Departure struct {
     TripID       string
-    ServiceDate  ServiceDay      // {Year, Month, Day}, departures/serviceday.go
+    ServiceDate  ServiceDay // {Year, Month, Day}; with TripID the trip instance realtime refers to
     StopID       string
+    StopSequence int32
     RouteID      string
-    Line         string
-    Mode         Mode
-    Headsign     string
-    DirectionID  *int8
-    Scheduled    time.Time
-    Predicted    *time.Time
-    DelaySeconds *int32
-    Source       Source          // SourceScheduled | SourceRealtime
-    Cancelled    bool
+    DirectionID  int16      // NoDirection (-1) if the feed has none
+    Headsign     string     // direction key = pole_directions.headsign
+    StopHeadsign string     // what the vehicle shows at this stop; "" if none
+    Scheduled    time.Time  // Europe/Berlin
 }
 
+// Immutable once published (ADR-0005); read without locks.
 type Snapshot struct {
-    Version          uint64
-    GeneratedAt      time.Time
-    RealtimeFeedTime time.Time      // header.timestamp of last applied RT feed
-    ByStop           map[string][]Departure // sorted by effective time
+    Version     uint64    // +1 per snapshot, starts at the process start time in Unix ms
+    GeneratedAt time.Time
+    ScheduleID  int64     // OID of the live gtfs schema the departures come from
+    From, To    time.Time // window covered, half-open
+    // unexported: one array grouped by pole; Departures(stopID) returns a
+    // pole's departures sorted by time, Len(), Stops()
 }
 ```
+
+Planned:
+- Line, mode and colour are per route (`route_id`). Task 2.4 decides where they are looked up.
+- Phase 4 adds the realtime fields: `Predicted *time.Time`, `DelaySeconds *int32`, `Source` (scheduled | realtime), `Cancelled`, and `Snapshot.RealtimeFeedTime` (`header.timestamp` of the last applied feed). Then the order inside a pole is by effective time (predicted, else scheduled).
 
 ## 9. Mobile core types (reference)
 
