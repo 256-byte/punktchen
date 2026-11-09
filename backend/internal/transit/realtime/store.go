@@ -89,19 +89,24 @@ const DefaultMaxAge = 5 * time.Minute
 // Merger returns the snapshot builder's RealtimeFunc: the current state
 // merged into the window's departures, unless there is none or it is older
 // than maxAge at now. It always reports the state's feed time, so health
-// shows how old it is.
-func (s *Store) Merger(maxAge time.Duration) departures.RealtimeFunc {
+// shows how old it is. Each call sets the match ratio (MatchRatio within
+// MatchWindow) on m (nil: none); without a merged state it is 0.
+func (s *Store) Merger(maxAge time.Duration, m *Metrics) departures.RealtimeFunc {
 	return func(deps []departures.Departure, now time.Time) ([]departures.Departure, time.Time) {
 		st := s.Current()
-		if st == nil {
-			return deps, time.Time{}
-		}
-		if now.Sub(st.FeedTime) > maxAge {
+		if st == nil || now.Sub(st.FeedTime) > maxAge {
+			m.matched(0)
+			if st == nil {
+				return deps, time.Time{}
+			}
 			return deps, st.FeedTime
 		}
 		merged, stats := Merge(deps, st)
+		ratio := MatchRatio(deps, st, now, MatchWindow)
+		m.matched(ratio)
 		s.log.Debug("realtime merged", "departures", stats.Departures, "with_trip", stats.WithTrip,
-			"realtime", stats.Realtime, "propagated", stats.Propagated, "cancelled", stats.Cancelled, "skipped", stats.Skipped)
+			"realtime", stats.Realtime, "propagated", stats.Propagated, "cancelled", stats.Cancelled, "skipped", stats.Skipped,
+			"match_ratio", ratio)
 		return merged, st.FeedTime
 	}
 }

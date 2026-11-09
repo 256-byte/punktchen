@@ -243,3 +243,30 @@ func TestPredicted(t *testing.T) {
 		t.Errorf("early: %s, want %s", d.Predicted(), want)
 	}
 }
+
+func TestMatchRatio(t *testing.T) {
+	now := time.Date(2026, 11, 8, 23, 0, 0, 0, time.UTC)
+	day := departures.ServiceDay{Year: 2026, Month: time.November, Day: 8}
+	st := state(&TripUpdate{Key: TripKey{"T1", day}}, &TripUpdate{Key: TripKey{"T2", day}})
+	dep := func(trip string, off time.Duration) departures.Departure {
+		return departures.Departure{TripID: trip, ServiceDate: day, Scheduled: now.Add(off)}
+	}
+	deps := []departures.Departure{
+		dep("T1", -MatchWindow),    // counted, matched
+		dep("T2", MatchWindow),     // counted, matched
+		dep("T3", time.Minute),     // counted, no TripUpdate
+		dep("T4", 0),               // counted, no TripUpdate
+		dep("T5", 40*time.Minute),  // too far ahead: not counted
+		dep("T1", -20*time.Minute), // too far back: not counted
+		{TripID: "T2", ServiceDate: departures.ServiceDay{Year: 2026, Month: time.November, Day: 7}, Scheduled: now}, // other service day: no match
+	}
+	if got := MatchRatio(deps, st, now, MatchWindow); got != 0.4 {
+		t.Errorf("ratio %v, want 0.4 (2 of 5 near now)", got)
+	}
+	if got := MatchRatio(deps[4:6], st, now, MatchWindow); got != 0 {
+		t.Errorf("none near now: %v", got)
+	}
+	if got := MatchRatio(deps, nil, now, MatchWindow); got != 0 {
+		t.Errorf("no state: %v", got)
+	}
+}

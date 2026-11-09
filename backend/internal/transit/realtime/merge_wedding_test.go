@@ -58,6 +58,13 @@ func TestMergeWeddingFixture(t *testing.T) {
 	if mismatched > 0 {
 		t.Errorf("%d of %d sequence matches point at another stop", mismatched, matched)
 	}
+	// Near the feed time almost every departure has a TripUpdate, although
+	// the Wedding subset schedule is three days older (DATA_MODEL §7 #31).
+	r := MatchRatio(w.Departures, st, st.FeedTime, MatchWindow)
+	t.Logf("match ratio within %s: %.3f", MatchWindow, r)
+	if r < 0.8 {
+		t.Errorf("match ratio %.3f, want ≥ 0.8", r)
+	}
 	if len(merged)+stats.Skipped != len(w.Departures) {
 		t.Errorf("%d merged + %d skipped != %d scheduled", len(merged), stats.Skipped, len(w.Departures))
 	}

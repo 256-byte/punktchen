@@ -30,12 +30,18 @@ func TestStoreOnApply(t *testing.T) {
 
 func TestMerger(t *testing.T) {
 	s := NewStore(slog.New(slog.DiscardHandler))
-	merge := s.Merger(DefaultMaxAge)
+	m := NewMetrics(prometheus.NewRegistry())
+	merge := s.Merger(DefaultMaxAge, m)
+	ratio := func() float64 { return testutil.ToFloat64(m.matchRatio) }
 	day := departures.ServiceDay{Year: 2026, Month: time.November, Day: 8}
-	deps := []departures.Departure{{TripID: "T1", ServiceDate: day, StopID: "p1", StopSequence: 1}}
+	feed := state().FeedTime
+	deps := []departures.Departure{
+		{TripID: "T1", ServiceDate: day, StopID: "p1", StopSequence: 1, Scheduled: feed.Add(8 * time.Minute)},
+		{TripID: "T2", ServiceDate: day, StopID: "p1", StopSequence: 4, Scheduled: feed.Add(9 * time.Minute)}, // no TripUpdate
+	}
 
-	if out, ft := merge(deps, time.Now()); !ft.IsZero() || len(out) != 1 || out[0].Realtime {
-		t.Fatalf("no state: %+v %s", out, ft)
+	if out, ft := merge(deps, time.Now()); !ft.IsZero() || len(out) != 2 || out[0].Realtime || ratio() != 0 {
+		t.Fatalf("no state: %+v %s, ratio %v", out, ft, ratio())
 	}
 
 	d := int32(90)
@@ -44,10 +50,17 @@ func TestMerger(t *testing.T) {
 	if out, ft := merge(deps, st.FeedTime.Add(DefaultMaxAge)); !ft.Equal(st.FeedTime) || !out[0].Realtime || out[0].Delay != 90 {
 		t.Errorf("fresh enough: %+v %s", out, ft)
 	}
+	if ratio() != 0.5 {
+		t.Errorf("match ratio %v, want 0.5 (1 of 2 departures has a TripUpdate)", ratio())
+	}
 	out, ft := merge(deps, st.FeedTime.Add(DefaultMaxAge+time.Second))
 	if !ft.Equal(st.FeedTime) || out[0].Realtime {
 		t.Errorf("older than %s: %+v %s; want the schedule and the old feed time", DefaultMaxAge, out, ft)
 	}
+	if ratio() != 0 {
+		t.Errorf("match ratio %v after the state got too old, want 0", ratio())
+	}
+	s.Merger(DefaultMaxAge, nil)(deps, time.Now()) // nil metrics record nothing
 	if deps[0].Realtime {
 		t.Error("Merger changed its input")
 	}

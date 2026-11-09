@@ -103,9 +103,10 @@ func serve(ctx context.Context, log *slog.Logger, cfg config.Config) error {
 	// feed (CLAUDE.md rule 7); each applied feed goes into the store.
 	rtLog := log.With("component", "realtime")
 	rtStore := realtime.NewStore(rtLog)
+	rtMetrics := realtime.NewMetrics(metrics)
 	poller, err := realtime.NewPoller(realtime.PollerConfig{
 		URL: cfg.GTFSRTURL, UserAgent: userAgent(), Interval: cfg.GTFSRTPollInterval,
-	}, rtStore.Apply, realtime.NewMetrics(metrics), rtLog)
+	}, rtStore.Apply, rtMetrics, rtLog)
 	if err != nil {
 		return err
 	}
@@ -114,7 +115,7 @@ func serve(ctx context.Context, log *slog.Logger, cfg config.Config) error {
 	// Departures snapshot (ARCHITECTURE §3.2, §3.4): moves the window every
 	// minute, loads the whole window again after an import, and merges the
 	// realtime state into every snapshot; a new feed republishes at once.
-	builder := departures.NewBuilder(departures.BuilderConfig{Realtime: rtStore.Merger(realtime.DefaultMaxAge)},
+	builder := departures.NewBuilder(departures.BuilderConfig{Realtime: rtStore.Merger(realtime.DefaultMaxAge, rtMetrics)},
 		departures.NewLoader(pool), departures.NewMetrics(metrics), log.With("component", "departures"))
 	rtStore.OnApply(builder.RealtimeChanged)
 	runImport := func(ctx context.Context) (*static.Outcome, error) {

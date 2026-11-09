@@ -9,7 +9,8 @@ import (
 // Metrics of the GTFS-RT ingestor (ARCHITECTURE §3.7). A nil *Metrics
 // records nothing.
 type Metrics struct {
-	polls *prometheus.CounterVec
+	polls      *prometheus.CounterVec
+	matchRatio prometheus.Gauge
 }
 
 // NewMetrics registers the realtime metrics on reg.
@@ -19,12 +20,23 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 			Name: "livestop_gtfsrt_poll_total",
 			Help: "GTFS-RT polls by result (updated, not_modified, rejected, error).",
 		}, []string{"result"}),
+		matchRatio: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "livestop_rt_match_ratio",
+			Help: "Share of scheduled departures within 15 min of now whose trip instance has a GTFS-RT TripUpdate, at the last snapshot merge; 0 when no realtime state is merged.",
+		}),
 	}
 	for _, r := range []Result{ResultUpdated, ResultNotModified, ResultRejected, ResultError} {
 		m.polls.WithLabelValues(string(r)) // export zeros from the start
 	}
-	reg.MustRegister(m.polls)
+	reg.MustRegister(m.polls, m.matchRatio)
 	return m
+}
+
+func (m *Metrics) matched(ratio float64) {
+	if m == nil {
+		return
+	}
+	m.matchRatio.Set(ratio)
 }
 
 func (m *Metrics) polled(r Result) {
