@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 2 — Schedule-based API (started 2026-11-09)
-- **Next task:** 2.4 transit provider
+- **Next task:** 2.5 API handlers
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -33,7 +33,7 @@
 | 2 | 2.1 Layer registry | done | Failing layer → `down`, others still served; race-clean (Docker) |
 | 2 | 2.2 Schedule window loader | done | Range loader `[from, to)`; new derived table `trip_info` + index `stop_times(departure_secs)` |
 | 2 | 2.3 Snapshot | done | Builder moves the window by the new minute only; race-clean (Docker). Found: no re-import after a layout change (fixed in PR #15) |
-| 2 | 2.4 Transit provider | todo | |
+| 2 | 2.4 Transit provider | done | Golden JSON for Wedding; directions merged + trimmed (174 → 51 at Wedding); colours incl. VBB list |
 | 2 | 2.5 API handlers | todo | |
 | 2 | 2.6 Spot check vs. VBB | todo | |
 
@@ -56,6 +56,8 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 | 2026-11-08 | User: keep config/docs in line with current upstream facts without asking first | — |
 | 2026-11-09 | PLAN updated from 1.1 findings (user approved): 1.2 SHA-256 skip criterion, `stations` table (DATA_MODEL §3.4), loop/ring rules, real Wedding subset fixture, 32 h window, line colours, new 4.0 coverage check, realtime = has `delay` | — (no architecture change) |
 | 2026-11-09 | Each import stamps a layout id (hash of the gtfs SQL + `layoutRevision`) on the schema; a missing or different stamp forces a full re-import even if the feed is unchanged | — (import detail, ARCHITECTURE §3.1) |
+| 2026-11-09 | VBB line colour list committed and embedded (exception to CLAUDE.md rule 11, user-approved) | — (DATA_MODEL §7 #25) |
+| 2026-11-09 | API directions per pole: terminal out, same label merged, per line and direction of travel only the ones with departures (else the most frequent, empty) — user decision | — (DATA_MODEL §3.2) |
 
 ## Open questions
 
@@ -75,6 +77,20 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 2.4
+- Done:
+  - `internal/transit`: `Provider` implements `layer.Provider` (`Info`, `Nearby`, `Version`, `Health`) plus `Station(id)` for the sheet. Payload = generated `*openapi.TransitLayer`. Per request two queries (`NearbyPoles`, new `PoleDirections`; `StationPoles` for the sheet) and departures from the snapshot (3 per direction, 10 on the sheet), starting at the snapshot's `GeneratedAt` so the response depends only on its version.
+  - Direction rules per pole (user decision, DATA_MODEL §3.2): terminal rows without departures out; same label (mode, line, display headsign, ring) merged; per line and direction of travel only directions with departures, else the most frequent one with an empty list. Wedding 500 m: 174 rows → 51 directions.
+  - Colours: `route_color`, else VBB's official list, else null. The list (`backend/internal/transit/data/linienfarben.csv`, 14 KB, CC BY 4.0) is committed and embedded, matched by (agency, line, mode) — user-approved exception to CLAUDE.md rule 11, README with source and update steps.
+  - Mode order (regional, sbahn, ubahn, tram, bus, ferry, other), natural line order, " (Berlin)" dropped from names and headsigns. Mode mapping stays in derived.sql (`modeOf` in Go only for the colour list).
+  - `departures.BuilderConfig.Now` (clock for tests). Contract: descriptions of `Station.modes`, `Pole.directions`, `Direction.color` (no shape change), Go + TS regenerated.
+  - Docs: ARCHITECTURE §3.5, DATA_MODEL §3.2, §5.2, §7 #25–#26; CLAUDE.md rule 11.
+- Tests: unit — colour list (spot checks, R/G/B = hex column on every row that has both, parse errors), `lineColor` precedence (route_color, list, rail replacement bus gets none), `modeOf` = DATA_MODEL §6, natural line order, `displayName`. Integration `TestProviderRules` (synthetic feed): station/mode/direction order, terminal rule, merge of two trip headsigns, empty short-turn hidden, night line shown once with no departures, max 3, departures from the snapshot time, platform, station sheet (10, no distance, unknown id), empty result `{"features":[],"layer":"transit"}`; no snapshot → `ErrNoDepartures` / `down`; health `degraded` after 3 min. **PLAN criterion:** `TestProviderWeddingGolden` — `/nearby` around U Wedding (500 m) and the S+U Wedding sheet at Tue 2026-11-10 17:00 equal `internal/transit/testdata/*.golden.json` (`-update` rewrites them; reviewed by hand; sheet poles: S-Bahn platforms, U-Bahn platforms, then bus poles). vet, golangci-lint 0 issues, mobile typecheck + lint, all backend tests green.
+- Full feed (`TestImportRealFeed`, 2026-11-08 feed, test container right after the import, snapshot at 17:00): transit `Nearby` Wedding 500 m — 6 stations, 52 directions, 26 KB JSON, median **4.5 ms**; Alexanderplatz 1000 m (densest, max radius) — 27 stations, 297 directions, 135 KB JSON (uncompressed), median **12.1 ms**.
+- Data facts found: §7 #25 (colour list vs feed), #26 (direction variants).
+- New deps (+ why): none (`oapi-codegen/runtime/types` was already a dependency of the generated code).
+- Next: 2.5 API handlers (`/v1/nearby`, `/v1/stations/{id}`, `/v1/layers`), wiring the registry and provider in `cmd/server`.
 
 ### 2026-11-09 — task 2.3
 - Done:

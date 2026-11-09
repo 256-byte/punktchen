@@ -184,7 +184,9 @@ type DepartureSource string
 
 // Direction One line + headsign leaving from a pole.
 type Direction struct {
-	// Color Line colour as `#RRGGBB`, if the feed has one.
+	// Color Line colour as `#RRGGBB`: the feed's route_color, else VBB's
+	// official line colour list; null if neither has one.
+	//
 	//
 	// Examples: #8C6DAB
 	Color *string `json:"color"`
@@ -320,6 +322,10 @@ type NearbyResponse struct {
 
 // Pole A physical stop point / platform (GTFS location_type 0).
 type Pole struct {
+	// Directions Directions leaving this pole (DATA_MODEL §3.2). Variants that riders
+	// see the same way are merged. Per line and direction of travel only
+	// the ones with departures are listed, or the most frequent one with
+	// an empty list if none has a departure.
 	Directions []Direction `json:"directions"`
 
 	// Id Examples: de:11000:900009104::1
@@ -363,7 +369,8 @@ type Station struct {
 	Kind     StationKind `json:"kind"`
 	Location LatLng      `json:"location"`
 
-	// Modes Modes served at this station, sorted by importance.
+	// Modes Modes served at this station, sorted by importance: regional,
+	// sbahn, ubahn, tram, bus, ferry, other.
 	Modes []Mode `json:"modes"`
 
 	// Name Examples: U Wedding

@@ -111,7 +111,7 @@ export interface components {
             error: {
                 /**
                  * @description Machine-readable code. Known values: `invalid_argument`,
-                 *     `not_found`, `not_implemented`, `internal`, `unavailable`.
+                 *     `not_found`, `not_implemented`, `conflict`, `internal`, `unavailable`.
                  * @example invalid_argument
                  */
                 code: string;
@@ -257,7 +257,10 @@ export interface components {
              * @description Distance from the query point. Only on /v1/nearby.
              */
             distanceMeters?: number;
-            /** @description Modes served at this station, sorted by importance. */
+            /**
+             * @description Modes served at this station, sorted by importance: regional,
+             *     sbahn, ubahn, tram, bus, ferry, other.
+             */
             modes: components["schemas"]["Mode"][];
             poles: components["schemas"]["Pole"][];
         };
@@ -271,6 +274,12 @@ export interface components {
              * @example 1
              */
             platform: string | null;
+            /**
+             * @description Directions leaving this pole (DATA_MODEL §3.2). Variants that riders
+             *     see the same way are merged. Per line and direction of travel only
+             *     the ones with departures are listed, or the most frequent one with
+             *     an empty list if none has a departure.
+             */
             directions: components["schemas"]["Direction"][];
         };
         /** @description One line + headsign leaving from a pole. */
@@ -279,7 +288,8 @@ export interface components {
             line: string;
             mode: components["schemas"]["Mode"];
             /**
-             * @description Line colour as `#RRGGBB`, if the feed has one.
+             * @description Line colour as `#RRGGBB`: the feed's route_color, else VBB's
+             *     official line colour list; null if neither has one.
              * @example #8C6DAB
              */
             color: string | null;

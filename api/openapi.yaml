@@ -451,7 +451,9 @@ components:
           description: Distance from the query point. Only on /v1/nearby.
         modes:
           type: array
-          description: Modes served at this station, sorted by importance.
+          description: |
+            Modes served at this station, sorted by importance: regional,
+            sbahn, ubahn, tram, bus, ferry, other.
           items:
             $ref: "#/components/schemas/Mode"
         poles:
@@ -475,6 +477,11 @@ components:
           examples: ["1"]
         directions:
           type: array
+          description: |
+            Directions leaving this pole (DATA_MODEL §3.2). Variants that riders
+            see the same way are merged. Per line and direction of travel only
+            the ones with departures are listed, or the most frequent one with
+            an empty list if none has a departure.
           items:
             $ref: "#/components/schemas/Direction"
 
@@ -490,7 +497,9 @@ components:
           $ref: "#/components/schemas/Mode"
         color:
           type: [string, "null"]
-          description: Line colour as `#RRGGBB`, if the feed has one.
+          description: |
+            Line colour as `#RRGGBB`: the feed's route_color, else VBB's
+            official line colour list; null if neither has one.
           pattern: "^#[0-9A-Fa-f]{6}$"
           examples: ["#8C6DAB"]
         headsign:

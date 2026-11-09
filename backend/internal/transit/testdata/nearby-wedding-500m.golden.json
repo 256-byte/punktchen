@@ -1,0 +1,1711 @@
+{
+  "features": [
+    {
+      "distanceMeters": 37,
+      "id": "de:11000:900009104",
+      "kind": "station",
+      "location": {
+        "lat": 52.542732,
+        "lng": 13.36606
+      },
+      "modes": [
+        "sbahn",
+        "ubahn",
+        "bus"
+      ],
+      "name": "S+U Wedding",
+      "poles": [
+        {
+          "directions": [
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:15:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795254"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:35:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795255"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:57:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795253"
+                }
+              ],
+              "headsign": "U Paracelsus-Bad",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "120",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:13:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805783"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:28:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805784"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:43:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805785"
+                }
+              ],
+              "headsign": "U Leopoldplatz",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "147",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [],
+              "headsign": "Berlin, An der Mühle",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "N6",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [],
+              "headsign": "Frohnau, Hainbuchenstr.",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "N20",
+              "mode": "bus"
+            }
+          ],
+          "id": "de:11000:900009104::3",
+          "location": {
+            "lat": 52.542915,
+            "lng": 13.365584
+          },
+          "platform": null
+        },
+        {
+          "directions": [
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:10:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795538"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:29:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795539"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:49:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795540"
+                }
+              ],
+              "headsign": "S+U Berlin Hauptbahnhof",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "120",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:02:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805549"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:22:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805550"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:42:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805540"
+                }
+              ],
+              "headsign": "S Ostbahnhof",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "147",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [],
+              "headsign": "U Alt-Mariendorf",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "N6",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [],
+              "headsign": "S+U Hauptbahnhof",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "N20",
+              "mode": "bus"
+            }
+          ],
+          "id": "de:11000:900009104::4",
+          "location": {
+            "lat": 52.54281,
+            "lng": 13.365222
+          },
+          "platform": null
+        },
+        {
+          "directions": [
+            {
+              "color": "#8C6DAB",
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:02:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310001831"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:06:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310001832"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:10:30+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310001833"
+                }
+              ],
+              "headsign": "U Kurt-Schumacher-Platz",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "U6",
+              "mode": "ubahn"
+            }
+          ],
+          "id": "de:11000:900009104::2",
+          "location": {
+            "lat": 52.543092,
+            "lng": 13.36509
+          },
+          "platform": "2"
+        },
+        {
+          "directions": [
+            {
+              "color": "#8C6DAB",
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:02:30+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310882708"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:07:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310882709"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:11:30+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310882710"
+                }
+              ],
+              "headsign": "U Alt-Mariendorf",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "U6",
+              "mode": "ubahn"
+            }
+          ],
+          "id": "de:11000:900009104::1",
+          "location": {
+            "lat": 52.543028,
+            "lng": 13.364987
+          },
+          "platform": "1"
+        },
+        {
+          "directions": [
+            {
+              "color": "#DA6BA2",
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:06:24+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "295888719"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:16:24+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "295886426"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:26:24+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "295888718"
+                }
+              ],
+              "headsign": "S+U Berlin Hauptbahnhof",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "S15",
+              "mode": "sbahn"
+            },
+            {
+              "color": "#AD5937",
+              "departures": [],
+              "headsign": "Ringbahn S 41",
+              "isRing": true,
+              "isTerminal": false,
+              "line": "S41",
+              "mode": "sbahn"
+            },
+            {
+              "color": "#CB6418",
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:03:54+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310712823"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:08:54+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310715508"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:13:54+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310712822"
+                }
+              ],
+              "headsign": "Ringbahn S 42",
+              "isRing": true,
+              "isTerminal": false,
+              "line": "S42",
+              "mode": "sbahn"
+            }
+          ],
+          "id": "de:11000:900009104:1:51",
+          "location": {
+            "lat": 52.543102,
+            "lng": 13.367604
+          },
+          "platform": "2"
+        },
+        {
+          "directions": [
+            {
+              "color": "#DA6BA2",
+              "departures": [],
+              "headsign": "S+U Berlin Hauptbahnhof",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "S15",
+              "mode": "sbahn"
+            },
+            {
+              "color": "#DA6BA2",
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:00:24+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "295886503"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:10:24+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "295888773"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:20:24+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "295886502"
+                }
+              ],
+              "headsign": "S+U Gesundbrunnen Bhf",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "S15",
+              "mode": "sbahn"
+            },
+            {
+              "color": "#AD5937",
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:02:54+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310706332"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:07:54+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310708985"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:12:54+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310706331"
+                }
+              ],
+              "headsign": "Ringbahn S 41",
+              "isRing": true,
+              "isTerminal": false,
+              "line": "S41",
+              "mode": "sbahn"
+            },
+            {
+              "color": "#CB6418",
+              "departures": [],
+              "headsign": "Ringbahn S 42",
+              "isRing": true,
+              "isTerminal": false,
+              "line": "S42",
+              "mode": "sbahn"
+            }
+          ],
+          "id": "de:11000:900009104:1:50",
+          "location": {
+            "lat": 52.543042,
+            "lng": 13.367693
+          },
+          "platform": "1"
+        }
+      ]
+    },
+    {
+      "distanceMeters": 209,
+      "id": "de:11000:900008104",
+      "kind": "station",
+      "location": {
+        "lat": 52.5411834,
+        "lng": 13.368662999999998
+      },
+      "modes": [
+        "bus"
+      ],
+      "name": "U Reinickendorfer Str.",
+      "poles": [
+        {
+          "directions": [
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:14:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795254"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:34:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795255"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:56:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795253"
+                }
+              ],
+              "headsign": "U Paracelsus-Bad",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "120",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:12:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805783"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:27:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805784"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:42:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805785"
+                }
+              ],
+              "headsign": "U Leopoldplatz via S+U Wedding",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "147",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [],
+              "headsign": "Berlin, An der Mühle",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "N6",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [],
+              "headsign": "Frohnau, Hainbuchenstr.",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "N20",
+              "mode": "bus"
+            }
+          ],
+          "id": "de:11000:900008104::5",
+          "location": {
+            "lat": 52.541402,
+            "lng": 13.368224
+          },
+          "platform": null
+        },
+        {
+          "directions": [
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:03:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805549"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:23:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805550"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:43:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805540"
+                }
+              ],
+              "headsign": "S Ostbahnhof",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "147",
+              "mode": "bus"
+            }
+          ],
+          "id": "de:11000:900008104::4",
+          "location": {
+            "lat": 52.540928,
+            "lng": 13.367815
+          },
+          "platform": null
+        },
+        {
+          "directions": [
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:06:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310858500"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:13:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310858498"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:20:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310858481"
+                }
+              ],
+              "headsign": "S+U Jungfernheide",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "M27",
+              "mode": "bus"
+            }
+          ],
+          "id": "de:11000:900008104::2",
+          "location": {
+            "lat": 52.541377,
+            "lng": 13.368765
+          },
+          "platform": null
+        },
+        {
+          "directions": [
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:01:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310857910"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:09:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310857911"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:17:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310857912"
+                }
+              ],
+              "headsign": "S+U Pankow",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "M27",
+              "mode": "bus"
+            }
+          ],
+          "id": "de:11000:900008104::3",
+          "location": {
+            "lat": 52.541499,
+            "lng": 13.369615
+          },
+          "platform": null
+        },
+        {
+          "directions": [
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:12:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795538"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:31:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795539"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:51:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795540"
+                }
+              ],
+              "headsign": "S+U Berlin Hauptbahnhof",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "120",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [],
+              "headsign": "U Alt-Mariendorf",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "N6",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [],
+              "headsign": "S+U Hauptbahnhof",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "N20",
+              "mode": "bus"
+            }
+          ],
+          "id": "de:11000:900008104::1",
+          "location": {
+            "lat": 52.540711,
+            "lng": 13.368896
+          },
+          "platform": null
+        }
+      ]
+    },
+    {
+      "distanceMeters": 293,
+      "id": "de:11000:900008103",
+      "kind": "station",
+      "location": {
+        "lat": 52.54436025,
+        "lng": 13.370472750000001
+      },
+      "modes": [
+        "bus"
+      ],
+      "name": "S Wedding/Martha-Ndumbe-Platz",
+      "poles": [
+        {
+          "directions": [
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:05:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310858500"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:12:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310858498"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:19:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310858481"
+                }
+              ],
+              "headsign": "S+U Jungfernheide",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "M27",
+              "mode": "bus"
+            }
+          ],
+          "id": "de:11000:900008103::3",
+          "location": {
+            "lat": 52.544164,
+            "lng": 13.369588
+          },
+          "platform": null
+        },
+        {
+          "directions": [
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:02:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310857910"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:10:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310857911"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:18:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310857912"
+                }
+              ],
+              "headsign": "S+U Pankow",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "M27",
+              "mode": "bus"
+            }
+          ],
+          "id": "de:11000:900008103::4",
+          "location": {
+            "lat": 52.54438,
+            "lng": 13.370193
+          },
+          "platform": null
+        },
+        {
+          "directions": [
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:09:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310825738"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:29:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310825739"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:49:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310825737"
+                }
+              ],
+              "headsign": "S Nordbahnhof",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "247",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:00:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310825615"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:19:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310825608"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:39:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310825609"
+                }
+              ],
+              "headsign": "U Bernauer Str./Schönholzer Str.",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "247",
+              "mode": "bus"
+            }
+          ],
+          "id": "de:11000:900008103::1",
+          "location": {
+            "lat": 52.544476,
+            "lng": 13.370697
+          },
+          "platform": null
+        },
+        {
+          "directions": [
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:05:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310825578"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:15:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310825421"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:25:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310825579"
+                }
+              ],
+              "headsign": "U Leopoldplatz",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "247",
+              "mode": "bus"
+            }
+          ],
+          "id": "de:11000:900008103::2",
+          "location": {
+            "lat": 52.544421,
+            "lng": 13.371413
+          },
+          "platform": null
+        }
+      ]
+    },
+    {
+      "distanceMeters": 302,
+      "id": "de:11000:900009151",
+      "kind": "station",
+      "location": {
+        "lat": 52.544535499999995,
+        "lng": 13.3624265
+      },
+      "modes": [
+        "bus"
+      ],
+      "name": "Gerichtstr.",
+      "poles": [
+        {
+          "directions": [
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:17:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795254"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:37:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795255"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:59:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795253"
+                }
+              ],
+              "headsign": "U Paracelsus-Bad",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "120",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:14:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805783"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:29:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805784"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:44:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805785"
+                }
+              ],
+              "headsign": "U Leopoldplatz",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "147",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [],
+              "headsign": "Berlin, An der Mühle",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "N6",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [],
+              "headsign": "Frohnau, Hainbuchenstr.",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "N20",
+              "mode": "bus"
+            }
+          ],
+          "id": "de:11000:900009151::2",
+          "location": {
+            "lat": 52.544526,
+            "lng": 13.3627
+          },
+          "platform": null
+        },
+        {
+          "directions": [
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:09:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795538"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:28:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795539"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:48:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795540"
+                }
+              ],
+              "headsign": "S+U Berlin Hauptbahnhof",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "120",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:01:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805549"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:21:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805550"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:41:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805540"
+                }
+              ],
+              "headsign": "S Ostbahnhof",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "147",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [],
+              "headsign": "U Alt-Mariendorf",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "N6",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [],
+              "headsign": "S+U Hauptbahnhof",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "N20",
+              "mode": "bus"
+            }
+          ],
+          "id": "de:11000:900009151::1",
+          "location": {
+            "lat": 52.544545,
+            "lng": 13.362153
+          },
+          "platform": null
+        }
+      ]
+    },
+    {
+      "distanceMeters": 409,
+      "id": "de:11000:900008102",
+      "kind": "station",
+      "location": {
+        "lat": 52.539887,
+        "lng": 13.370382
+      },
+      "modes": [
+        "ubahn",
+        "bus"
+      ],
+      "name": "U Reinickendorfer Str.",
+      "poles": [
+        {
+          "directions": [
+            {
+              "color": "#8C6DAB",
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:03:30+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310882708"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:08:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310882709"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:12:30+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310882710"
+                }
+              ],
+              "headsign": "U Alt-Mariendorf",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "U6",
+              "mode": "ubahn"
+            }
+          ],
+          "id": "de:11000:900008102::1",
+          "location": {
+            "lat": 52.540046,
+            "lng": 13.370176
+          },
+          "platform": "1"
+        },
+        {
+          "directions": [
+            {
+              "color": "#8C6DAB",
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:01:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310001831"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:05:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310001832"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:09:30+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310001833"
+                }
+              ],
+              "headsign": "U Kurt-Schumacher-Platz",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "U6",
+              "mode": "ubahn"
+            }
+          ],
+          "id": "de:11000:900008102::2",
+          "location": {
+            "lat": 52.540096,
+            "lng": 13.370265
+          },
+          "platform": "2"
+        },
+        {
+          "directions": [
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:13:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795538"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:32:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795539"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:52:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795540"
+                }
+              ],
+              "headsign": "S+U Berlin Hauptbahnhof",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "120",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [],
+              "headsign": "U Alt-Mariendorf",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "N6",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [],
+              "headsign": "S+U Hauptbahnhof",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "N20",
+              "mode": "bus"
+            }
+          ],
+          "id": "de:11000:900008102::3",
+          "location": {
+            "lat": 52.539643,
+            "lng": 13.370621
+          },
+          "platform": null
+        },
+        {
+          "directions": [
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:13:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795254"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:33:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795255"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:55:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310795253"
+                }
+              ],
+              "headsign": "U Paracelsus-Bad",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "120",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [],
+              "headsign": "Frohnau, Hainbuchenstr.",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "N20",
+              "mode": "bus"
+            }
+          ],
+          "id": "de:11000:900008102::4",
+          "location": {
+            "lat": 52.539775,
+            "lng": 13.370891
+          },
+          "platform": null
+        }
+      ]
+    },
+    {
+      "distanceMeters": 476,
+      "id": "de:11000:900001202",
+      "kind": "station",
+      "location": {
+        "lat": 52.5386765,
+        "lng": 13.363273
+      },
+      "modes": [
+        "bus"
+      ],
+      "name": "Am Nordhafen",
+      "poles": [
+        {
+          "directions": [
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:09:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805783"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:24:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805784"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:39:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805785"
+                }
+              ],
+              "headsign": "U Leopoldplatz via S+U Wedding",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "147",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:05:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310857911"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:13:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310857912"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:21:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310857913"
+                }
+              ],
+              "headsign": "S+U Pankow",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "M27",
+              "mode": "bus"
+            }
+          ],
+          "id": "de:11000:900001202::2",
+          "location": {
+            "lat": 52.538715,
+            "lng": 13.363443
+          },
+          "platform": null
+        },
+        {
+          "directions": [
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:04:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805549"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:24:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805550"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:44:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310805540"
+                }
+              ],
+              "headsign": "S Ostbahnhof",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "147",
+              "mode": "bus"
+            },
+            {
+              "color": null,
+              "departures": [
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:00:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310858499"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:08:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310858500"
+                },
+                {
+                  "cancelled": false,
+                  "delaySeconds": null,
+                  "predicted": null,
+                  "scheduled": "2026-11-10T17:15:00+01:00",
+                  "serviceDate": "2026-11-10",
+                  "source": "scheduled",
+                  "tripId": "310858498"
+                }
+              ],
+              "headsign": "S+U Jungfernheide",
+              "isRing": false,
+              "isTerminal": false,
+              "line": "M27",
+              "mode": "bus"
+            }
+          ],
+          "id": "de:11000:900001202::1",
+          "location": {
+            "lat": 52.538638,
+            "lng": 13.363103
+          },
+          "platform": null
+        }
+      ]
+    }
+  ],
+  "layer": "transit"
+}

@@ -111,6 +111,12 @@ type Provider interface {
 - Each layer has its **own typed payload** in OpenAPI (discriminated by `layer`).
 - Static layers (e.g. toilets) refresh rarely; live layers (transit) refresh in seconds. The cache handles both through `Version()`.
 - Only `transit` is implemented until a later phase says otherwise.
+- **Transit provider** (`internal/transit`, task 2.4):
+  - Per request: `NearbyPoles` (poles in the circle with their station) and `PoleDirections` (directions of those poles + route agency/colour), two indexed queries; departures come from the current snapshot, never from the DB. `Station(id)` does the same for all poles of one station (sheet, 10 departures per direction).
+  - The payload is the generated contract type (`*openapi.TransitLayer`), so the golden test files are the API JSON.
+  - `Result.Version` is the snapshot version, and departures start at the snapshot's `GeneratedAt`, so a response depends only on that version (cache/ETag safe). Static data is read from the live schema at request time; right after an import swap, the snapshot follows within seconds (`Reload`).
+  - Which directions a pole lists (terminal, merge, trim) and colours: DATA_MODEL §3.2, §5.2.
+  - Health: `down` without a snapshot, `degraded` when the snapshot is older than 3 refresh periods.
 
 ### 3.6 `api` — HTTP
 
