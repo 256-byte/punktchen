@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { distanceMeters } from './geo';
+import { distanceMeters, regionAround } from './geo';
 
 const wedding = { lat: 52.5427, lng: 13.366 };
 const alexanderplatz = { lat: 52.521512, lng: 13.411267 };
@@ -36,5 +36,19 @@ describe('distanceMeters', () => {
       Math.PI * 6_371_008.8,
       0,
     );
+  });
+});
+
+describe('regionAround', () => {
+  it('shows the radius with a margin, wider in degrees of longitude', () => {
+    const r = regionAround(wedding, 500);
+    expect(r.latitude).toBe(wedding.lat);
+    expect(r.longitude).toBe(wedding.lng);
+    // Edges of the region are 600 m from the centre in both directions.
+    const north = { lat: wedding.lat + r.latitudeDelta / 2, lng: wedding.lng };
+    const east = { lat: wedding.lat, lng: wedding.lng + r.longitudeDelta / 2 };
+    expect(distanceMeters(wedding, north)).toBeCloseTo(600, 0);
+    expect(distanceMeters(wedding, east)).toBeCloseTo(600, 0);
+    expect(r.longitudeDelta).toBeGreaterThan(r.latitudeDelta);
   });
 });

@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 3 — Mobile MVP (Phase 2 done 2026-11-09)
-- **Next task:** 3.4 Map screen (`react-native-maps`, follows the user on open, layer registry)
+- **Next task:** 3.5 Transit layer markers (next departure per direction, 1 s ticker, minute-level re-render)
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -39,7 +39,7 @@
 | 3 | 3.1 `src/core` | done | time, departures, staleness, geo, fetch policy; coverage 100 % (gate 90 % in `npm test`) |
 | 3 | 3.2 API client + `useNearby` | done | 304 keeps the same response object, new `checkedAt`; backend sends ETags from 5.3 |
 | 3 | 3.3 Location | done | Denied → explanation + "Allow location"/"Open settings" + "Use map center"; fixes kept from 25 m moves; not yet tried on a phone |
-| 3 | 3.4 Map screen | todo | |
+| 3 | 3.4 Map screen | done | Opens centred on the user, follows until a drag; layer registry with a plain station pin; request centre moves after > 150 m; not yet tried on a phone |
 | 3 | 3.5 Transit layer markers | todo | |
 | 3 | 3.6 Station sheet | todo | |
 | 3 | 3.7 Attribution | todo | |
@@ -85,6 +85,13 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 3.4
+- Done: `src/layers/registry.ts` (`MapLayer` with id/select/key/Marker, `defineLayer`), `src/layers/transit` (selects stations, plain pin per station until 3.5), `src/layers/index.ts` (`mapLayers`), `src/ui/MapScreen.tsx` (react-native-maps: opens centred on the position, follows the device until a drag, reports its centre to the store, `/v1/nearby` around a request centre, backend-missing and error cards), home screen = location gate → map. Core: `regionAround` (geo), `nextRequestCenter` (fetch policy: moves after > 150 m). `useNearby` accepts a null client (backend not configured → no request).
+- Tests: Vitest +4 (`regionAround`, `nextRequestCenter`; core coverage 100 %). Jest `tests/ui/map-screen.test.tsx` (8) with a react-native-maps stand-in (`tests/ui/maps-mock.tsx`): opens centred on the user (acceptance criterion), follows until a drag, map-centre mode keeps the camera and reports the centre, stations drawn through the registry, new request only after > 150 m, missing backend, error + try again, transit `select` with a down layer. Home screen test now opens the map. Typecheck, lint pass.
+- Not checked yet: on a phone (Expo Go): map on start, follow, deny → "Use map center" → pan.
+- New deps (+ why): `react-native-maps` 1.29.11 (the map; in the stack, CLAUDE.md §3; installed with `npx expo install`, part of Expo Go).
+- Next: 3.5 transit layer markers.
 
 ### 2026-11-09 — task 3.3
 - Done: `src/core/location.ts` (pure: `acceptFix` movement threshold 25 m / 2× precision, `locationView`, `BERLIN_CENTER`), `src/state/location.ts` (zustand store + `useLocationView`), `src/lib/location.ts` (`useDeviceLocation`: permission on start and on each return to the foreground, last known ≤ 5 min, watch while in the foreground; `requestLocationAccess`: prompt again or open the settings app), `src/ui/LocationGate.tsx` (checking / denied screen with "Use map center"), home screen shows where it looks until the map (3.4). `app.json`: expo-location plugin with the iOS "when in use" text (used by builds; Expo Go shows its own).

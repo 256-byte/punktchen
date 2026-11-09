@@ -22,18 +22,18 @@ export function nearbyQueryKey(params: NearbyParams | null) {
  * kept ETag; a 304 keeps the data and updates `checkedAt`. While new
  * parameters load, the previous area stays visible (`isPlaceholderData`).
  *
- * params null: no request (e.g. no position yet). When to refetch is the
- * fetch policy's job (ARCHITECTURE §4.2, wired in task 5.4): no retries here,
- * and the data counts as fresh for 30 s, so mounting another user of the
- * same query does not refetch.
+ * client or params null: no request (backend not configured, no position
+ * yet). When to refetch is the fetch policy's job (ARCHITECTURE §4.2, wired
+ * in task 5.4): no retries here, and the data counts as fresh for 30 s, so
+ * mounting another user of the same query does not refetch.
  */
-export function useNearby(client: ApiClient, params: NearbyParams | null) {
+export function useNearby(client: ApiClient | null, params: NearbyParams | null) {
   const queryClient = useQueryClient();
   const queryKey = nearbyQueryKey(params);
   return useQuery({
     queryKey,
     queryFn:
-      params === null
+      client === null || params === null
         ? skipToken
         : ({ signal }) =>
             fetchNearby(client, params, {
