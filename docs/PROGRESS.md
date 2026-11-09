@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 5 — Traffic & cache (Phase 4 done except 4.0's final step; exception, see Decisions 2026-11-09)
-- **Next task:** 5.2 LRU cell cache; 4.0's final step in between (waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
+- **Next task:** 5.3 ETag/304 end-to-end, gzip; 4.0's final step in between (waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -51,7 +51,7 @@
 | 4 | 4.5 Mobile: delay, realtime indicator, cancelled | done | Live times green, late ones red with "+N", timetable black, cancelled struck through (marker + sheet); iPhone: new display seen working (user, 2026-11-09) |
 | 4 | 4.6 Match ratio metric | done | `livestop_rt_match_ratio` over departures within ±15 min of now; observed 0.93 live (Monday 22:24), 0.91 on the Wedding fixture; whole-window ratio would be ~0.5 (DATA_MODEL §7 #31) |
 | 5 | 5.1 Geohash cell snapping + radius expansion | done | `/v1/nearby` answers for the precision-7 cell centre with radius + half diagonal (~90 m in Berlin); `meta.cell` set; two users 50 m apart in one cell get byte-identical responses (contract test on real data) |
-| 5 | 5.2 LRU cell cache, TTL, metrics | todo | |
+| 5 | 5.2 LRU cell cache, TTL, metrics | done | Key (cell, radius bucket, layer versions); LRU 1024, TTL 60 s; one build per key; load test: 1000 requests from one cell → 1 build (1 miss, 99 shared, 900 hits); generatedAt stays the response time |
 | 5 | 5.3 ETag/304 end-to-end, gzip | todo | |
 | 5 | 5.4 Mobile fetch policy wired | todo | |
 | 5 | 5.5 Performance numbers in README | todo | |
@@ -101,6 +101,14 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 5.2
+- Done: `internal/api/cache.go` — generic `cellCache` (LRU via `container/list`, TTL, one build per key, waiters share it and may give up on their own context; the build gets `context.WithoutCancel` + 10 s; a panicking build gives waiters an error, not a zero value). `GetNearby`: key from `Layers.Resolve` (new in the interface) + provider versions; radius rounded up to 100 m; the answer is stored under the versions it was built from and not stored when a layer failed. `Config.Metrics` / `CacheEntries` / `CacheTTL`; `cmd/server` passes the metrics registry.
+- Decision: the cached answer has no `generatedAt`; each response sets it to the current server time. The app corrects its clock from it when off by > 30 s (ADR-0007), so a cached build time (up to a minute old) would have shifted the app's clock. Contract: description of `generatedAt` (regenerated Go + TS).
+- Tests: cache unit tests (hit, TTL, LRU order, entries gauge and hit counters, stored under the build's key, failures/no key not stored, 50 waiters + 1 build while the starting request is cancelled, a waiter that gives up, panicking build). **Acceptance `TestNearbyLoad`: 1000 requests spread over one cell (100 clients × 10; Windows refuses 1000 simultaneous connections to the test listener) → the layer is asked once, all bodies identical; hits 900, shared 99, miss 1.** Radius 450 shares the 500 bucket, 550 does not; a new layer version builds again; a failing layer is asked every time; `generatedAt` from a cached answer is the response time. Race (api, 3 runs), all backend tests, golangci-lint, mobile typecheck pass.
+- Live (dev stack): 20 requests from two cells → 2 misses, 18 hits.
+- New deps: none.
+- Next: 5.3 ETag/304 and gzip.
 
 ### 2026-11-09 — task 5.1
 - Phase 5 started before 4.0's final step (user decision, see Decisions).

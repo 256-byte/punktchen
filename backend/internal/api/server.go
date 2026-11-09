@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/256-byte/punktchen/backend/gen/openapi"
 	"github.com/256-byte/punktchen/backend/internal/layer"
 	"github.com/256-byte/punktchen/backend/internal/platform"
@@ -51,20 +53,36 @@ type Config struct {
 	Imports  ImportTrigger   // used only when Dev
 	Dev      bool            // LIVESTOP_DEV: enables /internal/*
 	Log      *slog.Logger
+
+	// Metrics gets the cell cache metrics (nil: not exported).
+	Metrics prometheus.Registerer
+	// CacheEntries and CacheTTL bound the /v1/nearby cell cache (0: the
+	// defaults DefaultCacheEntries, DefaultCacheTTL).
+	CacheEntries int
+	CacheTTL     time.Duration
 }
 
 // Server implements openapi.StrictServerInterface.
 type Server struct {
-	cfg Config
-	log *slog.Logger
-	now func() time.Time
+	cfg    Config
+	log    *slog.Logger
+	now    func() time.Time
+	nearby *cellCache[*openapi.NearbyResponse]
 }
 
 var _ openapi.StrictServerInterface = (*Server)(nil)
 
 // NewServer returns the API implementation.
 func NewServer(cfg Config) *Server {
-	return &Server{cfg: cfg, log: cfg.Log, now: time.Now}
+	if cfg.CacheEntries <= 0 {
+		cfg.CacheEntries = DefaultCacheEntries
+	}
+	if cfg.CacheTTL <= 0 {
+		cfg.CacheTTL = DefaultCacheTTL
+	}
+	s := &Server{cfg: cfg, log: cfg.Log, now: time.Now}
+	s.nearby = newCellCache[*openapi.NearbyResponse](cfg.CacheEntries, cfg.CacheTTL, func() time.Time { return s.now() }, cfg.Metrics)
+	return s
 }
 
 // NewHandler wires the generated router to s. Parameter errors and unknown

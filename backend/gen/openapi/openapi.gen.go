@@ -362,7 +362,11 @@ type ResponseMeta struct {
 	// Examples: u33dbjh
 	Cell *string `json:"cell,omitempty"`
 
-	// GeneratedAt ISO-8601 with offset, Europe/Berlin.
+	// GeneratedAt Server time of this response. /v1/nearby answers come from the
+	// cell cache and their data may be up to a minute older (see
+	// `layers.*.version`), but generatedAt is always when this response
+	// was sent, so clients can correct their clock with it (ADR-0007).
+	//
 	//
 	// Examples: 2026-11-05T14:32:00+01:00
 	GeneratedAt Timestamp `json:"generatedAt"`

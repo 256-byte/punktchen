@@ -212,6 +212,12 @@ export interface components {
             realtimeAgeSeconds?: number | null;
         };
         ResponseMeta: {
+            /**
+             * @description Server time of this response. /v1/nearby answers come from the
+             *     cell cache and their data may be up to a minute older (see
+             *     `layers.*.version`), but generatedAt is always when this response
+             *     was sent, so clients can correct their clock with it (ADR-0007).
+             */
             generatedAt: components["schemas"]["Timestamp"];
             /**
              * @description Cache cell (geohash) the request was snapped to. Only on /v1/nearby.

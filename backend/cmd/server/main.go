@@ -140,7 +140,7 @@ func serve(ctx context.Context, log *slog.Logger, cfg config.Config) error {
 
 	apiHandler := api.NewHandler(api.NewServer(api.Config{
 		Version: version, DB: pool, Schedule: status, Layers: layers, Transit: transitLayer,
-		Imports: scheduler, Dev: cfg.Dev,
+		Imports: scheduler, Dev: cfg.Dev, Metrics: metrics,
 		Log: log.With("component", "api"),
 	}))
 	apiSrv, err := platform.Listen("api", cfg.HTTPAddr, apiHandler)
