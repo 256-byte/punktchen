@@ -6,7 +6,7 @@ import {
   type Direction,
   directionKey,
   MARKER_ROWS,
-  markerDirections,
+  markerRows,
   MODE_COLORS,
   nextLabels,
   textColorOn,
@@ -73,18 +73,26 @@ describe('directionKey', () => {
   });
 });
 
-describe('markerDirections', () => {
+describe('markerRows', () => {
   const six = Array.from({ length: 6 }, (_, i) => direction({ line: `M${i}` }));
 
-  it(`shows up to ${MARKER_ROWS} rows and counts the rest`, () => {
-    const { shown, more } = markerDirections(six);
-    expect(shown.map((d) => d.line)).toEqual(['M0', 'M1', 'M2', 'M3']);
-    expect(more).toBe(2);
+  it(`shows up to ${MARKER_ROWS} running directions and counts the other running ones`, () => {
+    const { rows, more } = markerRows(six, ['1 min', null, '2 min', '3 min', '4 min', '5 min']);
+    expect(rows.map((r) => `${r.direction.line} ${r.label}`)).toEqual([
+      'M0 1 min',
+      'M2 2 min',
+      'M3 3 min',
+      'M4 4 min',
+    ]);
+    expect(more).toBe(1);
   });
 
-  it('shows all when they fit', () => {
-    expect(markerDirections(six.slice(0, 2))).toEqual({ shown: six.slice(0, 2), more: 0 });
-    expect(markerDirections([], 3)).toEqual({ shown: [], more: 0 });
+  it('leaves out directions with nothing coming', () => {
+    const { rows, more } = markerRows(six.slice(0, 3), [null, '14:52', null]);
+    expect(rows).toEqual([{ direction: six[1], label: '14:52' }]);
+    expect(more).toBe(0);
+    expect(markerRows(six.slice(0, 2), [null, null])).toEqual({ rows: [], more: 0 });
+    expect(markerRows([], [], 3)).toEqual({ rows: [], more: 0 });
   });
 });
 

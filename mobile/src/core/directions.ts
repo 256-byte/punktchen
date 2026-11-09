@@ -56,11 +56,32 @@ export function directionKey(d: Direction): string {
 /** Rows on a marker; the rest are counted ("+2") and listed in the sheet (3.6). */
 export const MARKER_ROWS = 4;
 
-export function markerDirections(
+export interface MarkerRow {
+  direction: Direction;
+  /** Countdown of its next departure. */
+  label: string;
+}
+
+/**
+ * The rows of a pole marker: only directions with an upcoming departure, in
+ * API order, up to max; `more` counts the other running ones. Directions
+ * without one (night lines by day, rail replacement outside its hours,
+ * suspended lines) are left to the station sheet (user decision
+ * 2026-11-09). No rows: the pole has nothing coming, no marker.
+ *
+ * labels: nextLabels() of the same directions.
+ */
+export function markerRows(
   directions: readonly Direction[],
+  labels: readonly (string | null)[],
   max = MARKER_ROWS,
-): { shown: Direction[]; more: number } {
-  return { shown: directions.slice(0, max), more: Math.max(0, directions.length - max) };
+): { rows: MarkerRow[]; more: number } {
+  const running: MarkerRow[] = [];
+  directions.forEach((direction, i) => {
+    const label = labels[i];
+    if (label != null) running.push({ direction, label });
+  });
+  return { rows: running.slice(0, max), more: Math.max(0, running.length - max) };
 }
 
 /**

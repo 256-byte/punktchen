@@ -6,7 +6,8 @@ import {
   badgeColor,
   type Direction,
   directionKey,
-  markerDirections,
+  type MarkerRow,
+  markerRows,
   nextLabels,
   textColorOn,
 } from '@/core/directions';
@@ -18,9 +19,11 @@ import type { PoleFeature } from './index';
 export const TRACK_CHANGES_MS = 500;
 
 /**
- * A pole: one row per direction with line badge, headsign and the countdown
- * to the next departure (task 3.5). Re-renders when a label changes (about
- * once a minute), not on every tick (ARCHITECTURE §4.5).
+ * A pole: one row per direction with an upcoming departure — line badge,
+ * headsign, countdown (task 3.5). Directions with nothing coming are left
+ * out (station sheet, 3.6); a pole with none draws no marker. Re-renders
+ * when a label changes (about once a minute), not on every tick
+ * (ARCHITECTURE §4.5).
  */
 export function PoleMarker({
   feature,
@@ -29,22 +32,23 @@ export function PoleMarker({
   feature: PoleFeature;
   clock?: ClockStore;
 }) {
-  const { shown, more } = useMemo(
-    () => markerDirections(feature.pole.directions),
-    [feature.pole.directions],
-  );
-  const labels = useNow((now) => nextLabels(shown, now), clock);
-  const tracks = useTracksViewChanges(feature.pole.directions, labels);
+  const directions = feature.pole.directions;
+  const labels = useNow((now) => nextLabels(directions, now), clock);
+  const { rows, more } = useMemo(() => markerRows(directions, labels), [directions, labels]);
+  const tracks = useTracksViewChanges(directions, labels);
 
+  if (rows.length === 0) {
+    return null;
+  }
   return (
     <Marker
       coordinate={{ latitude: feature.pole.location.lat, longitude: feature.pole.location.lng }}
       anchor={{ x: 0.5, y: 1 }}
       tracksViewChanges={tracks}
     >
-      <View style={styles.bubble} accessibilityLabel={accessibilityText(feature, shown, labels)}>
-        {shown.map((d, i) => (
-          <Row key={directionKey(d)} direction={d} label={labels[i] ?? null} />
+      <View style={styles.bubble} accessibilityLabel={accessibilityText(feature, rows)}>
+        {rows.map((r) => (
+          <Row key={directionKey(r.direction)} row={r} />
         ))}
         {more > 0 ? <Text style={styles.more}>+{more} more</Text> : null}
       </View>
@@ -52,26 +56,24 @@ export function PoleMarker({
   );
 }
 
-function Row({ direction, label }: { direction: Direction; label: string | null }) {
+function Row({ row: { direction, label } }: { row: MarkerRow }) {
   const background = badgeColor(direction);
   return (
-    <View style={[styles.row, label === null && styles.idle]}>
+    <View style={styles.row}>
       <View style={[styles.badge, { backgroundColor: background }]}>
         <Text style={[styles.line, { color: textColorOn(background) }]}>{direction.line}</Text>
       </View>
       <Text style={styles.headsign} numberOfLines={1}>
         {direction.headsign}
       </Text>
-      <Text style={styles.countdown}>{label ?? '—'}</Text>
+      <Text style={styles.countdown}>{label}</Text>
     </View>
   );
 }
 
-function accessibilityText(feature: PoleFeature, shown: Direction[], labels: (string | null)[]) {
-  const rows = shown.map(
-    (d, i) => `${d.line} to ${d.headsign}: ${labels[i] ?? 'no departure soon'}`,
-  );
-  return [feature.station.name, ...rows].join('. ');
+function accessibilityText(feature: PoleFeature, rows: MarkerRow[]) {
+  const parts = rows.map((r) => `${r.direction.line} to ${r.direction.headsign}: ${r.label}`);
+  return [feature.station.name, ...parts].join('. ');
 }
 
 /**
@@ -114,9 +116,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-  },
-  idle: {
-    opacity: 0.5,
   },
   badge: {
     minWidth: 30,
