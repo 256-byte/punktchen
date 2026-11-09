@@ -25,7 +25,7 @@ import (
 const (
 	defaultZip    = "data/gtfs/GTFS.zip"
 	defaultRawDir = "data/gtfsrt"
-	userAgent     = "livestop-dev (data exploration)"
+	userAgent     = "livestop-dev (data exploration; https://github.com/256-byte/punktchen)"
 )
 
 // printer writes the report. Write errors stick in the bufio.Writer and are
@@ -77,6 +77,10 @@ func main() {
 		zipPath := fs.String("zip", defaultZip, "static GTFS zip")
 		_ = fs.Parse(args)
 		err = reportRealtime(out, *zipPath, fs.Args())
+	case "coverage":
+		db := fs.String("db", defaultDevDB, "dev database URL (Docker Compose db, see .env)")
+		_ = fs.Parse(args)
+		err = coverage(out, *db, fs.Args())
 	case "subset":
 		zipPath := fs.String("zip", defaultZip, "static GTFS zip")
 		dst := fs.String("out", "testdata/gtfs/vbb-wedding-800m.zip", "output zip")
@@ -104,6 +108,6 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: gtfsexplore download|static|stops|subset|record|rt|trim [flags] [files]")
+	fmt.Fprintln(os.Stderr, "usage: gtfsexplore download|static|stops|subset|record|rt|coverage|trim [flags] [files]")
 	os.Exit(2)
 }
