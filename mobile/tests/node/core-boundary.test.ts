@@ -1,9 +1,16 @@
 import { ESLint } from 'eslint';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 // Guards CLAUDE.md rule 10: src/core must not import React, React Native or
 // Expo. Runs the real ESLint config on in-memory files.
 const eslint = new ESLint({ cwd: process.cwd() });
+
+// The first lint loads the config and all Expo plugins (several seconds on a
+// busy machine). Do it once here with a generous timeout, so the cases below
+// stay within the default per-test timeout.
+beforeAll(async () => {
+  await eslint.lintText('export {};\n', { filePath: 'src/core/warmup.ts' });
+}, 60_000);
 
 async function restrictedImports(filePath: string, source: string): Promise<string[]> {
   const [result] = await eslint.lintText(`${source}\n`, { filePath });

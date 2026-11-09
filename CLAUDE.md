@@ -92,26 +92,46 @@ If something you are asked to do contradicts these documents, **stop and ask the
 
 ## 5. Commands
 
-> Fill in / correct these as they become real during Phase 0. Keep this section accurate.
+> Every command runs **from the repo root** in Windows PowerShell 5.1 or PowerShell 7 (no `cd` needed; `go -C` / `npm --prefix` pick the directory). Keep this section accurate when commands change.
+>
+> Needs Docker Desktop running for: Compose, backend integration tests (testcontainers), lint, `go generate` (sqlc runs in a container).
 
 ```powershell
-# start db + backend
-docker compose up -d --build
-# backend logs
-docker compose logs -f backend
-# backend tests (needs Docker running for testcontainers)
-cd backend; go test ./...
-# lint
-cd backend; golangci-lint run
-# regenerate code after changing api/openapi.yaml or db/queries
-cd backend; go generate ./...
-cd mobile; npm run gen:api
-# mobile
-cd mobile; npx expo start          # scan QR with Expo Go (iPhone) or press "a" (Android emulator)
-cd mobile; npm test; npm run typecheck; npm run lint
-# trigger a GTFS import manually (dev)
-curl -X POST http://localhost:8080/internal/import   # dev-only endpoint, disabled unless LIVESTOP_DEV=true
+# --- backend + database (Docker Compose) ---
+docker compose up -d --build --wait          # build + start db and backend, wait until healthy
+curl.exe http://localhost:8080/v1/health     # curl.exe, not curl: in PowerShell 5.1 `curl` is Invoke-WebRequest
+docker compose logs -f backend               # follow backend logs (Ctrl+C stops following)
+docker compose down                          # stop; data stays in volume livestop_pgdata (`down -v` deletes it)
+
+# --- backend checks ---
+go -C backend vet ./...
+go -C backend test ./...                     # unit + integration tests (starts PostGIS containers)
+go -C backend test -short ./...              # unit tests only, no Docker
+docker run --rm -v "${PWD}\backend:/app" -v golangci-cache:/root/.cache -w /app golangci/golangci-lint:v2.15.0 golangci-lint run ./...
+                                             # lint: same version as CI, config backend/.golangci.yml (incl. gofmt)
+
+# --- code generation (after changing api/openapi.yaml or backend/db/queries) ---
+go -C backend generate ./...                 # oapi-codegen (go tool) + sqlc (pinned Docker image)
+npm --prefix mobile run gen:api              # TypeScript types → mobile/src/api/schema.gen.ts
+                                             # commit the generated files; CI fails on drift
+
+# --- mobile ---
+npm --prefix mobile ci                       # install exact versions from package-lock.json
+npm --prefix mobile run typecheck
+npm --prefix mobile run lint                 # ESLint + Prettier check (`npm --prefix mobile run format` fixes formatting)
+npm --prefix mobile test                     # Vitest (src/core, tests/node) + Jest (UI)
+npm --prefix mobile start                    # Expo dev server: scan QR with Expo Go (iPhone) or press "a" (Android emulator)
+npm --prefix mobile start -- --clear         # after npm install or a mobile/.env change (Metro cache)
+cd mobile; npx expo install <package>; cd .. # add an Expo/RN dependency with the SDK-matched version
+
+# --- dev-only (Phase 1.7, not implemented yet) ---
+curl.exe -X POST http://localhost:8080/internal/import   # trigger a GTFS import; disabled unless LIVESTOP_DEV=true
 ```
+
+Notes:
+- Phone setup (LAN IP, `mobile/.env`, firewall, Expo login): README "Run the app on your phone".
+- `go test -race` needs cgo (not available on the Windows dev machine); CI runs it.
+- After `npm install`, restart a running Expo server with `--clear`, otherwise Metro fails with "Unable to resolve module".
 
 ## 6. Definition of done (every task)
 
