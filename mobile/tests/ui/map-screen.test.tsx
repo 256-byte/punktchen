@@ -184,7 +184,7 @@ describe('MapScreen layers', () => {
   });
 
   it('explains a missing backend configuration', async () => {
-    const queryClient = new QueryClient();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity } } });
     await render(
       <QueryClientProvider client={queryClient}>
         <MapScreen

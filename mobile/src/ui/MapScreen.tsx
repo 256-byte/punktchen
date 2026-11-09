@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import MapView from 'react-native-maps';
+import { useStore } from 'zustand';
 
 import type { ApiClient } from '@/api/client';
 import type { NearbyResponse } from '@/api/nearby';
@@ -15,6 +16,7 @@ import { type ClockStore, clockStore, useClockTicker } from '@/state/clock';
 import { locationStore, type LocationStore } from '@/state/location';
 
 import { BackendStatus } from './BackendStatus';
+import { DevPlacePicker } from './DevPlacePicker';
 
 /** The map opens showing this radius around the user (the /v1/nearby default). */
 export const START_RADIUS_M = 500;
@@ -28,6 +30,8 @@ type Props = {
   layers?: readonly AnyMapLayer[];
   store?: LocationStore;
   clock?: ClockStore;
+  /** Developer tools (place picker); default: only in development builds. */
+  devTools?: boolean;
 };
 
 /**
@@ -45,17 +49,31 @@ export function MapScreen({
   layers = mapLayers,
   store = locationStore,
   clock = clockStore,
+  devTools = __DEV__,
 }: Props) {
   const map = useRef<MapView>(null);
   const [initialRegion] = useState(() => regionAround(position, START_RADIUS_M));
   const following = useRef(true);
   const followsDevice = source !== 'mapCenter';
 
+  // Back to the device position (e.g. "My location" in the dev picker): follow again.
+  useEffect(() => {
+    if (followsDevice) following.current = true;
+  }, [followsDevice]);
+
   useEffect(() => {
     if (followsDevice && following.current) {
       map.current?.animateToRegion(regionAround(position, START_RADIUS_M), FOLLOW_ANIMATION_MS);
     }
   }, [followsDevice, position]);
+
+  // A place chosen with lookAt (dev place picker): move there once.
+  const jump = useStore(store, (s) => s.jump);
+  useEffect(() => {
+    if (jump) {
+      map.current?.animateToRegion(regionAround(jump.center, START_RADIUS_M), FOLLOW_ANIMATION_MS);
+    }
+  }, [jump]);
 
   const center = useRequestCenter(position);
   const nearby = useNearby(client, { lat: center.lat, lng: center.lng });
@@ -81,6 +99,7 @@ export function MapScreen({
       >
         {nearby.data ? <LayerMarkers layers={layers} response={nearby.data.response} /> : null}
       </MapView>
+      {devTools ? <DevPlacePicker store={store} /> : null}
       {client === null ? (
         <View style={styles.status}>
           <BackendStatus baseUrl={baseUrl} client={client} />
