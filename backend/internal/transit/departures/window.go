@@ -34,6 +34,20 @@ type Departure struct {
 	// StopHeadsign is what the vehicle shows at this stop; "" if none.
 	StopHeadsign string
 	Scheduled    time.Time // in Europe/Berlin
+
+	// Realtime, set by realtime.Merge (task 4.3); zero values: schedule only.
+	Delay     int32 // seconds against Scheduled, valid if Realtime
+	Realtime  bool  // predicted from GTFS-RT (an event with a delay, own or propagated)
+	Cancelled bool  // the trip does not run (TripUpdate CANCELED)
+}
+
+// Predicted is when the vehicle leaves: Scheduled plus the realtime delay,
+// else Scheduled.
+func (d Departure) Predicted() time.Time {
+	if !d.Realtime {
+		return d.Scheduled
+	}
+	return d.Scheduled.Add(time.Duration(d.Delay) * time.Second)
 }
 
 // Window holds the departures of a time window.

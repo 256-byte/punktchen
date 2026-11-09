@@ -84,13 +84,14 @@ All backend parts live in **one binary** (modular monolith, ADR-0002). Package b
 Every time either the schedule window or the RT state changes:
 
 1. Start from scheduled departures.
-2. For each trip with a TripUpdate:
-   - trip `CANCELED` → mark all its departures cancelled.
-   - per stop: use `stop_time_update` matched by `stop_id` (fallback `stop_sequence`).
-   - stops **after** the last update without own data → propagate the last known delay (GTFS-RT semantics).
-   - stops **before** the first update → keep schedule.
+2. For each trip instance `(trip_id, start_date)` with a TripUpdate (`realtime.Merge`, task 4.3):
+   - trip `CANCELED` → all its departures `Cancelled` (no delay).
+   - per stop: the stop time update with the departure's `stop_sequence`; without a sequence, the one whose `stop_id` is the pole (only if that stop_id occurs once in the trip). Sequence first because loops pass a pole twice; on the recorded Wedding feed every sequence match also matches the pole or its station number (DATA_MODEL §7 #30).
+   - its delay: departure event, else arrival (a first stop may arrive after it departs, §7 #29). Only an event with a `delay` is realtime; VBB fills the others from the schedule (§7 #18). `NO_DATA` → schedule.
    - `SKIPPED` stop → remove that departure.
-3. Set `source = realtime | scheduled` per departure. VBB fills events without realtime data from the schedule (`time` without `delay`), so only events with `delay` count as `realtime` (DATA_MODEL §7 #18). `stop_id`s that are bare station numbers match by `stop_sequence`.
+   - stops without an own update → the last update before it (by sequence, skipped ones passed over) decides: with a delay → propagate it (GTFS-RT semantics); filled from the schedule or `NO_DATA` → schedule. VBB lists every stop, so propagation did not occur on the recorded feed.
+   - stops before the first update → `TripUpdate.delay` if set, else schedule.
+3. `Departure.Realtime` (and `Delay`, `Predicted()`) is set for departures with a delay; the API's `source = realtime | scheduled` follows from it. `Merge` returns a new slice and `MergeStats` (with a TripUpdate, realtime, propagated, cancelled, skipped) for logs and the match ratio (4.6). It lives in `transit/realtime` because that package already depends on `departures` (for `ServiceDay`); `departures` stays free of realtime.
 4. Build an immutable `Snapshot{Version, GeneratedAt, ScheduleID, From, To, departures by pole}` and publish with `atomic.Pointer[Snapshot]` (ADR-0005). Readers are lock-free. All departures sit in one array grouped by pole; each pole gets a capped slice of it, so a reader cannot change another pole by appending. `RealtimeFeedTime` comes with Phase 4 (task 4.4).
 5. `Version` increments monotonically; it is part of cache keys and ETags. It starts at the Unix time in milliseconds when the process starts, so it also keeps increasing across restarts and an ETag from before a restart cannot match new data. Until Phase 4 a new snapshot is published once a minute (the window moves).
 
