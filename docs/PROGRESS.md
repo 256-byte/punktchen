@@ -4,8 +4,8 @@
 
 ## Current status
 
-- **Active phase:** Phase 1 — Static GTFS (started 2026-11-08 with the user's OK while 0.9 is blocked)
-- **Next task:** 1.8
+- **Active phase:** Phase 1 — Static GTFS: all tasks done (2026-11-09). Phase 2 starts when the user says so.
+- **Next task:** 2.1 (Phase 2 — Schedule-based API)
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -29,7 +29,13 @@
 | 1 | 1.5 Derived tables | done | `service_dates` now covers the whole feed (no daily rebuild) |
 | 1 | 1.6 Sanity checks + swap | done | 0 failed reads in ~4,000 during 6 swaps; real feed passes default limits |
 | 1 | 1.7 Scheduler | done | Dev DB now has the live schedule (startup import in Docker) |
-| 1 | 1.8 Nearby query | todo | |
+| 1 | 1.8 Nearby query | done | Wedding 500 m: median 2.8 ms on the full feed |
+| 2 | 2.1 Layer registry | todo | |
+| 2 | 2.2 Schedule window loader | todo | |
+| 2 | 2.3 Snapshot | todo | |
+| 2 | 2.4 Transit provider | todo | |
+| 2 | 2.5 API handlers | todo | |
+| 2 | 2.6 Spot check vs. VBB | todo | |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
 
@@ -68,6 +74,16 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 1.8
+- Done:
+  - sqlc query `NearbyPoles(lat, lng, radius_m)` (`db/queries/nearby.sql`): served (`pole_directions` exists), in-scope poles within the radius (`ST_DWithin` on `stops.geom`), joined with `stations`; rows grouped by station, ordered by station distance (= its nearest pole) then pole distance. Returns station id/name/location/modes and pole id/platform/location/distance. All PostGIS results cast to `float8`, so the Go types are exact.
+  - `sqlc.yaml`: `strict_function_checks` turned off — sqlc's catalog does not know PostGIS functions (`function "st_y" does not exist`). Documented in the file.
+  - DATA_MODEL §7 #23.
+- Tests: `TestNearbyPolesWedding` on the Wedding fixture (loaded + swapped): S+U Wedding is one station with exactly its 6 served poles incl. bus `::3`/`::4`, nearest first; Martha-Ndumbe-Platz separate; stations ordered and not split; every pole inside the radius; empty area → no rows. Speed (acceptance < 20 ms): full feed in `TestImportRealFeed`, 25 runs on one connection: Wedding 500 m median 2.8 ms, Alexanderplatz 1000 m 11.9 ms; `EXPLAIN ANALYZE` on the dev DB confirms index scans only (first call ~90 ms with planning). vet, golangci-lint 0 issues, `go generate` up to date.
+- Data facts found: same-name neighbouring stations with different DHIDs ("U Reinickendorfer Str."), §7 #23.
+- New deps (+ why): none.
+- **Phase 1 is complete.** Next: Phase 2 (2.1 layer registry) when the user starts it.
 
 ### 2026-11-09 — task 1.7
 - Done:

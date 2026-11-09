@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/256-byte/punktchen/backend/gen/queries"
 )
 
 // rulesFeed's services run 2026-11-09 … 2026-11-20.
@@ -404,4 +406,14 @@ func TestImportRealFeed(t *testing.T) {
 	if err != nil || again.Changed {
 		t.Fatalf("second run: %+v, %v; want skipped", again, err)
 	}
+
+	// PLAN 1.8: "Wedding 500 m" in < 20 ms on the full feed (warm, prepared).
+	d, n := medianNearby(t, pool, wedding, 25)
+	t.Logf("nearby Wedding 500 m: %d rows, median %s", n, d)
+	if d > 20*time.Millisecond {
+		t.Errorf("nearby query median %s, want < 20 ms", d)
+	}
+	alex := queries.NearbyPolesParams{Lat: 52.5219, Lng: 13.4132, RadiusM: 1000}
+	d, n = medianNearby(t, pool, alex, 25)
+	t.Logf("nearby Alexanderplatz 1000 m (max radius, densest area): %d rows, median %s", n, d)
 }
