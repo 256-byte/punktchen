@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 1 — Static GTFS (started 2026-11-08 with the user's OK while 0.9 is blocked)
-- **Next task:** 1.6
+- **Next task:** 1.7
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -27,7 +27,7 @@
 | 1 | 1.3 Streaming import | done | Full VBB feed in ~9 s, peak Go memory 18 MB |
 | 1 | 1.4 Indexes + in_scope | done | 10,841 poles / 3,914 stations in scope (2,974 in Berlin) |
 | 1 | 1.5 Derived tables | done | `service_dates` now covers the whole feed (no daily rebuild) |
-| 1 | 1.6 Sanity checks + swap | todo | |
+| 1 | 1.6 Sanity checks + swap | done | 0 failed reads in ~4,000 during 6 swaps; real feed passes default limits |
 | 1 | 1.7 Scheduler | todo | |
 | 1 | 1.8 Nearby query | todo | |
 
@@ -68,6 +68,16 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 1.6
+- Done:
+  - `static.check` (sanity.go): size floors (VBB defaults: 5,000 in-scope poles, 1 M stop_times) and max 50 % drop vs. the last successful import's `row_counts`; dangling trip/stop/route references; trips without running service or stop times; served poles without coordinates; stop times without departure; service in `[today, today + 7]` (Europe/Berlin). All checks run; all problems are reported in one error.
+  - `swap` (swap.go): one transaction (`lock_timeout` 10 s) renames `gtfs` → `gtfs_old` and `gtfs_staging` → `gtfs`; `gtfs_old` is dropped afterwards in its own transaction (`lock_timeout` 60 s, failure only logged; the next swap drops leftovers).
+  - `static.Importer.Run` (importer.go): advisory lock (`ErrImportRunning` for a concurrent run) → `Downloader.Fetch` → skip if unchanged → `Loader.Load` → `check` → `swap` → `ImportLog.Succeed` with row counts + `in_scope_poles`/`in_scope_stations`; any error → `Fail`, live schedule untouched, zip removed.
+  - ARCHITECTURE §3.1 steps 5–6 + pipeline; DATA_MODEL §3.3 `row_counts` keys; CLAUDE.md real-feed test command now runs both real-feed tests.
+- Tests: `TestSwapWithoutFailedReads` (acceptance): 4 readers on their own pool (prepared statements) query `gtfs.stops` and a `pole_directions` ⨝ `stations` join while 6 full imports swap the schema: 4,109–4,538 reads, **0 failed**, both old and new data seen, only `gtfs` left. `TestImporter`: first import creates `gtfs`; unchanged feed skipped (same schema oid); changed feed replaces data; failures (sanity, not a zip, expired feed, > 50 % drop) keep the old data and record `failed` with the reason; held lock → `ErrImportRunning`. `TestSanityChecks`: every check fires on a crafted feed, clean feed passes. Real feed (`TestImportRealFeed`, default limits): all checks pass (~8 s), swap 18 ms, whole run 2 min 14 s, second run skipped. Test helper `writeZip` now writes files in sorted order (map order made identical feeds hash differently). vet, golangci-lint 0 issues.
+- New deps (+ why): none.
+- Next: 1.7 scheduler (daily run + import on empty DB + dev endpoint), which calls `Importer.Run`.
 
 ### 2026-11-09 — task 1.5
 - Done:

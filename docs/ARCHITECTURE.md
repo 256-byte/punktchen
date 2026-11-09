@@ -48,9 +48,10 @@ All backend parts live in **one binary** (modular monolith, ADR-0002). Package b
   2. Load into schema `gtfs_staging` using `pgx.CopyFrom`.
   3. Create indexes, run derived-table SQL (see DATA_MODEL §3).
   4. Apply scope filter (Berlin bbox, config) by flagging `stops.in_scope` — rows are kept, filtering happens in queries/derived tables.
-  5. Sanity checks (row counts above minimums, every in-scope stop has coordinates, etc.). Fail → keep old data, log + metric.
-  6. In one transaction: `gtfs` → `gtfs_old`, `gtfs_staging` → `gtfs`; commit; drop `gtfs_old`.
-- Readers never see a half-imported dataset. sqlc queries always reference `gtfs.*`.
+  5. Sanity checks (`static.check`, all run, all problems reported together): in-scope poles and stop_times above floors (VBB defaults 5,000 / 1,000,000) and not more than 50 % below the last successful import; no dangling `trip_id` / `stop_id` / `route_id`; every trip has a running service and stop times; served poles have coordinates; every stop time has a departure; the feed has service in `[today, today + 7]`. Fail → keep old data, attempt `failed` with the list; `gtfs_staging` stays for inspection until the next load drops it.
+  6. Swap, one transaction with `lock_timeout` 10 s: `gtfs` → `gtfs_old`, `gtfs_staging` → `gtfs`; commit (~20 ms); then drop `gtfs_old` in its own transaction (`lock_timeout` 60 s; on timeout the next swap drops it).
+- Readers never see a half-imported dataset. sqlc queries always reference `gtfs.*`. A statement resolves `gtfs.<table>` either before the swap commits (old tables) or after (new ones); statements still running on the old tables keep their locks, so the drop waits for them. Verified with 4 concurrent readers over 6 swaps: ~4,000–4,500 reads, none failed (task 1.6).
+- `static.Importer.Run` is the whole pipeline (download → load → check → swap → `meta.feed_imports`). A Postgres advisory lock (`pg_try_advisory_lock`) makes concurrent runs (scheduler + manual trigger, several processes) return `ErrImportRunning` instead of racing.
 
 ### 3.2 `transit/departures` — schedule window
 
