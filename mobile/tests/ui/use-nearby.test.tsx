@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { ApiError, createApiClient, type ApiClientOptions } from '@/api/client';
 import { fetchNearby, type NearbyParams, type NearbyResponse } from '@/api/nearby';
 import { nearbyQueryKey, useNearby } from '@/api/useNearby';
+import { MAX_DATA_AGE_MS, MIN_INTERVAL_MS } from '@/core/fetchPolicy';
 
 const BASE = 'http://192.168.178.29:8080';
 const WEDDING: NearbyParams = { lat: 52.5427, lng: 13.366 };
@@ -54,6 +55,7 @@ function wrapper() {
 
 afterEach(() => {
   jest.restoreAllMocks();
+  jest.useRealTimers();
 });
 
 describe('fetchNearby', () => {
@@ -185,6 +187,7 @@ describe('useNearby', () => {
   });
 
   it('shows the previous area while new parameters load, without its ETag', async () => {
+    jest.useFakeTimers(); // the move is requested after the 10 s floor
     // The second answer waits until the placeholder was seen.
     let release: () => void = () => {};
     const gate = new Promise<void>((resolve) => (release = resolve));
@@ -205,6 +208,7 @@ describe('useNearby', () => {
     expect(result.current.isPlaceholderData).toBe(true);
     expect(result.current.data!.etag).toBe('"wedding"');
 
+    await act(async () => jest.advanceTimersByTime(MIN_INTERVAL_MS));
     release();
     await waitFor(() => expect(result.current.isPlaceholderData).toBe(false));
     expect(result.current.data!.etag).toBe('"alex"');
@@ -229,5 +233,52 @@ describe('useNearby', () => {
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error).toMatchObject({ status: 500 });
     expect(server.requests).toHaveLength(1);
+  });
+});
+
+describe('useNearby fetch policy', () => {
+  it('revalidates when the data is 30 s old, also on a device clock days off the server', async () => {
+    // The server says 2026-11-05 (body()), the device 2026-11-09: the app
+    // corrects its clock by −4 days. The policy's 10 s and 30 s are device
+    // time and must not jump with that correction.
+    jest.useFakeTimers({ now: Date.parse('2026-11-09T10:00:00Z') });
+    const server = fakeServer(
+      () => ok(body(), '"v1"'),
+      () => notModified('"v1"'),
+    );
+    const { result } = await renderHook(() => useNearby(server.client, WEDDING), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.data?.etag).toBe('"v1"'));
+    expect(result.current.data!.clockOffsetMs).toBeLessThan(-3 * 24 * 3600_000);
+
+    await act(async () => jest.advanceTimersByTime(MAX_DATA_AGE_MS - 1_000));
+    expect(server.requests).toHaveLength(1);
+    await act(async () => jest.advanceTimersByTime(1_000));
+    await waitFor(() => expect(server.requests).toHaveLength(2));
+    expect(server.requests[1]!.headers.get('If-None-Match')).toBe('"v1"');
+  });
+
+  it('asks again on refresh() once the 10 s floor has passed', async () => {
+    jest.useFakeTimers();
+    const server = fakeServer(
+      () => new Response('', { status: 500 }),
+      () => ok(body(), '"v1"'),
+    );
+    const { result } = await renderHook(() => useNearby(server.client, WEDDING), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    // Read data now: TanStack Query re-renders only for result fields that
+    // were read (tracked properties), and isError is false again while the
+    // next request runs.
+    expect(result.current.data).toBeUndefined();
+    await act(async () => {
+      result.current.refresh();
+    });
+    expect(server.requests).toHaveLength(1);
+    await act(async () => jest.advanceTimersByTime(MIN_INTERVAL_MS));
+    await waitFor(() => expect(result.current.data?.etag).toBe('"v1"'));
+    expect(server.requests).toHaveLength(2);
   });
 });

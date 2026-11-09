@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 5 — Traffic & cache (Phase 4 done except 4.0's final step; exception, see Decisions 2026-11-09)
-- **Next task:** 5.4 mobile fetch policy wired; 4.0's final step in between (waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
+- **Next task:** 5.5 performance numbers in the README; 4.0's final step in between (waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -53,7 +53,7 @@
 | 5 | 5.1 Geohash cell snapping + radius expansion | done | `/v1/nearby` answers for the precision-7 cell centre with radius + half diagonal (~90 m in Berlin); `meta.cell` set; two users 50 m apart in one cell get byte-identical responses (contract test on real data) |
 | 5 | 5.2 LRU cell cache, TTL, metrics | done | Key (cell, radius bucket, layer versions); LRU 1024, TTL 60 s; one build per key; load test: 1000 requests from one cell → 1 build (1 miss, 99 shared, 900 hits); generatedAt stays the response time |
 | 5 | 5.3 ETag/304 end-to-end, gzip | done | Weak ETags on nearby (cache key) and station (id + version); `curl` with `If-None-Match` → 304, 0 bytes (live); gzip 31.9 KB → 2.9 KB (Wedding) |
-| 5 | 5.4 Mobile fetch policy wired | todo | |
+| 5 | 5.4 Mobile fetch policy wired | done | `createFetchLoop` + `useNearby`; interim 30 s refetch removed; dev log per request with count per minute; iPhone: request log within the policy (user, 2026-11-09) |
 | 5 | 5.5 Performance numbers in README | todo | |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
@@ -101,6 +101,17 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 5.4
+- Done: `src/core/fetchLoop.ts` — `createFetchLoop` runs `decideFetch` (3.3) on events and once at `until` (one timer, one request at a time), keeps the policy state, logs each request with the count of the last minute and each failure. `nearbyDepartureLists` (`fetchPolicy.ts`) feeds `earliestDepartureAt`. `useNearby`: query `enabled: false`; the loop requests through `queryClient.fetchQuery`; latest key/clock/log via `useEffectEvent`; foreground from AppState; `refresh()` for "Try again" (skips the backoff, not the 10 s floor). Interim `refetchInterval` removed.
+- Found and fixed while wiring:
+  - **Clock correction vs. intervals:** with the server-corrected clock, a −4 day correction (test server's `generatedAt`) made the loop see "under 10 s since the last request" for 4 days; a phone 5 min off would have stopped refreshing for 5 min. Intervals now use the device clock; only the earliest departure is computed in server time and converted back.
+  - **Tracked properties:** reading `query.refetch` during render made TanStack Query re-render only when `refetch` changed, so new data never showed. The hook reads nothing from the result during render.
+- Behaviour change: a move of > 150 m (or a dev place jump, or "Try again") within 10 s of the last request now loads after the 10 s floor; the old area stays shown meanwhile.
+- Tests: Vitest `fetchLoop.test.ts` (12: first request needs foreground + position; one timer to the 30 s refetch; departed earlier than that; move waits for the floor and records the new place; backoff 10/10/20 s with thrown errors counted, reset on success; "Try again" skips backoff not floor; one request at a time; background stops the timer and the return decides at once; requests-per-minute log; dispose), `nearbyDepartureLists`. Jest: hook revalidates after 30 s with a device clock 4 days off the server (regression), `refresh()` after an error waits for the floor; map/place picker/placeholder tests now advance fake time over the 10 s floor and check nothing is sent before it. Vitest 204, Jest 61, core coverage 100 % lines; typecheck, lint pass.
+- Manual check (user, iPhone, Expo Go): the Expo terminal's `[nearby] request (…)` lines stayed within the policy. Acceptance met.
+- New deps: none.
+- Next: 5.5 (performance numbers in the README).
 
 ### 2026-11-09 — task 5.3
 - Done: `internal/api/etag.go` — `etagOf` (weak `W/"…"`, 128-bit sha256 hex; weak because `generatedAt` and gzip change the bytes), `matchesETag` (weak comparison, lists, `*`). `/v1/nearby`: ETag of the cache key, 304 before the cache lookup; the cached answer carries its ETag (the key it was built from); no ETag when a layer failed. `/v1/stations/{id}`: ETag of id + snapshot version, 304 after building (cheap; saves the transfer). `internal/api/gzip.go` — `withGzip` around the API handler: 2xx JSON gzipped when `Accept-Encoding` allows it (q-values parsed), pooled writers, `Vary: Accept-Encoding`; errors and 304s untouched. No contract change: ETag, `If-None-Match` and 304 were already in it; the app already revalidates (3.3).

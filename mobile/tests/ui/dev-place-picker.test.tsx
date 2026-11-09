@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import { createApiClient, type ApiClientOptions } from '@/api/client';
+import { MIN_INTERVAL_MS } from '@/core/fetchPolicy';
 import { regionAround } from '@/core/geo';
 import { createLocationStore, type LocationStore } from '@/state/location';
 import { DEV_PLACES } from '@/ui/DevPlacePicker';
@@ -65,8 +66,13 @@ async function renderApp(devTools: boolean) {
   );
 }
 
+afterEach(() => {
+  jest.useRealTimers();
+});
+
 describe('DevPlacePicker', () => {
   it('jumps to a station and loads its surroundings', async () => {
+    jest.useFakeTimers(); // the new area loads after the fetch policy's 10 s floor
     await renderApp(true);
     await waitFor(() => expect(requests).toHaveLength(1));
 
@@ -76,6 +82,7 @@ describe('DevPlacePicker', () => {
 
     expect(store.getState().mode).toBe('mapCenter');
     expect(map.animateToRegion).toHaveBeenLastCalledWith(regionAround(ALEX, START_RADIUS_M), 400);
+    await act(async () => jest.advanceTimersByTime(MIN_INTERVAL_MS));
     await waitFor(() => expect(requests).toHaveLength(2));
     expect(Number(requests[1]?.searchParams.get('lat'))).toBeCloseTo(ALEX.lat, 5);
     expect(screen.queryByText('S Wannsee')).toBeNull(); // list closed

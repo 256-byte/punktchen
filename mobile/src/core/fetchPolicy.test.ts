@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { backoffMs, decideFetch, type FetchState, nextRequestCenter } from './fetchPolicy';
+import {
+  backoffMs,
+  decideFetch,
+  type FetchState,
+  nearbyDepartureLists,
+  nextRequestCenter,
+} from './fetchPolicy';
 import { MINUTE, SECOND } from './time';
 
 const t0 = Date.parse('2026-11-05T14:30:00+01:00');
@@ -201,5 +207,55 @@ describe('nextRequestCenter', () => {
 
   it('moves to the position after more than 150 m', () => {
     expect(nextRequestCenter(wedding, far)).toBe(far);
+  });
+});
+
+describe('nearbyDepartureLists', () => {
+  it('lists every direction of every pole of the transit layer', () => {
+    const dep = (tripId: string) => ({
+      tripId,
+      serviceDate: '2026-11-05',
+      scheduled: '2026-11-05T14:32:00+01:00',
+      predicted: null,
+      delaySeconds: null,
+      source: 'scheduled' as const,
+      cancelled: false,
+    });
+    const direction = (tripId: string) => ({
+      line: 'M27',
+      mode: 'bus' as const,
+      color: null,
+      headsign: 'S Jungfernheide',
+      isTerminal: false,
+      isRing: false,
+      departures: [dep(tripId)],
+    });
+    const pole = (...dirs: ReturnType<typeof direction>[]) => ({
+      id: 'p',
+      location: { lat: 52.5, lng: 13.4 },
+      platform: null,
+      description: null,
+      directions: dirs,
+    });
+    const station = (...poles: ReturnType<typeof pole>[]) => ({
+      id: 's',
+      kind: 'station' as const,
+      name: 'S+U Wedding',
+      location: { lat: 52.5, lng: 13.4 },
+      modes: [],
+      poles,
+    });
+    const meta = { generatedAt: '2026-11-05T14:30:12+01:00', attribution: [], layers: {} };
+    const lists = nearbyDepartureLists({
+      meta,
+      layers: {
+        transit: {
+          layer: 'transit',
+          features: [station(pole(direction('a'), direction('b'))), station(pole(direction('c')))],
+        },
+      },
+    });
+    expect([...lists].map((l) => l[0]!.tripId)).toEqual(['a', 'b', 'c']);
+    expect([...nearbyDepartureLists({ meta, layers: {} })]).toEqual([]); // transit down
   });
 });
