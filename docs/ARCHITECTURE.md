@@ -129,7 +129,7 @@ type Provider interface {
   - `/v1/layers` lists the registry's layers; `/v1/nearby` goes through `layer.Registry.Nearby`; `/v1/stations/{id}` asks the transit provider directly (`TransitStations`). `cmd/server` builds the registry with the transit provider.
   - Validation the generated binding does not do: lat/lng ranges, radius 100–1000 (default 500), layer ids (default `transit`; unknown, empty or repeated → 400). All problems of a request are reported in one message.
   - A layer that fails (e.g. no departures before the first import) → still 200, layer `down` in `meta.layers`, no payload, not in `attribution`. Station sheet: 404 unknown, 503 `unavailable` without departures.
-  - `meta.layers.<id>.version` = the version the payload was built from; `Cache-Control: no-cache`. Not yet: `ETag`/304, gzip (Phase 5).
+  - `meta.layers.<id>.version` = the version the payload was built from; `Cache-Control: no-cache`; ETag/304 and gzip since task 5.3 (below).
   - Contract tests (`contract_test.go`): every endpoint on the Wedding fixture and on an empty state, each response (status, headers, body) validated against `api/openapi.yaml` with kin-openapi (JSON Schema 2020-12 for OpenAPI 3.1).
 - **Cell cache (ADR-0006):**
   - Snap request location to a geohash cell (precision 7, ~150 m × 150 m).
@@ -139,6 +139,7 @@ type Provider interface {
   - Done in task 5.2 (`internal/api/cache.go`, `GetNearby`): key = cell, radius rounded up to 100 m, `layer=version` of each requested layer in registration order (the ids are in it). LRU of 1024 entries (~30 KB each as JSON), TTL 60 s as a safety net (the transit snapshot gets a new version at least every minute). Concurrent requests for one key wait for a single build, which runs with a context detached from the request (10 s limit), so one client going away does not fail the others. An answer is stored under the versions it was really built from, and not at all if a layer failed. The cached value has no `generatedAt`: every response gets the current server time, so the app's clock correction (ADR-0007) stays right. Metrics `livestop_cache_hits_total{result=hit|shared|miss}`, `livestop_cache_entries`.
   - `ETag` = hash of the key. `If-None-Match` match → `304` with empty body.
   - Response bodies gzip-compressed.
+  - Done in task 5.3 (`internal/api/etag.go`, `gzip.go`): weak ETags (`W/"<128-bit sha256 hex>"`), because the bytes differ per response (`generatedAt`, gzip). `/v1/nearby`: ETag of the cache key; a matching `If-None-Match` (weak comparison, lists, `*`) answers 304 before any lookup or build; answers with a failed layer get no ETag. `/v1/stations/{id}`: ETag of `(id, snapshot version)`, checked after the station is built (it is small; saves the transfer). `withGzip` compresses 2xx JSON for clients that send `Accept-Encoding: gzip` (pooled writers; errors and 304s unchanged; `Vary: Accept-Encoding` always). Wedding 500 m: 31.9 KB → 2.9 KB. A 304 is possible while the snapshot version stays the same, i.e. between two realtime feeds (~30 s).
 - Middleware: request ID, structured access log, panic recovery, timeout, CORS (dev only).
 - `/metrics` on a separate port (not exposed publicly).
 
