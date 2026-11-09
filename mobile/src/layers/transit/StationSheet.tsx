@@ -8,6 +8,7 @@ import { poleTitle, type SheetPole, type SheetRow, sheetModel, sheetSignature } 
 import { type ClockStore, clockStore, useNow } from '@/state/clock';
 import { Attribution } from '@/ui/Attribution';
 
+import { DepartureTime } from './DepartureTime';
 import type { PoleFeature } from './index';
 import { LineBadge } from './LineBadge';
 
@@ -63,6 +64,11 @@ export function StationSheet({
           ))}
         </View>
       ) : null}
+      {model.poles.length > 0 ? (
+        <Text style={styles.legend}>
+          Green: live, on time. Red: live and late (+2 = 2 min). Black: timetable only.
+        </Text>
+      ) : null}
       <Attribution lines={query.data?.response.meta.attribution ?? []} />
     </BottomSheetScrollView>
   );
@@ -89,13 +95,7 @@ function DirectionRow({ row }: { row: SheetRow }) {
       </Text>
       <View style={styles.times}>
         {row.departures.map((d, i) => (
-          <Text
-            key={i}
-            style={[styles.time, i === 0 && styles.next, d.cancelled && styles.cancelled]}
-            accessibilityLabel={d.cancelled ? `${d.label}, cancelled` : d.label}
-          >
-            {d.label}
-          </Text>
+          <DepartureTime key={i} cell={d} style={[styles.time, i === 0 && styles.next]} />
         ))}
       </View>
     </View>
@@ -159,8 +159,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#111111',
   },
-  cancelled: {
-    textDecorationLine: 'line-through',
-    color: '#b42318',
+  legend: {
+    fontSize: 12,
+    color: '#666666',
   },
 });

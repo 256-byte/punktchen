@@ -5,6 +5,7 @@
 import type { components } from '../api/schema.gen';
 import { upcomingDepartures } from './departures';
 import { type Direction, directionKey } from './directions';
+import { type DepartureCell, decodeCell, departureCell, encodeCell } from './realtime';
 
 export type Station = components['schemas']['Station'];
 export type Pole = components['schemas']['Pole'];
@@ -12,12 +13,11 @@ export type Pole = components['schemas']['Pole'];
 /** Departures per direction in the sheet (the API sends up to 10). */
 export const SHEET_DEPARTURES = 3;
 
-const CANCELLED = '~';
-
 /**
  * One string per direction of the station (poles in order, then their
- * directions): its next departures' labels, cancelled ones marked, joined
- * by "|"; "" when no running departure is left. Plain strings, so a clock
+ * directions): its next departures as encoded cells (countdown, live or
+ * timetable, delay, cancelled; task 4.5), joined by "|"; "" when no
+ * running departure is left. Plain strings, so a clock
  * selector over it (useNow) changes only when a label changes.
  */
 export function sheetSignature(station: Station, now: number, max = SHEET_DEPARTURES): string[] {
@@ -29,21 +29,16 @@ export function sheetSignature(station: Station, now: number, max = SHEET_DEPART
       }
       return upcoming
         .slice(0, max)
-        .map((e) => (e.cancelled ? CANCELLED : '') + e.label)
+        .map((e) => encodeCell(departureCell(e)))
         .join('|');
     }),
   );
 }
 
-export interface SheetDeparture {
-  label: string;
-  cancelled: boolean;
-}
-
 export interface SheetRow {
   key: string;
   direction: Direction;
-  departures: SheetDeparture[];
+  departures: DepartureCell[];
 }
 
 export interface SheetPole {
@@ -77,7 +72,7 @@ export function sheetModel(station: Station, signature: readonly string[]): Shee
       const sig = signature[i++] ?? '';
       const key = directionKey(direction);
       if (sig !== '') {
-        rows.push({ key, direction, departures: sig.split('|').map(decode) });
+        rows.push({ key, direction, departures: sig.split('|').map(decodeCell) });
       } else if (!seenIdle.has(key)) {
         seenIdle.add(key);
         idle.push({ key, direction, platform: pole.platform });
@@ -88,12 +83,6 @@ export function sheetModel(station: Station, signature: readonly string[]): Shee
     }
   }
   return { poles, idle };
-}
-
-function decode(s: string): SheetDeparture {
-  return s.startsWith(CANCELLED)
-    ? { label: s.slice(CANCELLED.length), cancelled: true }
-    : { label: s, cancelled: false };
 }
 
 /**

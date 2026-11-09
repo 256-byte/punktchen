@@ -18,6 +18,16 @@ function dep(time: string, cancelled = false): Departure {
   };
 }
 
+/** A realtime departure: scheduled at time, predicted at predicted. */
+function live(time: string, predicted: string, delaySeconds: number): Departure {
+  return {
+    ...dep(time),
+    predicted: `2026-11-05T${predicted}:00+01:00`,
+    delaySeconds,
+    source: 'realtime',
+  };
+}
+
 function direction(line: string, headsign: string, departures: Departure[]): Direction {
   return { line, mode: 'bus', color: null, headsign, isTerminal: false, isRing: false, departures };
 }
@@ -34,7 +44,12 @@ const station: Station = {
   modes: ['sbahn', 'bus'],
   poles: [
     pole('p1', '1', [
-      direction('S41', 'Ringbahn S 41', [dep('14:32'), dep('14:37'), dep('14:42'), dep('14:47')]),
+      direction('S41', 'Ringbahn S 41', [
+        dep('14:32'),
+        live('14:37', '14:39', 120),
+        dep('14:42'),
+        dep('14:47'),
+      ]),
       direction('N20', 'S Oranienburger Str.', []),
     ]),
     pole('p2', null, [
@@ -47,12 +62,12 @@ const station: Station = {
 };
 
 describe('sheetSignature', () => {
-  it('encodes each direction’s next departures, cancelled ones marked', () => {
+  it('encodes each direction’s next departures: live, delay, cancelled', () => {
     expect(sheetSignature(station, now)).toEqual([
-      '2 min|7 min|12 min',
+      's\t2 min|l+2\t9 min|s\t12 min', // the late one by its predicted time
       '',
       '',
-      '~3 min|13 min',
+      'c\t3 min|s\t13 min',
       '',
       '',
     ]);
@@ -77,8 +92,8 @@ describe('sheetModel', () => {
         key: 'bus|M27|S Jungfernheide|',
         direction: station.poles[1]!.directions[1],
         departures: [
-          { label: '3 min', cancelled: true },
-          { label: '13 min', cancelled: false },
+          { label: '3 min', state: 'cancelled', delay: null },
+          { label: '13 min', state: 'scheduled', delay: null },
         ],
       },
     ]);

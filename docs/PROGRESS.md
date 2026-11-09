@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 4 — Realtime (Phase 3 done 2026-11-09)
-- **Next task:** 4.5 Mobile: delay, realtime indicator, cancelled style (4.0 waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
+- **Next task:** 4.6 match ratio metric (4.0 waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -48,7 +48,7 @@
 | 4 | 4.2 Parser → trip-instance state | done | `realtime.Parse` + `Store`: key (trip_id, start_date), latest wins, empty feed keeps the state; golden on the recorded feeds |
 | 4 | 4.3 Merge rules | done | `realtime.Merge`: match by sequence then stop_id, delay from the departure event, propagation, cancel, skip; checked on the recorded Wedding feed |
 | 4 | 4.4 Snapshot rebuild on RT change, health | done | Poller + store wired; snapshot merges realtime, republishes per feed; degraded > 2 min, schedule-only > 5 min; live check: 19 of 52 departures realtime at Wedding |
-| 4 | 4.5 Mobile: delay, realtime indicator, cancelled | todo | |
+| 4 | 4.5 Mobile: delay, realtime indicator, cancelled | done | Live times green, late ones red with "+N", timetable black, cancelled struck through (marker + sheet); iPhone: new display seen working (user, 2026-11-09) |
 | 4 | 4.6 Match ratio metric | todo | |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
@@ -95,6 +95,17 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 4.5
+- Done:
+  - `src/core/realtime.ts` (pure): `departureCell` — a departure's countdown with its state `scheduled | onTime | early | late | cancelled` and delay text ("+2", "−1"); `delayMinutes` rounds toward zero (under a minute late or early is on time); `cellDescription` for screen readers ("5 min, live, 2 min late"); `encodeCell`/`decodeCell` keep cells plain strings for the clock selectors.
+  - `nextLabels` → `nextCells` (`directions.ts`) and `sheetSignature` (`sheet.ts`) carry encoded cells, so markers and the sheet still re-render only when what they show changes; `MarkerRow.next` and `SheetRow.departures` are cells.
+  - `DepartureTime` (`src/layers/transit`): timetable times in the row's colour; live ones green (`#067647`), late ones red (`#b42318`) with a bold "+N"; early ones green with "−N"; cancelled ones red and struck through. Used by marker rows and the station sheet; the sheet ends with a one-line legend above the attribution.
+- Choices (no ADR, UI only; may change in 7.1): colour follows the usual journey planners (green live, red late); a delay is shown from one whole minute.
+- Tests: Vitest `src/core/realtime.test.ts` (new: rounding, states, cancelled wins, descriptions, encode/decode round trip), `directions.test.ts` / `sheet.test.ts` updated (cells, a late departure ordered by its predicted time). Jest: marker shows "5 min +2" in red, an on-time live one green, a timetable one black; sheet shows "10 min +3", cancelled struck through, legend. Typecheck, lint, all tests (Vitest 191, Jest 59, core coverage gate) pass.
+- Manual check (user, iPhone, Expo Go, after VBB's feed came back): green live times, red "+N" delays and the legend shown as intended. Acceptance met.
+- New deps: none.
+- Next: 4.6 match ratio metric.
 
 ### 2026-11-09 — task 4.4
 - Done:
