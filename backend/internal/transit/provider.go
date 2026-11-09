@@ -112,7 +112,7 @@ func (p *Provider) Nearby(ctx context.Context, q layer.NearbyQuery) (layer.Resul
 				id: r.StationID, name: deref(r.StationName), lat: r.StationLat, lng: r.StationLng,
 				modes: r.StationModes, distance: &dist,
 			},
-			id: r.StopID, platform: r.PlatformCode, lat: r.Lat, lng: r.Lng,
+			id: r.StopID, platform: r.PlatformCode, description: nonEmpty(r.Description), lat: r.Lat, lng: r.Lng,
 		}
 	}
 	features, err := p.build(ctx, s, poles, NearbyDepartures)
@@ -144,7 +144,7 @@ func (p *Provider) Station(ctx context.Context, id string) (*openapi.Station, ui
 	for i, r := range rows {
 		poles[i] = poleRow{
 			station: stationRow{id: r.StationID, name: r.StationName, lat: r.StationLat, lng: r.StationLng, modes: r.StationModes},
-			id:      r.StopID, platform: r.PlatformCode, lat: r.Lat, lng: r.Lng,
+			id:      r.StopID, platform: r.PlatformCode, description: nonEmpty(r.Description), lat: r.Lat, lng: r.Lng,
 		}
 	}
 	features, err := p.build(ctx, s, poles, StationDepartures)

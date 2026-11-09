@@ -472,7 +472,7 @@ components:
     Pole:
       type: object
       description: A physical stop point / platform (GTFS location_type 0).
-      required: [id, location, platform, directions]
+      required: [id, location, platform, description, directions]
       properties:
         id:
           type: string
@@ -483,6 +483,14 @@ components:
           type: [string, "null"]
           description: GTFS platform_code, if any.
           examples: ["1"]
+        description:
+          type: [string, "null"]
+          description: |
+            GTFS stop_desc as VBB writes it, null if empty: where the pole is
+            ("Bushalt Müllerstraße ht. Lindower Straße", "S-Bahnsteig Gleis 1",
+            "Ersatzhalt …" for a rail replacement stop). Set on 99.6 % of bus
+            poles and all others (DATA_MODEL §7 #28).
+          examples: ["Bushalt Müllerstraße ht. Lindower Straße"]
         directions:
           type: array
           description: |

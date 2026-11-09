@@ -29,7 +29,9 @@ type poleRow struct {
 	station  stationRow
 	id       string
 	platform *string
-	lat, lng float64
+	// description is GTFS stop_desc, trimmed; nil if empty (DATA_MODEL §7 #28).
+	description *string
+	lat, lng    float64
 }
 
 // dirKey identifies a direction at a pole: pole_directions' key, which is
@@ -202,10 +204,11 @@ func buildPole(s *departures.Snapshot, pr poleRow, rows []queries.PoleDirections
 	})
 
 	pole := openapi.Pole{
-		Id:         pr.id,
-		Location:   openapi.LatLng{Lat: pr.lat, Lng: pr.lng},
-		Platform:   pr.platform,
-		Directions: make([]openapi.Direction, len(keep)),
+		Id:          pr.id,
+		Location:    openapi.LatLng{Lat: pr.lat, Lng: pr.lng},
+		Platform:    pr.platform,
+		Description: pr.description,
+		Directions:  make([]openapi.Direction, len(keep)),
 	}
 	for i, m := range keep {
 		slices.SortFunc(m.deps, func(a, b departures.Departure) int {
@@ -247,6 +250,18 @@ func apiDeparture(d departures.Departure) openapi.Departure {
 		Scheduled:   d.Scheduled,
 		Source:      openapi.DepartureSourceScheduled,
 	}
+}
+
+// nonEmpty trims s; nil for nil or blank (GTFS stop_desc).
+func nonEmpty(s *string) *string {
+	if s == nil {
+		return nil
+	}
+	t := strings.TrimSpace(*s)
+	if t == "" {
+		return nil
+	}
+	return &t
 }
 
 // displayName drops the locality suffix " (Berlin)" that VBB adds to every

@@ -8,6 +8,7 @@ WITH center AS (
     SELECT ST_SetSRID(ST_MakePoint(sqlc.arg(lng)::float8, sqlc.arg(lat)::float8), 4326)::geography AS g
 ), poles AS (
     SELECT p.stop_id, p.station_id, p.platform_code,
+           p.stop_desc AS description,
            ST_Y(p.geom::geometry)::float8 AS lat,
            ST_X(p.geom::geometry)::float8 AS lng,
            ST_Distance(p.geom, c.g)::float8 AS distance_m
@@ -28,6 +29,7 @@ SELECT s.station_id,
        r.station_distance_m::float8 AS station_distance_m,
        r.stop_id,
        r.platform_code,
+       r.description,
        r.lat,
        r.lng,
        r.distance_m

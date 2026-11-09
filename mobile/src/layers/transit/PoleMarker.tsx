@@ -3,17 +3,16 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Marker } from 'react-native-maps';
 
 import {
-  badgeColor,
   type Direction,
   directionKey,
   type MarkerRow,
   markerRows,
   nextLabels,
-  textColorOn,
 } from '@/core/directions';
 import { type ClockStore, clockStore, useNow } from '@/state/clock';
 
 import type { PoleFeature } from './index';
+import { LineBadge } from './LineBadge';
 
 /** How long a marker redraws its native snapshot after its content changed. */
 export const TRACK_CHANGES_MS = 500;
@@ -27,9 +26,12 @@ export const TRACK_CHANGES_MS = 500;
  */
 export function PoleMarker({
   feature,
+  onPress,
   clock = clockStore,
 }: {
   feature: PoleFeature;
+  /** Tap: open the station sheet (task 3.6). */
+  onPress?: (feature: PoleFeature) => void;
   clock?: ClockStore;
 }) {
   const directions = feature.pole.directions;
@@ -45,6 +47,7 @@ export function PoleMarker({
       coordinate={{ latitude: feature.pole.location.lat, longitude: feature.pole.location.lng }}
       anchor={{ x: 0.5, y: 1 }}
       tracksViewChanges={tracks}
+      onPress={onPress ? () => onPress(feature) : undefined}
     >
       <View style={styles.bubble} accessibilityLabel={accessibilityText(feature, rows)}>
         {rows.map((r) => (
@@ -57,12 +60,9 @@ export function PoleMarker({
 }
 
 function Row({ row: { direction, label } }: { row: MarkerRow }) {
-  const background = badgeColor(direction);
   return (
     <View style={styles.row}>
-      <View style={[styles.badge, { backgroundColor: background }]}>
-        <Text style={[styles.line, { color: textColorOn(background) }]}>{direction.line}</Text>
-      </View>
+      <LineBadge direction={direction} />
       <Text style={styles.headsign} numberOfLines={1}>
         {direction.headsign}
       </Text>
@@ -116,17 +116,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-  },
-  badge: {
-    minWidth: 30,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 4,
-    alignItems: 'center',
-  },
-  line: {
-    fontSize: 12,
-    fontWeight: '700',
   },
   headsign: {
     flexShrink: 1,

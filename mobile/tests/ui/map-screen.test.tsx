@@ -40,6 +40,7 @@ function station(id: string, name: string) {
         id: `${id}::1`,
         location: { lat: 52.5427, lng: 13.366 },
         platform: null,
+        description: null,
         directions: [
           {
             line: 'M27',

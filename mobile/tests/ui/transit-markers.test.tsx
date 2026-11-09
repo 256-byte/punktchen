@@ -54,6 +54,7 @@ function feature(directions: Direction[]): PoleFeature {
       id: 'de:11000:900009104::3',
       location: { lat: 52.5426, lng: 13.3658 },
       platform: null,
+      description: null,
       directions,
     },
   };
