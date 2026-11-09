@@ -94,12 +94,17 @@ func (d *Download) Remove() error {
 	return err
 }
 
-// Fetch records an attempt and downloads the feed if it changed. On error the
-// attempt is closed as "failed".
-func (d *Downloader) Fetch(ctx context.Context) (*Download, error) {
+// Fetch records an attempt and downloads the feed if it changed. With force
+// it downloads the feed and treats it as changed, without conditional
+// headers or comparing the SHA-256. On error the attempt is closed as
+// "failed".
+func (d *Downloader) Fetch(ctx context.Context, force bool) (*Download, error) {
 	last, err := d.log.lastSuccessful(ctx, d.cfg.Source)
 	if err != nil {
 		return nil, err
+	}
+	if force {
+		last = nil
 	}
 	id, err := d.log.start(ctx, d.cfg.Source, d.cfg.URL)
 	if err != nil {
