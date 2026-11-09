@@ -1,10 +1,12 @@
 package realtime
 
 import (
+	"time"
+
 	"github.com/256-byte/punktchen/backend/internal/transit/departures"
 )
 
-// MergeStats counts what Merge did, for logs and the match ratio (4.6).
+// MergeStats counts what Merge did, for logs.
 type MergeStats struct {
 	Departures int // scheduled departures in
 	WithTrip   int // ... whose trip instance has a TripUpdate
@@ -12,6 +14,34 @@ type MergeStats struct {
 	Propagated int // ... of those, from an earlier stop
 	Cancelled  int // ... of a cancelled trip
 	Skipped    int // ... removed: SKIPPED stop
+}
+
+// MatchWindow: the match ratio counts departures scheduled at most this far
+// from now. VBB sends TripUpdates only for trips running around now: ~95 %
+// of departures within ±15 min have one, 14 % of those 60–90 min ahead
+// (DATA_MODEL §7 #31), so a ratio over the whole window would mostly
+// measure the window's shape.
+const MatchWindow = 15 * time.Minute
+
+// MatchRatio is the share of departures scheduled within ±window of now
+// whose trip instance (trip_id, start_date) has a TripUpdate in st; 0 when
+// there are none or st is nil. A sudden drop means static and realtime IDs
+// no longer match (e.g. a new schedule that the feed does not use yet).
+func MatchRatio(deps []departures.Departure, st *State, now time.Time, window time.Duration) float64 {
+	var near, matched int
+	for _, d := range deps {
+		if off := d.Scheduled.Sub(now); off < -window || off > window {
+			continue
+		}
+		near++
+		if st.Trip(TripKey{TripID: d.TripID, ServiceDate: d.ServiceDate}) != nil {
+			matched++
+		}
+	}
+	if near == 0 {
+		return 0
+	}
+	return float64(matched) / float64(near)
 }
 
 // Merge applies the realtime state to scheduled departures (ARCHITECTURE

@@ -95,7 +95,7 @@ func TestPipelineHealth(t *testing.T) {
 	}
 
 	store := NewStore(log)
-	builder := departures.NewBuilder(departures.BuilderConfig{Now: c.Now, Realtime: store.Merger(DefaultMaxAge)},
+	builder := departures.NewBuilder(departures.BuilderConfig{Now: c.Now, Realtime: store.Merger(DefaultMaxAge, nil)},
 		oneDeparture{dep}, nil, log)
 	store.OnApply(func() { builder.Republish() })
 	provider := transit.NewProvider(nil, builder, transit.WithRealtime(transit.DefaultRealtimeStaleAfter), transit.WithClock(c.Now))

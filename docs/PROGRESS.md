@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 4 — Realtime (Phase 3 done 2026-11-09)
-- **Next task:** 4.6 match ratio metric (4.0 waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
+- **Next task:** 4.0 final step, the last open task of Phase 4 (waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -49,7 +49,7 @@
 | 4 | 4.3 Merge rules | done | `realtime.Merge`: match by sequence then stop_id, delay from the departure event, propagation, cancel, skip; checked on the recorded Wedding feed |
 | 4 | 4.4 Snapshot rebuild on RT change, health | done | Poller + store wired; snapshot merges realtime, republishes per feed; degraded > 2 min, schedule-only > 5 min; live check: 19 of 52 departures realtime at Wedding |
 | 4 | 4.5 Mobile: delay, realtime indicator, cancelled | done | Live times green, late ones red with "+N", timetable black, cancelled struck through (marker + sheet); iPhone: new display seen working (user, 2026-11-09) |
-| 4 | 4.6 Match ratio metric | todo | |
+| 4 | 4.6 Match ratio metric | done | `livestop_rt_match_ratio` over departures within ±15 min of now; observed 0.93 live (Monday 22:24), 0.91 on the Wedding fixture; whole-window ratio would be ~0.5 (DATA_MODEL §7 #31) |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
 
@@ -95,6 +95,14 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 4.6
+- Done: `realtime.MatchRatio` + `MatchWindow` (15 min); `Store.Merger(maxAge, *Metrics)` sets gauge `livestop_rt_match_ratio` after every merge (0 without a merged state); merge debug log carries `match_ratio`.
+- Found: a first version over the whole snapshot window showed **0.485** live. A probe (recorded Monday 19:46 feed against the Compose db) showed why: VBB has TripUpdates for ~95 % of departures within ±15 min of now, but only 14 % of those 60–90 min ahead (DATA_MODEL §7 #31). So the ratio counts only near-now departures; otherwise a dropping ID match would hide in the window's shape.
+- Observed: **0.93** live (dev stack, Monday 22:24, 3 samples 30 s apart, feed 13–15 s old); Wedding fixture 0.91.
+- Tests: `TestMatchRatio` (window edges, other service day, no state), `TestMerger` checks the gauge (0 without state, 0.5 with 1 of 2 matched, 0 once the state is too old), Wedding fixture ≥ 0.8. All backend tests, race (realtime) and golangci-lint pass.
+- New deps: none.
+- Next: 4.0 final step on 2026-11-10 (daytime samples), then Phase 4 is done.
 
 ### 2026-11-09 — task 4.5
 - Done:
