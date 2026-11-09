@@ -55,6 +55,7 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 | 2026-11-08 | GTFS-RT limit 7 req/min: CLAUDE.md rule 7 updated, poll interval floor 10 s | — (config, DATA_MODEL §7 #20) |
 | 2026-11-08 | User: keep config/docs in line with current upstream facts without asking first | — |
 | 2026-11-09 | PLAN updated from 1.1 findings (user approved): 1.2 SHA-256 skip criterion, `stations` table (DATA_MODEL §3.4), loop/ring rules, real Wedding subset fixture, 32 h window, line colours, new 4.0 coverage check, realtime = has `delay` | — (no architecture change) |
+| 2026-11-09 | Each import stamps a layout id (hash of the gtfs SQL + `layoutRevision`) on the schema; a missing or different stamp forces a full re-import even if the feed is unchanged | — (import detail, ARCHITECTURE §3.1) |
 
 ## Open questions
 
@@ -74,6 +75,17 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — fix: re-import after a layout change
+- Found during 2.3: the dev DB's live schedule was imported before 2.2 (no `trip_info`). The feed was unchanged (same SHA-256), so every import was `skipped` and the departures loader failed with `relation "gtfs.trip_info" does not exist`. The same would happen after every change to `db/gtfs/*.sql`, and after a lost live schema while `meta.feed_imports` still lists the feed.
+- Done:
+  - `static.Layout`: hash of the gtfs SQL files + `layoutRevision` (Go constant, increase it when Go code changes what an import writes). The loader stamps it as the staging schema's comment; the swap carries it to `gtfs`.
+  - Live schema missing or another stamp → `Status.Current` is false (the scheduler imports at startup) and `Importer.Run` calls `Downloader.Fetch(ctx, force=true)` (no conditional headers, no SHA-256 skip). No migration.
+  - Docs: ARCHITECTURE §3.1, DATA_MODEL §3.3 (import log lifecycle).
+- Tests: `TestLayoutOf` (revision, content and file boundaries change the id); downloader: forced fetch sends no validators and returns the unchanged file as changed; importer: an older stamp and a missing stamp are imported again with the same feed (new schema, `Current` true), then the next run is `skipped` again; a dropped live schema is imported again although the log has the feed. vet, golangci-lint 0 issues, all backend tests green.
+- Manual check (Docker Compose, dev DB): startup logged "live schedule missing or from another layout", downloaded the unchanged feed (sha256 `d9625924…`), import succeeded in 4 min 13 s; `gtfs` now has the stamp and `trip_info` (263,715 rows). A restart afterwards did not import again.
+- New deps (+ why): none.
+- Next: 2.3 snapshot (branch `feature/departure-snapshot`), then check the builder on the dev DB.
 
 ### 2026-11-09 — task 2.2
 - Done:

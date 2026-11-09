@@ -36,6 +36,12 @@ func (s *Status) HasData(ctx context.Context) (bool, error) {
 	return ok, err
 }
 
+// Current reports whether the live schema exists and has this binary's
+// Layout. If not, the scheduler imports at once (ARCHITECTURE §3.1).
+func (s *Status) Current(ctx context.Context) (bool, error) {
+	return liveLayoutCurrent(ctx, s.pool)
+}
+
 // ScheduleState returns whether data exists and when it was last confirmed.
 func (s *Status) ScheduleState(ctx context.Context) (ScheduleState, error) {
 	ok, err := s.HasData(ctx)

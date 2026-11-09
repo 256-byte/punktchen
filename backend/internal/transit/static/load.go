@@ -79,6 +79,9 @@ func (l *Loader) Load(ctx context.Context, zipPath string) (*LoadResult, error) 
 	if _, err := tx.Exec(ctx, toStaging(db.GTFSSchema)); err != nil {
 		return nil, fmt.Errorf("create %s: %w", StagingSchema, err)
 	}
+	if err := stampLayout(ctx, tx); err != nil {
+		return nil, fmt.Errorf("stamp %s: %w", StagingSchema, err)
+	}
 
 	res := &LoadResult{Rows: make(map[string]int64, len(tables))}
 	for _, spec := range tables {

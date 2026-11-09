@@ -103,7 +103,7 @@ func newEnv(t *testing.T, pool *pgxpool.Pool, feed *fakeFeed, maxBytes int64) *e
 
 func (e *env) fetch() *Download {
 	e.t.Helper()
-	dl, err := e.d.Fetch(context.Background())
+	dl, err := e.d.Fetch(context.Background(), false)
 	if err != nil {
 		e.t.Fatalf("Fetch: %v", err)
 	}
@@ -225,6 +225,25 @@ func TestDownloader(t *testing.T) {
 		}
 	})
 
+	t.Run("force downloads an unchanged feed in full", func(t *testing.T) {
+		e := newEnv(t, pool, &fakeFeed{body: "zip", etag: `"v1"`, honour304: true}, 0)
+		first := e.fetch()
+		e.succeed(first)
+
+		dl, err := e.d.Fetch(ctx, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if h := e.feed.lastRequest(); h.Get("If-None-Match") != "" || h.Get("If-Modified-Since") != "" {
+			t.Fatalf("conditional headers on a forced fetch: %v", h)
+		}
+		r := e.row(dl.ImportID)
+		if !dl.Changed || dl.Path == "" || dl.SHA256 != first.SHA256 || r.status != StatusRunning {
+			t.Fatalf("forced fetch: %+v row=%+v, want changed with a file", dl, r)
+		}
+		e.succeed(dl)
+	})
+
 	t.Run("last-modified: 304 is skipped without download", func(t *testing.T) {
 		lm := "Fri, 06 Nov 2026 10:00:00 GMT"
 		e := newEnv(t, pool, &fakeFeed{body: "zip", lastModified: lm, honour304: true}, 0)
@@ -264,7 +283,7 @@ func TestDownloader(t *testing.T) {
 
 	t.Run("http error fails the attempt", func(t *testing.T) {
 		e := newEnv(t, pool, &fakeFeed{status: http.StatusInternalServerError}, 0)
-		_, err := e.d.Fetch(ctx)
+		_, err := e.d.Fetch(ctx, false)
 		if err == nil || !strings.Contains(err.Error(), "500") {
 			t.Fatalf("err = %v, want 500", err)
 		}
@@ -279,7 +298,7 @@ func TestDownloader(t *testing.T) {
 
 	t.Run("too large is rejected and leaves no file", func(t *testing.T) {
 		e := newEnv(t, pool, &fakeFeed{body: strings.Repeat("x", 100)}, 10)
-		if _, err := e.d.Fetch(ctx); err == nil || !strings.Contains(err.Error(), "larger than 10 bytes") {
+		if _, err := e.d.Fetch(ctx, false); err == nil || !strings.Contains(err.Error(), "larger than 10 bytes") {
 			t.Fatalf("err = %v", err)
 		}
 		if left := e.filesLeft(); len(left) != 0 {
@@ -303,7 +322,7 @@ func TestDownloader(t *testing.T) {
 				time.Sleep(10 * time.Millisecond)
 			}
 		}()
-		if _, err := e.d.Fetch(cctx); !errors.Is(err, context.Canceled) {
+		if _, err := e.d.Fetch(cctx, false); !errors.Is(err, context.Canceled) {
 			t.Fatalf("err = %v, want context.Canceled", err)
 		}
 		var status string
@@ -351,7 +370,7 @@ func TestDownloaderLiveVBB(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	first, err := d.Fetch(ctx)
+	first, err := d.Fetch(ctx, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -364,7 +383,7 @@ func TestDownloaderLiveVBB(t *testing.T) {
 	_ = first.Remove()
 
 	start := time.Now()
-	second, err := d.Fetch(ctx)
+	second, err := d.Fetch(ctx, false)
 	if err != nil {
 		t.Fatal(err)
 	}

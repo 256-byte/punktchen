@@ -12,7 +12,7 @@ import (
 type Trigger string
 
 const (
-	TriggerStartup   Trigger = "startup"   // no schedule data yet
+	TriggerStartup   Trigger = "startup"   // no current schedule (none yet, or another layout)
 	TriggerScheduled Trigger = "scheduled" // daily run
 	TriggerRetry     Trigger = "retry"     // after a failed run
 	TriggerManual    Trigger = "manual"    // POST /internal/import
@@ -32,12 +32,13 @@ type SchedulerConfig struct {
 // RunFunc runs one import (Importer.Run).
 type RunFunc func(ctx context.Context) (*Outcome, error)
 
-// Scheduler runs the import daily, at startup when there is no schedule yet,
-// after failures, and on demand (ARCHITECTURE §3.1).
+// Scheduler runs the import daily, at startup when there is no current
+// schedule (none yet, or another Layout), after failures, and on demand
+// (ARCHITECTURE §3.1).
 type Scheduler struct {
 	cfg     SchedulerConfig
 	run     RunFunc
-	hasData func(ctx context.Context) (bool, error)
+	current func(ctx context.Context) (bool, error)
 	metrics *Metrics
 	log     *slog.Logger
 
@@ -49,7 +50,7 @@ type Scheduler struct {
 }
 
 // NewScheduler returns a Scheduler; call Run to start it.
-func NewScheduler(cfg SchedulerConfig, run RunFunc, hasData func(ctx context.Context) (bool, error), m *Metrics, log *slog.Logger) *Scheduler {
+func NewScheduler(cfg SchedulerConfig, run RunFunc, current func(ctx context.Context) (bool, error), m *Metrics, log *slog.Logger) *Scheduler {
 	if cfg.RetryAfter <= 0 {
 		cfg.RetryAfter = DefaultRetryAfter
 	}
@@ -57,7 +58,7 @@ func NewScheduler(cfg SchedulerConfig, run RunFunc, hasData func(ctx context.Con
 		cfg.Loc = time.UTC
 	}
 	return &Scheduler{
-		cfg: cfg, run: run, hasData: hasData, metrics: m, log: log,
+		cfg: cfg, run: run, current: current, metrics: m, log: log,
 		now: time.Now, after: time.After,
 		trigger: make(chan struct{}, 1),
 	}
@@ -80,11 +81,11 @@ func (s *Scheduler) Trigger() error {
 // Run blocks until ctx is done.
 func (s *Scheduler) Run(ctx context.Context) {
 	failed := false
-	if ok, err := s.hasData(ctx); err != nil {
+	if ok, err := s.current(ctx); err != nil {
 		s.log.Error("cannot check for schedule data; importing", "error", err.Error())
 		failed = !s.runOnce(ctx, TriggerStartup)
 	} else if !ok {
-		s.log.Info("no schedule data yet; importing now")
+		s.log.Info("no current schedule (none yet, or another layout); importing now")
 		failed = !s.runOnce(ctx, TriggerStartup)
 	}
 

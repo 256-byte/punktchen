@@ -104,6 +104,9 @@ func TestImporter(t *testing.T) {
 		if st, err := status.ScheduleState(ctx); err != nil || st.HasData || st.CheckedAt != nil {
 			t.Fatalf("before any import: %+v, %v; want no data, never checked", st, err)
 		}
+		if ok, err := status.Current(ctx); err != nil || ok {
+			t.Fatalf("before any import: Current = %v, %v; want false", ok, err)
+		}
 		e := newImportEnv(t, pool, rulesFeed())
 		out, err := e.im.Run(ctx)
 		if err != nil {
@@ -124,6 +127,9 @@ func TestImporter(t *testing.T) {
 		}
 		if st, err := status.ScheduleState(ctx); err != nil || !st.HasData || st.CheckedAt == nil {
 			t.Fatalf("after import: %+v, %v; want data and a check time", st, err)
+		}
+		if ok, err := status.Current(ctx); err != nil || !ok {
+			t.Fatalf("after import: Current = %v, %v; want true", ok, err)
 		}
 	})
 
@@ -153,6 +159,55 @@ func TestImporter(t *testing.T) {
 		}
 		if s := e.schemas(); s != "gtfs" {
 			t.Fatalf("schemas %q, want only gtfs", s)
+		}
+	})
+
+	t.Run("schedule of another layout is imported again", func(t *testing.T) {
+		// The live data is withExtraStop("Neu") with the current layout.
+		e := newImportEnv(t, pool, withExtraStop("Neu"))
+		for _, stamp := range []string{
+			`COMMENT ON SCHEMA gtfs IS 'livestop layout 0000000000000000'`, // older binary
+			`COMMENT ON SCHEMA gtfs IS NULL`,                               // imported before layouts were stamped
+		} {
+			if _, err := pool.Exec(ctx, stamp); err != nil {
+				t.Fatal(err)
+			}
+			if ok, err := status.Current(ctx); err != nil || ok {
+				t.Fatalf("%s: Current = %v, %v; want false", stamp, ok, err)
+			}
+			before := scalar[int64](t, pool, `SELECT oid::bigint FROM pg_namespace WHERE nspname = 'gtfs'`)
+			out, err := e.im.Run(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			after := scalar[int64](t, pool, `SELECT oid::bigint FROM pg_namespace WHERE nspname = 'gtfs'`)
+			if !out.Changed || before == after {
+				t.Fatalf("%s: changed=%v, schema oid %d → %d; want a new import of the same feed", stamp, out.Changed, before, after)
+			}
+			if ok, err := status.Current(ctx); err != nil || !ok {
+				t.Fatalf("%s: after the import Current = %v, %v", stamp, ok, err)
+			}
+			if n := e.liveStops(); n != 11 {
+				t.Fatalf("live stops %d, want 11", n)
+			}
+		}
+		// Current layout again: the unchanged feed is skipped as before.
+		if out, err := e.im.Run(ctx); err != nil || out.Changed {
+			t.Fatalf("changed=%v err=%v; want skipped", out != nil && out.Changed, err)
+		}
+	})
+
+	t.Run("missing live schema is imported although the log has the feed", func(t *testing.T) {
+		e := newImportEnv(t, pool, withExtraStop("Neu"))
+		if _, err := pool.Exec(ctx, `DROP SCHEMA gtfs CASCADE`); err != nil {
+			t.Fatal(err)
+		}
+		if ok, err := status.Current(ctx); err != nil || ok {
+			t.Fatalf("Current = %v, %v; want false", ok, err)
+		}
+		out, err := e.im.Run(ctx)
+		if err != nil || !out.Changed || e.liveStops() != 11 {
+			t.Fatalf("changed=%v err=%v; want the feed imported again", out != nil && out.Changed, err)
 		}
 	})
 

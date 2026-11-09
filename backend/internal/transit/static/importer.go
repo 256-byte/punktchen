@@ -50,7 +50,8 @@ type Outcome struct {
 	Rows     map[string]int64
 }
 
-// Run imports the feed if it changed. On any error the attempt is recorded as
+// Run imports the feed if it changed, or if the live schedule is missing or
+// from another Layout. On any error the attempt is recorded as
 // failed and the live schedule stays untouched.
 func (im *Importer) Run(ctx context.Context) (*Outcome, error) {
 	conn, err := im.pool.Acquire(ctx)
@@ -73,7 +74,14 @@ func (im *Importer) Run(ctx context.Context) (*Outcome, error) {
 	}()
 
 	start := time.Now()
-	dl, err := im.dl.Fetch(ctx)
+	current, err := liveLayoutCurrent(ctx, im.pool)
+	if err != nil {
+		return nil, fmt.Errorf("live layout: %w", err)
+	}
+	if !current {
+		im.log.Info("live schedule missing or from another layout; importing even if the feed is unchanged", "layout", Layout)
+	}
+	dl, err := im.dl.Fetch(ctx, !current)
 	if err != nil {
 		return nil, err // the downloader already recorded the failure
 	}

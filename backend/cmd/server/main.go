@@ -97,7 +97,7 @@ func serve(ctx context.Context, log *slog.Logger, cfg config.Config) error {
 	status := static.NewStatus(pool, static.SourceGTFS)
 	scheduler := static.NewScheduler(static.SchedulerConfig{
 		Hour: cfg.GTFSImportTime.Hour, Minute: cfg.GTFSImportTime.Minute, Loc: platform.Berlin,
-	}, importer.Run, status.HasData, static.NewMetrics(metrics), importLog)
+	}, importer.Run, status.Current, static.NewMetrics(metrics), importLog)
 
 	apiHandler := api.NewHandler(api.NewServer(api.Config{
 		Version: version, DB: pool, Schedule: status, Imports: scheduler, Dev: cfg.Dev,
