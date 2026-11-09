@@ -74,13 +74,14 @@ var createTable = regexp.MustCompile(`(?s)CREATE TABLE gtfs\.(\w+) \((.*?)\n\);`
 
 // TestSpecsMatchSchemaFile keeps tables.go and db/gtfs/schema.sql in sync:
 // every column that COPY writes exists, in the same order, and the only
-// extra columns are generated ones.
+// extra columns are generated ones or ones with a DEFAULT that are set after
+// loading (stops.in_scope).
 func TestSpecsMatchSchemaFile(t *testing.T) {
 	ddlCols := map[string][]string{}
 	for _, m := range createTable.FindAllStringSubmatch(db.GTFSSchema, -1) {
 		for _, line := range strings.Split(m[2], "\n") {
 			line = strings.TrimSpace(line)
-			if line == "" || strings.HasPrefix(line, "--") || strings.HasPrefix(line, "GENERATED") {
+			if line == "" || strings.HasPrefix(line, "--") || strings.HasPrefix(line, "GENERATED") || strings.Contains(line, "DEFAULT") {
 				continue
 			}
 			if strings.Contains(line, "geography(") {
@@ -100,7 +101,7 @@ func TestSpecsMatchSchemaFile(t *testing.T) {
 }
 
 func TestStagingDDLRewritesEverySchemaReference(t *testing.T) {
-	ddl := stagingDDL()
+	ddl := toStaging(db.GTFSSchema) + toStaging(db.GTFSIndexes)
 	if regexp.MustCompile(`\bgtfs\b`).MatchString(ddl) {
 		t.Fatalf("staging DDL still references schema gtfs:\n%s", ddl)
 	}
