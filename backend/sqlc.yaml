@@ -8,7 +8,9 @@ sql:
       - db/migrations
       - db/gtfs/schema.sql
     queries: db/queries
-    strict_function_checks: true
+    # Off: sqlc does not know PostGIS functions (ST_DWithin, ST_Y, ...). Cast
+    # their results (e.g. ::float8) so the generated Go types stay exact.
+    strict_function_checks: false
     gen:
       go:
         package: queries
