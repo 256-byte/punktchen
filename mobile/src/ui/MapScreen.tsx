@@ -11,6 +11,7 @@ import { type LatLng, regionAround } from '@/core/geo';
 import type { LocationView } from '@/core/location';
 import { mapLayers } from '@/layers';
 import type { AnyMapLayer } from '@/layers/registry';
+import { type ClockStore, clockStore, useClockTicker } from '@/state/clock';
 import { locationStore, type LocationStore } from '@/state/location';
 
 import { BackendStatus } from './BackendStatus';
@@ -26,13 +27,15 @@ type Props = {
   client: ApiClient | null;
   layers?: readonly AnyMapLayer[];
   store?: LocationStore;
+  clock?: ClockStore;
 };
 
 /**
  * The map (task 3.4). Opens centred on the position and follows the device
  * until the user pans; reports its centre to the location store (used in
  * "map center" mode); draws the registered layers' features from
- * /v1/nearby around the request centre.
+ * /v1/nearby around the request centre; runs the 1 s clock ticker for
+ * the countdowns (task 3.5).
  */
 export function MapScreen({
   position,
@@ -41,6 +44,7 @@ export function MapScreen({
   client,
   layers = mapLayers,
   store = locationStore,
+  clock = clockStore,
 }: Props) {
   const map = useRef<MapView>(null);
   const [initialRegion] = useState(() => regionAround(position, START_RADIUS_M));
@@ -55,6 +59,11 @@ export function MapScreen({
 
   const center = useRequestCenter(position);
   const nearby = useNearby(client, { lat: center.lat, lng: center.lng });
+
+  // Countdowns: one global ticker, corrected by the server clock.
+  useClockTicker(clock);
+  const offsetMs = nearby.data?.clockOffsetMs ?? 0;
+  useEffect(() => clock.getState().setOffset(offsetMs), [clock, offsetMs]);
 
   return (
     <View style={styles.container}>

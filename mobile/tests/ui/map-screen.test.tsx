@@ -34,8 +34,25 @@ function station(id: string, name: string) {
     kind: 'station' as const,
     name,
     location: { lat: 52.5427, lng: 13.366 },
-    modes: [],
-    poles: [],
+    modes: ['bus' as const],
+    poles: [
+      {
+        id: `${id}::1`,
+        location: { lat: 52.5427, lng: 13.366 },
+        platform: null,
+        directions: [
+          {
+            line: 'M27',
+            mode: 'bus' as const,
+            color: null,
+            headsign: `${name} → Jungfernheide`,
+            isTerminal: false,
+            isRing: false,
+            departures: [],
+          },
+        ],
+      },
+    ],
   };
 }
 
@@ -135,16 +152,16 @@ describe('MapScreen camera', () => {
 });
 
 describe('MapScreen layers', () => {
-  it('draws the stations from /v1/nearby through the layer registry', async () => {
+  it('draws the poles from /v1/nearby through the layer registry', async () => {
     await renderMap(WEDDING);
-    expect(await screen.findByText('pin S+U Wedding')).toBeOnTheScreen();
+    expect(await screen.findByText('S+U Wedding → Jungfernheide')).toBeOnTheScreen();
     expect(requests).toHaveLength(1);
     expect(requests[0]?.searchParams.get('lat')).toBe('52.5427');
   });
 
   it('requests again only after a move of more than 150 m', async () => {
     const { move } = await renderMap(WEDDING);
-    await screen.findByText('pin S+U Wedding');
+    await screen.findByText('S+U Wedding → Jungfernheide');
 
     await move(north(100));
     await move(north(140));
@@ -184,15 +201,15 @@ describe('MapScreen layers', () => {
         headers: { 'Content-Type': 'application/json' },
       });
     fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
-    expect(await screen.findByText('pin S+U Wedding')).toBeOnTheScreen();
+    expect(await screen.findByText('S+U Wedding → Jungfernheide')).toBeOnTheScreen();
     expect(screen.queryByText('Could not load departures')).toBeNull();
   });
 });
 
 describe('transit layer', () => {
-  it('selects the stations, and none when the layer is down', () => {
+  it('selects the poles, and none when the layer is down', () => {
     const r = nearby(station('a', 'A'), station('b', 'B'));
-    expect(transitLayer.select(r).map((s) => transitLayer.key(s))).toEqual(['a', 'b']);
+    expect(transitLayer.select(r).map((s) => transitLayer.key(s))).toEqual(['a::1', 'b::1']);
     expect(transitLayer.select({ ...r, layers: {} })).toEqual([]);
   });
 });
