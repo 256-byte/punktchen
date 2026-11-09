@@ -27,13 +27,13 @@ Goal: a correct, swappable schedule database with derived tables.
 | ID | Task | Acceptance criteria |
 |---|---|---|
 | 1.1 | **Data exploration.** Script/test (not shipped) that downloads the feed and prints: file sizes/row counts, sample stop IDs (station/pole), route_type histogram, direction_id null ratio, max departure_time, ring line headsigns, platform_code coverage. Also record ~5 GTFS-RT samples (15 s apart) into `backend/testdata/` (if < 5 MB, else a trimmed version). | Findings written to DATA_MODEL §7, all **(verify)** items answered |
-| 1.2 | Downloader with conditional GET + SHA-256, writes `meta.feed_imports` | Second run without change → "skipped" in < 2 s |
+| 1.2 | Downloader: conditional GET when the server sends `ETag`/`Last-Modified`, otherwise download + SHA-256 compare (the default URL sends neither, DATA_MODEL §7 #15); writes `meta.feed_imports` | Unchanged file → status `skipped`, no import started. Tests with a fake HTTP server cover both paths (304, and same SHA-256 without validators) |
 | 1.3 | Streaming CSV → `gtfs_staging` via `CopyFrom`; times parsed to seconds; geometry column | Full import finishes; row counts logged; memory stays < 500 MB |
-| 1.4 | Indexes + `in_scope` flag from bbox config | Count of in-scope stations plausible (Berlin) and documented |
-| 1.5 | Derived tables: `service_dates`, `pole_directions` (with terminal/origin logic) | Tests on a tiny fixture GTFS (hand-written, in testdata) cover: weekday service, added/removed dates, trip after 24:00, terminal detection |
+| 1.4 | Indexes + `in_scope` flag from bbox config | Count of in-scope poles and stations (grouped as in DATA_MODEL §3.4) plausible (Berlin) and documented in §7 |
+| 1.5 | Derived tables: `stations` (grouping by `parent_station`, else DHID prefix; name, centroid, modes), `service_dates`, `pole_directions` (terminal/origin logic, loop trips, `is_ring`). Plus a real-data static subset fixture around U Wedding (cut with `gtfsexplore`, < 5 MB) that matches the GTFS-RT fixtures | Tests on a tiny hand-written fixture GTFS cover: weekday service, added/removed dates, trip after 24:00, terminal detection, loop trip not terminal at its origin, pole without `parent_station` grouped by DHID prefix. On the Wedding subset: bus poles `::3`–`::8` belong to station `de:11000:900009104` |
 | 1.6 | Sanity checks + atomic schema swap (ADR-0004) | Integration test: failed import leaves old data readable; successful import swaps with zero failed reads during swap |
 | 1.7 | Scheduler: daily import at configured time + import on empty DB at startup; dev endpoint `POST /internal/import` | Manual trigger works; logs + metrics emitted |
-| 1.8 | sqlc query: poles within radius of point (PostGIS `ST_DWithin`), grouped by station | "Wedding 500 m" query returns expected stations (U Wedding, S Wedding area poles) in < 20 ms |
+| 1.8 | sqlc query: poles within radius of point (PostGIS `ST_DWithin`), grouped by station | "Wedding 500 m" (52.5427, 13.3660) returns S+U Wedding as **one** station including its bus poles, and S Wedding/Martha-Ndumbe-Platz (`de:11000:900008103`) as a separate station; < 20 ms |
 
 ## Phase 2 — Schedule-based API
 
@@ -42,9 +42,9 @@ Goal: real `/v1/nearby` from the schedule only. API is layer-based from day one.
 | ID | Task | Acceptance criteria |
 |---|---|---|
 | 2.1 | `internal/layer`: `Provider` interface, registry, `NearbyQuery`, composition of multi-layer responses | Unit tests with a fake provider |
-| 2.2 | `transit/departures`: schedule window loader (service dates, ≥ 24:00 handling, DST-safe) | Tests: trip at 24:30 on service day D appears on calendar day D+1 00:30; DST switch day fixture |
+| 2.2 | `transit/departures`: schedule window loader (service dates, ≥ 24:00 handling up to 32 h on the previous service day, DST-safe) | Tests: trip at 24:30 on service day D appears on calendar day D+1 00:30; trip at 31:17 on D appears on D+1 07:17; DST switch day fixture |
 | 2.3 | Snapshot type + builder (schedule only for now) + `atomic.Pointer` publish + version counter | Race detector clean under concurrent reads |
-| 2.4 | Transit provider: build features (station → poles → directions → next 3 departures), terminal rule, mode/colour mapping | Golden JSON test for a fixture area |
+| 2.4 | Transit provider: build features (station → poles → directions → next 3 departures), terminal rule, mode mapping from `route_type` (rail replacement buses stay `bus`), colours: `route_color`, else VBB line colour list (`linienfarben`), else null | Golden JSON test for the Wedding fixture area |
 | 2.5 | `/v1/nearby`, `/v1/stations/{id}`, `/v1/layers` handlers; validation; error format | Contract tests: responses validate against openapi.yaml |
 | 2.6 | Spot check vs. official VBB departures for 5 stops (manual, documented in PROGRESS) | Scheduled times match |
 
@@ -66,10 +66,11 @@ Goal: see live-counting pins around you on the iPhone.
 
 | ID | Task | Acceptance criteria |
 |---|---|---|
-| 4.1 | GTFS-RT poller: interval, `If-None-Match`, gzip, timeout, backoff, metrics; never > 7 req/min (provider limit since 2026-11-02) | Unit test with fake server: 304 path, error/backoff path |
-| 4.2 | Parser → trip-instance state (latest wins), using recorded testdata | Golden tests on recorded feeds |
-| 4.3 | Merge rules (ARCHITECTURE §3.4): stop match, delay propagation, cancellations, skipped stops, `source` flag | Table-driven tests for each rule |
-| 4.4 | Rebuild snapshot on RT change; `realtimeAgeSeconds`; health `degraded` when feed > 2 min old | Killing upstream (fake) → degraded, schedule still served |
+| 4.0 | **Realtime coverage check.** Weekday daytime samples (morning, noon, evening) with `gtfsexplore rt`: share of trips per mode that have real `delay` values (DATA_MODEL §7 #18, #19). Decide whether an additional realtime source is needed for BVG U-Bahn/tram (if yes: ADR first, user approval) | Numbers in DATA_MODEL §7; decision in PROGRESS |
+| 4.1 | GTFS-RT poller: interval, `If-None-Match`, gzip, timeout, backoff, metrics; never > 7 req/min (provider limit since 2026-11-02); User-Agent with project name + repository URL | Unit test with fake server: 304 path, error/backoff path |
+| 4.2 | Parser → trip-instance state (latest wins), using recorded testdata; an empty feed with a stale header is "no data" and keeps the last state | Golden tests on recorded feeds incl. `vbb-empty-stale.pb` |
+| 4.3 | Merge rules (ARCHITECTURE §3.4): stop match (`stop_id`, else `stop_sequence` for bare station numbers), delay propagation, cancellations, skipped stops, `source` flag (`realtime` only for events with `delay`) | Table-driven tests for each rule |
+| 4.4 | Rebuild snapshot on RT change; `realtimeAgeSeconds` from `header.timestamp`; health `degraded` when the feed is > 2 min old | Killing upstream (fake) → degraded, schedule still served; stale empty feed → degraded |
 | 4.5 | Mobile: show delay (e.g. +2), realtime vs scheduled indicator, cancelled style | Visible on device |
 | 4.6 | Metric `livestop_rt_match_ratio` + note in PROGRESS of observed ratio | Ratio observed and documented |
 

@@ -36,7 +36,7 @@ const (
 const (
 	DefaultHTTPAddr           = ":8080"
 	DefaultMetricsAddr        = ":9090"
-	DefaultGTFSURL            = "https://www.vbb.de/gtfs" // current feed, matches GTFS-RT trip ids; no ETag (DATA_MODEL §7 #15)
+	DefaultGTFSURL            = "https://unternehmen.vbb.de/gtfs" // official link, matches GTFS-RT trip ids; no ETag (DATA_MODEL §7 #15)
 	DefaultGTFSImportTime     = "03:30"
 	DefaultScopeBBox          = "13.088,52.338,13.761,52.675"
 	DefaultGTFSRTURL          = "https://production.gtfsrt.vbb.de/data"
