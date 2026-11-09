@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 1 — Static GTFS (started 2026-11-08 with the user's OK while 0.9 is blocked)
-- **Next task:** 1.2
+- **Next task:** 1.3
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -23,7 +23,7 @@
 | 0 | 0.9 CI | blocked | Workflow merged (PR #1); jobs not started: GitHub account billing lock. Re-run when unlocked |
 | 0 | 0.10 Real commands in CLAUDE.md | done | All commands run from the repo root; tested in Windows PowerShell 5.1 |
 | 1 | 1.1 Data exploration | done | DATA_MODEL §7 #1–#20; all (verify) items answered. Default GTFS URL and RT rate limit updated |
-| 1 | 1.2 Downloader | todo | |
+| 1 | 1.2 Downloader | done | Changed zip stays `running` until the importer (1.3) closes it |
 | 1 | 1.3 Streaming import | todo | |
 | 1 | 1.4 Indexes + in_scope | todo | |
 | 1 | 1.5 Derived tables | todo | Now includes `stations` + real Wedding subset fixture |
@@ -68,6 +68,16 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 1.2
+- Done:
+  - `internal/transit/static`: `Downloader.Fetch` opens a `running` row in `meta.feed_imports`, sends `If-None-Match` / `If-Modified-Since` only if the last **succeeded** import stored them, streams the body to a temp file while hashing (SHA-256, size cap 1 GiB), records validators + hash, and closes the row as `skipped` on 304 or same hash. A changed zip is returned as `Download{Path, SHA256, …}`; the importer closes the row with `ImportLog.Succeed/Fail` and calls `Remove`. Errors close the row as `failed`; closing works even with a cancelled context.
+  - sqlc queries `StartFeedImport`, `RecordFeedDownload`, `FinishFeedImport` (`:execrows`, only updates `running` rows → no double close).
+  - Zip goes to the OS temp dir (distroless has `/tmp`); no new config or volume needed.
+  - DATA_MODEL §3.3: attempt lifecycle. CLAUDE.md §5: live test command.
+- Tests: integration (fake HTTP server + PostGIS): no validators → skipped by sha256 and no file left; ETag → 304; Last-Modified → 304; server ignores validators → still skipped by hash; failed import is not a reference; HTTP 500 → `failed` row; size cap; cancelled download → row `failed`, no file; double close rejected. Live test (`LIVESTOP_LIVE_TESTS=1`, real VBB): 84.5 MB in ~5 s, second run `skipped` by sha256 in ~4.9 s. Command line checked in PowerShell 5.1. vet, golangci-lint 0 issues, `go generate` up to date.
+- New deps (+ why): none.
+- Next: 1.3 streaming import into `gtfs_staging`.
 
 ### 2026-11-08 — task 1.1
 - Done:

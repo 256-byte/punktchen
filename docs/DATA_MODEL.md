@@ -79,6 +79,7 @@ Loop trips (first station = last station, e.g. Ringbahn full circles, bus 365; �
   - `status`: `running` | `succeeded` | `failed` | `skipped` (unchanged upstream).
   - `finished_at` is NULL exactly while `running`; `error` only on `failed`; `sha256` is lowercase hex or NULL (nothing downloaded).
   - `etag` / `last_modified` are stored as raw header text, to send back unchanged in conditional GETs.
+  - Lifecycle (task 1.2, `internal/transit/static`): a `running` row is opened **before** the download (failed downloads are logged too) → validators + `sha256` are recorded after the download → `skipped` if upstream answered 304 or the hash equals the last **succeeded** row of the same `source`, else the importer closes it as `succeeded` (with `row_counts`) or `failed`. Rows are closed even when the caller's context is cancelled. Source name of the static feed: `vbb-gtfs`.
 - `meta.schema_migrations` (golang-migrate, version + dirty flag). Migrations are embedded in the binary (`backend/db/migrations`) and run on every startup.
 
 ### 3.4 `stations`
