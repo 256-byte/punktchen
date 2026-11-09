@@ -166,6 +166,12 @@ expo-location ──► location store (zustand) ──► fetch policy (core) �
 - Arrays go out as `layers=a,b` (OpenAPI `style: form, explode: false`), set once in `createApiClient`.
 - To check in 5.3 on devices: iOS (`NSURLSession`) and Android (OkHttp) may answer a conditional request from their own HTTP cache; with an explicit `If-None-Match` they are expected to pass the `304` through.
 
+Location (task 3.3):
+- `src/state/location.ts` (zustand): permission, kept device fix, mode (`device` or `mapCenter`), map centre (Berlin Mitte until the map sets it, 3.4). `useLocationView` gives the screen state: `checking`, `denied`, or `ready` with a position.
+- `src/lib/location.ts` (expo-location, foreground only): on start and on every return to the foreground reads the permission and asks once if the OS has not asked yet; while granted and in the foreground shows the OS's cached position (≤ 5 min old) at once, then watches (`Balanced`, every ≥ 25 m / 5 s).
+- Movement threshold (`acceptFix` in `src/core/location.ts`): a new fix replaces the kept one when it moved ≥ 25 m, is at least twice as precise, or is the first live fix; jitter and late older fixes are dropped. The 150 m refetch threshold (§4.2) is separate.
+- Denied: a screen explains why, with "Allow location" (OS prompt again, or the settings app once the OS no longer asks) and "Use map center". While waiting for a first fix (e.g. location services off) the map centre is offered too. Granting later switches back to the device position.
+
 ### 4.2 Fetch policy (pure function in `src/core/fetchPolicy.ts`)
 
 Fetch only when the app is in the foreground **and** at least one is true:

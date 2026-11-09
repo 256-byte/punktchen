@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 3 — Mobile MVP (Phase 2 done 2026-11-09)
-- **Next task:** 3.3 Location (permission flow, last known position, movement threshold)
+- **Next task:** 3.4 Map screen (`react-native-maps`, follows the user on open, layer registry)
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -38,7 +38,7 @@
 | 2 | 2.6 Spot check vs. VBB | done | 5 stations, 69 directions: all scheduled times match fahrinfo.vbb.de |
 | 3 | 3.1 `src/core` | done | time, departures, staleness, geo, fetch policy; coverage 100 % (gate 90 % in `npm test`) |
 | 3 | 3.2 API client + `useNearby` | done | 304 keeps the same response object, new `checkedAt`; backend sends ETags from 5.3 |
-| 3 | 3.3 Location | todo | |
+| 3 | 3.3 Location | done | Denied → explanation + "Allow location"/"Open settings" + "Use map center"; fixes kept from 25 m moves; not yet tried on a phone |
 | 3 | 3.4 Map screen | todo | |
 | 3 | 3.5 Transit layer markers | todo | |
 | 3 | 3.6 Station sheet | todo | |
@@ -85,6 +85,13 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 3.3
+- Done: `src/core/location.ts` (pure: `acceptFix` movement threshold 25 m / 2× precision, `locationView`, `BERLIN_CENTER`), `src/state/location.ts` (zustand store + `useLocationView`), `src/lib/location.ts` (`useDeviceLocation`: permission on start and on each return to the foreground, last known ≤ 5 min, watch while in the foreground; `requestLocationAccess`: prompt again or open the settings app), `src/ui/LocationGate.tsx` (checking / denied screen with "Use map center"), home screen shows where it looks until the map (3.4). `app.json`: expo-location plugin with the iOS "when in use" text (used by builds; Expo Go shows its own).
+- Tests: Vitest `src/core/location.test.ts` (13, coverage stays 100 %); Jest `tests/ui/location.test.tsx` (9) with an in-memory expo-location (`tests/ui/location-mock.ts`): ask once, last known then live, jitter ignored and 40 m move kept, watch removed on unmount, denied screen + "Use map center" (acceptance criterion), "Allow location" after denial, "Open settings" when the OS no longer asks, back to the device after granting, map centre while waiting. Home screen test updated. Typecheck, lint pass.
+- Not checked yet: on a phone (Expo Go). Worth a look in 3.4 when the map is there: deny → screen → "Use map center"; grant in Settings → back to the device.
+- New deps (+ why): `expo-location` ~58.0.20 (device position and permission; in the stack, CLAUDE.md §3; installed with `npx expo install`, part of Expo Go), `zustand` ^5.1.0 (location store; in the stack).
+- Next: 3.4 map screen.
 
 ### 2026-11-09 — task 3.2
 - Done: `src/api/nearby.ts` `fetchNearby` (sends `If-None-Match` from the kept answer; 304 → same `response`, new `checkedAt`; 200 → new data, ETag, device clock offset from `meta.generatedAt`; 304 without a kept answer and error bodies → `ApiError`). `src/api/useNearby.ts` hook (normalized query key, `skipToken` without params, `keepPreviousData`, no retries, 30 s `staleTime`). `createApiClient` now serializes arrays as `layers=a,b` like the contract (openapi-fetch's default would send `layers=a&layers=b`).
