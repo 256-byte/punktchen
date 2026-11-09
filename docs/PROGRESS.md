@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 3 — Mobile MVP (Phase 2 done 2026-11-09)
-- **Next task:** 3.1 `src/core` (time, countdown, labels, staleness, fetch policy)
+- **Next task:** 3.2 API client (openapi-fetch) + `useNearby` with ETag/`If-None-Match`
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -36,7 +36,7 @@
 | 2 | 2.4 Transit provider | done | Golden JSON for Wedding; directions merged + trimmed (174 → 51 at Wedding); colours incl. VBB list |
 | 2 | 2.5 API handlers | done | Contract tests validate every response against openapi.yaml (kin-openapi); ETag/cell stay for Phase 5 |
 | 2 | 2.6 Spot check vs. VBB | done | 5 stations, 69 directions: all scheduled times match fahrinfo.vbb.de |
-| 3 | 3.1 `src/core` | todo | |
+| 3 | 3.1 `src/core` | done | time, departures, staleness, geo, fetch policy; coverage 100 % (gate 90 % in `npm test`) |
 | 3 | 3.2 API client + `useNearby` | todo | |
 | 3 | 3.3 Location | todo | |
 | 3 | 3.4 Map screen | todo | |
@@ -65,6 +65,7 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 | 2026-11-09 | Each import stamps a layout id (hash of the gtfs SQL + `layoutRevision`) on the schema; a missing or different stamp forces a full re-import even if the feed is unchanged | — (import detail, ARCHITECTURE §3.1) |
 | 2026-11-09 | VBB line colour list committed and embedded (exception to CLAUDE.md rule 11, user-approved) | — (DATA_MODEL §7 #25) |
 | 2026-11-09 | API directions per pole: terminal out, same label merged, per line and direction of travel only the ones with departures (else the most frequent, empty) — user decision | — (DATA_MODEL §3.2) |
+| 2026-11-09 | Lines suspended for weeks (e.g. RE at Alexanderplatz until 2026-12-13) stay listed with an empty departure list; revisit after seeing it in the UI (3.5). A "runs within N days" filter would not hide them for good: it is evaluated against the calendar, so they come back on their own — user decision (former open question #4) | — (DATA_MODEL §3.2) |
 
 ## Open questions
 
@@ -73,7 +74,6 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 | 1 | Server for deployment | user | later |
 | 2 | Alert sources: format/terms of VBB Verkehrsmeldungen | Claude Code (research) | Phase 8 |
 | 3 | Final app name | user | Phase 7 |
-| 4 | Lines suspended for weeks (e.g. RE at Alexanderplatz until 2026-12-13) are listed with an empty departure list. Keep (rider sees the line exists), or list a direction only if it runs within the next N days? | user | Phase 3 (3.5 markers) |
 
 ## Session log
 
@@ -85,6 +85,19 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 3.1
+- Done: pure functions in `mobile/src/core` (no React/RN/Expo imports):
+  - `time.ts`: `parseTimestamp` (strict RFC 3339, offset required), `wallClock` ("HH:mm" as written, Berlin), `minutesLeft` (rounded down), `countdownLabel` ("now" / "N min" / "HH:mm"), `clockOffset` (device clock correction if > 30 s off, ADR-0007).
+  - `departures.ts`: `effectiveDeparture` (predicted ?? scheduled + label), `hasDeparted` (one minute after the effective time), `upcomingDepartures` (drops departed/invalid, ordered by effective time, keeps cancelled), `nextDeparture` (skips cancelled), `earliestDepartureAt` (for the fetch policy).
+  - `staleness.ts`: `freshness` (fresh < 60 s, aging ≤ 5 min, stale), `updatedAgoLabel`.
+  - `geo.ts`: `distanceMeters` (haversine).
+  - `fetchPolicy.ts`: `decideFetch(state, now)` → fetch + reason or wait + reason + `until`; ARCHITECTURE §4.2 made precise: the 10 s floor also holds after errors (first retry after 10 s, not 5 s); pull to refresh skips the backoff, not the floor. Wiring into `useNearby` stays for 5.4.
+  - Former open question #4 decided by the user: suspended lines stay listed (see Decisions).
+- Tests: 116 Vitest tests (102 new in `src/core`); `src/core` coverage 100 % statements/branches/functions/lines. `npm test` now runs Vitest with `--coverage` and fails below 90 % (thresholds in `vitest.config.mts`). Typecheck, lint, Jest pass.
+- New deps (+ why): `@vitest/coverage-v8` ^5.1.0 (dev) — measures the coverage the 3.1 acceptance criterion asks for; the official provider for Vitest 5.1, same major version.
+- Data facts found: none.
+- Next: 3.2 API client + `useNearby` with ETag.
 
 ### 2026-11-09 — task 2.6
 - Done: manual spot check of `/v1/stations/{id}` (dev DB, live feed sha256 `d9625924…`, files of 2026-11-05; snapshot 13:06) against VBB's official departure board (https://fahrinfo.vbb.de/webapp, tab "Abfahrten", Monday 2026-11-09 ~13:08–13:15). VBB shows the scheduled time with the delay separately (`13:10 +2 Minuten`), so scheduled times compare directly. Compared every departure both lists show (ours: up to 10 per direction within the 92-min window).

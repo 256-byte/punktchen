@@ -80,7 +80,7 @@ Terminal rule: at a terminal pole, arrivals that end there are **not** shown as 
 **API directions of a pole** (task 2.4, `transit.buildPole`; user decision 2026-11-09). Rows are many more than what riders see: at the Wedding area (500 m) 174 rows at 23 poles, mostly short-turn and night variants with no departure in the window (§7 #26). The API applies, in order:
 1. **Terminal:** a row with `is_terminal` and no departure in the window is left out (a rare continuing trip keeps it, flagged `isTerminal`).
 2. **Merge:** rows with the same label — mode, line, display headsign (without " (Berlin)"), ring flag — are one direction; departures are combined, sorted, cut to the limit. Example: S41 "Ringbahn S 41" from 10+ trip headsigns at one platform.
-3. **Trim:** per line and direction of travel (mode, line, `direction_id` of the label's most frequent row), only directions with departures are listed. If none has one, the most frequent (`trip_count`) is listed with an empty list, so a pole still shows which lines stop there (e.g. night lines in the afternoon). This hides empty variants like "U6 → U Seestr." while the U6 runs.
+3. **Trim:** per line and direction of travel (mode, line, `direction_id` of the label's most frequent row), only directions with departures are listed. If none has one, the most frequent (`trip_count`) is listed with an empty list, so a pole still shows which lines stop there (e.g. night lines in the afternoon). This hides empty variants like "U6 → U Seestr." while the U6 runs. Lines suspended for weeks stay listed this way too (e.g. RE2 at Alexanderplatz before 2026-12-13, §7 #27); user decision 2026-11-09, to be revisited in the UI (3.5).
 
 Poles left without directions and stations left without poles are not returned. Wedding 500 m at 17:00: 174 rows → 51 directions.
 
@@ -331,6 +331,13 @@ type EffectiveDeparture = Departure & {
 ```
 
 Display rules: `< 1 min` → "now"; `≤ 59 min` → "N min"; `≥ 60 min` → clock time `HH:mm`. Cancelled → struck through, not counted as "next".
+
+Details (`src/core/time.ts`, `src/core/departures.ts`, task 3.1):
+- Minutes are rounded down: 1 min 59 s left → "1 min".
+- The clock time is taken as written in the timestamp (`14:52` from `…T14:52:00+01:00`), i.e. Berlin time whatever the device's timezone; no Intl timezone data needed.
+- A departure is gone one minute after its effective time (GTFS times are whole minutes: a train due 14:32 leaves during 14:32 and shows "now" until 14:33).
+- Timestamps without seconds or offset are rejected (would be read as device time); such a departure is dropped.
+- Upcoming departures are ordered by effective time (a late train can fall behind the next one); equal times keep the API order.
 
 ## 10. Future layer: alerts (Phase 8, design sketch only)
 
