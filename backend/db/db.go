@@ -19,3 +19,10 @@ var Migrations embed.FS
 
 // MigrationsDir is the directory inside Migrations that holds the files.
 const MigrationsDir = "migrations"
+
+// GTFSSchema creates the schema "gtfs" and its tables (DATA_MODEL §2). The
+// importer runs it with "gtfs." rewritten to the staging schema; sqlc reads
+// the file directly.
+//
+//go:embed gtfs/schema.sql
+var GTFSSchema string

@@ -4,7 +4,9 @@ version: "2"
 sql:
   - engine: postgresql
     # golang-migrate files: sqlc applies *.up.sql in order and ignores *.down.sql.
-    schema: db/migrations
+    schema:
+      - db/migrations
+      - db/gtfs/schema.sql
     queries: db/queries
     strict_function_checks: true
     gen:
