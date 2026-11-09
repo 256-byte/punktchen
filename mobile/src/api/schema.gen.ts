@@ -280,6 +280,14 @@ export interface components {
              */
             platform: string | null;
             /**
+             * @description GTFS stop_desc as VBB writes it, null if empty: where the pole is
+             *     ("Bushalt Müllerstraße ht. Lindower Straße", "S-Bahnsteig Gleis 1",
+             *     "Ersatzhalt …" for a rail replacement stop). Set on 99.6 % of bus
+             *     poles and all others (DATA_MODEL §7 #28).
+             * @example Bushalt Müllerstraße ht. Lindower Straße
+             */
+            description: string | null;
+            /**
              * @description Directions leaving this pole (DATA_MODEL §3.2). Variants that riders
              *     see the same way are merged. Per line and direction of travel only
              *     the ones with departures are listed, or the most frequent one with

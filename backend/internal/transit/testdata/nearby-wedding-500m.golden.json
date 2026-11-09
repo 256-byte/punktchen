@@ -16,6 +16,7 @@
       "name": "S+U Wedding",
       "poles": [
         {
+          "description": "Bushalt Müllerstraße ht. Lindower Straße",
           "directions": [
             {
               "color": null,
@@ -118,6 +119,7 @@
           "platform": null
         },
         {
+          "description": "Bushalt Müllerstraße vor Lynarstraße",
           "directions": [
             {
               "color": null,
@@ -220,6 +222,7 @@
           "platform": null
         },
         {
+          "description": "U Bahnsteig Gleis 2",
           "directions": [
             {
               "color": "#8C6DAB",
@@ -267,6 +270,7 @@
           "platform": "2"
         },
         {
+          "description": "U Bahnsteig Gleis 1",
           "directions": [
             {
               "color": "#8C6DAB",
@@ -314,6 +318,7 @@
           "platform": "1"
         },
         {
+          "description": "S-Bahnsteig Gleis 2",
           "directions": [
             {
               "color": "#DA6BA2",
@@ -407,6 +412,7 @@
           "platform": "2"
         },
         {
+          "description": "S-Bahnsteig Gleis 1",
           "directions": [
             {
               "color": "#DA6BA2",
@@ -524,6 +530,7 @@
       "name": "U Reinickendorfer Str.",
       "poles": [
         {
+          "description": "Bushalt Müllerstraße ht. Fennstraße",
           "directions": [
             {
               "color": null,
@@ -626,6 +633,7 @@
           "platform": null
         },
         {
+          "description": "Bushalt Fennstraße ht. Müllerstraße",
           "directions": [
             {
               "color": null,
@@ -673,6 +681,7 @@
           "platform": null
         },
         {
+          "description": "Bushalt Fennstraße vor Müllerstraße",
           "directions": [
             {
               "color": null,
@@ -720,6 +729,7 @@
           "platform": null
         },
         {
+          "description": "Bushalt Fennstraße ht. Müllerstraße",
           "directions": [
             {
               "color": null,
@@ -767,6 +777,7 @@
           "platform": null
         },
         {
+          "description": "Bushalt Müllerstraße ht. Fennstraße",
           "directions": [
             {
               "color": null,
@@ -847,6 +858,7 @@
       "name": "S Wedding/Martha-Ndumbe-Platz",
       "poles": [
         {
+          "description": "Bushalt Reinickendorfer Straße ht. Gerichtstraße",
           "directions": [
             {
               "color": null,
@@ -894,6 +906,7 @@
           "platform": null
         },
         {
+          "description": "Bushalt Reinickendorfer Straße vor Gerichtstraße",
           "directions": [
             {
               "color": null,
@@ -941,6 +954,7 @@
           "platform": null
         },
         {
+          "description": "Bushalt Gerichtstraße ht. Pankstraße",
           "directions": [
             {
               "color": null,
@@ -1025,6 +1039,7 @@
           "platform": null
         },
         {
+          "description": "Bushalt Gerichtstraße vor Pankstraße",
           "directions": [
             {
               "color": null,
@@ -1087,6 +1102,7 @@
       "name": "Gerichtstr.",
       "poles": [
         {
+          "description": "Bushalt Müllerstraße vor Gerichtstraße",
           "directions": [
             {
               "color": null,
@@ -1189,6 +1205,7 @@
           "platform": null
         },
         {
+          "description": "Bushalt Müllerstraße hinter Triftstraße",
           "directions": [
             {
               "color": null,
@@ -1307,6 +1324,7 @@
       "name": "U Reinickendorfer Str.",
       "poles": [
         {
+          "description": "U Bahnsteig Gleis 1",
           "directions": [
             {
               "color": "#8C6DAB",
@@ -1354,6 +1372,7 @@
           "platform": "1"
         },
         {
+          "description": "U Bahnsteig Gleis 2",
           "directions": [
             {
               "color": "#8C6DAB",
@@ -1401,6 +1420,7 @@
           "platform": "2"
         },
         {
+          "description": "Bushalt Müllerstraße ht. Sellerstraße",
           "directions": [
             {
               "color": null,
@@ -1466,6 +1486,7 @@
           "platform": null
         },
         {
+          "description": "Bushalt Müllerstraße vor Schulzendorfer Straße",
           "directions": [
             {
               "color": null,
@@ -1537,6 +1558,7 @@
       "name": "Am Nordhafen",
       "poles": [
         {
+          "description": "Bushalt Fennstraße hinter Am Nordhafen",
           "directions": [
             {
               "color": null,
@@ -1621,6 +1643,7 @@
           "platform": null
         },
         {
+          "description": "Bushalt Fennstraße vor Am Nordhafen",
           "directions": [
             {
               "color": null,

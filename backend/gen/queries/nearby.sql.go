@@ -14,6 +14,7 @@ WITH center AS (
     SELECT ST_SetSRID(ST_MakePoint($1::float8, $2::float8), 4326)::geography AS g
 ), poles AS (
     SELECT p.stop_id, p.station_id, p.platform_code,
+           p.stop_desc AS description,
            ST_Y(p.geom::geometry)::float8 AS lat,
            ST_X(p.geom::geometry)::float8 AS lng,
            ST_Distance(p.geom, c.g)::float8 AS distance_m
@@ -23,7 +24,7 @@ WITH center AS (
       AND coalesce(p.location_type, 0) = 0
       AND EXISTS (SELECT 1 FROM gtfs.pole_directions d WHERE d.stop_id = p.stop_id)
 ), ranked AS (
-    SELECT poles.stop_id, poles.station_id, poles.platform_code, poles.lat, poles.lng, poles.distance_m, min(distance_m) OVER (PARTITION BY station_id) AS station_distance_m
+    SELECT poles.stop_id, poles.station_id, poles.platform_code, poles.description, poles.lat, poles.lng, poles.distance_m, min(distance_m) OVER (PARTITION BY station_id) AS station_distance_m
     FROM poles
 )
 SELECT s.station_id,
@@ -34,6 +35,7 @@ SELECT s.station_id,
        r.station_distance_m::float8 AS station_distance_m,
        r.stop_id,
        r.platform_code,
+       r.description,
        r.lat,
        r.lng,
        r.distance_m
@@ -57,6 +59,7 @@ type NearbyPolesRow struct {
 	StationDistanceM float64
 	StopID           string
 	PlatformCode     *string
+	Description      *string
 	Lat              float64
 	Lng              float64
 	DistanceM        float64
@@ -85,6 +88,7 @@ func (q *Queries) NearbyPoles(ctx context.Context, arg NearbyPolesParams) ([]Nea
 			&i.StationDistanceM,
 			&i.StopID,
 			&i.PlatformCode,
+			&i.Description,
 			&i.Lat,
 			&i.Lng,
 			&i.DistanceM,

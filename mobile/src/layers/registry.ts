@@ -3,6 +3,7 @@
 // departures, stations or any other layer's features.
 import type { ComponentType } from 'react';
 
+import type { ApiClient } from '@/api/client';
 import type { NearbyResponse } from '@/api/nearby';
 import type { components } from '@/api/schema.gen';
 
@@ -14,8 +15,10 @@ export interface MapLayer<TFeature> {
   select(response: NearbyResponse): TFeature[];
   /** Stable React key of a feature. */
   key(feature: TFeature): string;
-  /** What the map draws for a feature (a react-native-maps Marker). */
-  Marker: ComponentType<{ feature: TFeature }>;
+  /** What the map draws for a feature (a react-native-maps Marker); onPress opens its sheet. */
+  Marker: ComponentType<{ feature: TFeature; onPress: (feature: TFeature) => void }>;
+  /** Content of the bottom sheet for a tapped feature (the map screen owns the sheet). */
+  Sheet: ComponentType<{ feature: TFeature; client: ApiClient | null }>;
 }
 
 /**

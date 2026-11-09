@@ -29,6 +29,7 @@ SELECT s.station_id,
        s.modes AS station_modes,
        p.stop_id,
        p.platform_code,
+       p.stop_desc AS description,
        ST_Y(p.geom::geometry)::float8 AS lat,
        ST_X(p.geom::geometry)::float8 AS lng
 FROM gtfs.stations s

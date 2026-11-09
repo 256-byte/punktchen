@@ -163,3 +163,21 @@ func TestDisplayName(t *testing.T) {
 		}
 	}
 }
+
+func TestNonEmpty(t *testing.T) {
+	s := func(v string) *string { return &v }
+	for _, c := range []struct {
+		in   *string
+		want *string
+	}{
+		{nil, nil},
+		{s(""), nil},
+		{s("  "), nil},
+		{s(" Bushalt Müllerstraße ht. Lindower Straße "), s("Bushalt Müllerstraße ht. Lindower Straße")},
+	} {
+		got := nonEmpty(c.in)
+		if (got == nil) != (c.want == nil) || got != nil && *got != *c.want {
+			t.Errorf("nonEmpty(%v) = %v, want %v", c.in, got, c.want)
+		}
+	}
+}

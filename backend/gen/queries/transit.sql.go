@@ -87,6 +87,7 @@ SELECT s.station_id,
        s.modes AS station_modes,
        p.stop_id,
        p.platform_code,
+       p.stop_desc AS description,
        ST_Y(p.geom::geometry)::float8 AS lat,
        ST_X(p.geom::geometry)::float8 AS lng
 FROM gtfs.stations s
@@ -106,6 +107,7 @@ type StationPolesRow struct {
 	StationModes []string
 	StopID       string
 	PlatformCode *string
+	Description  *string
 	Lat          float64
 	Lng          float64
 }
@@ -129,6 +131,7 @@ func (q *Queries) StationPoles(ctx context.Context, stationID string) ([]Station
 			&i.StationModes,
 			&i.StopID,
 			&i.PlatformCode,
+			&i.Description,
 			&i.Lat,
 			&i.Lng,
 		); err != nil {

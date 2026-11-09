@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import BottomSheet from '@gorhom/bottom-sheet';
 import MapView from 'react-native-maps';
 import { useStore } from 'zustand';
 
@@ -77,6 +78,7 @@ export function MapScreen({
 
   const center = useRequestCenter(position);
   const nearby = useNearby(client, { lat: center.lat, lng: center.lng });
+  const [selected, setSelected] = useState<Selected | null>(null);
 
   // Countdowns: one global ticker, corrected by the server clock.
   useClockTicker(clock);
@@ -97,7 +99,9 @@ export function MapScreen({
           store.getState().setMapCenter({ lat: r.latitude, lng: r.longitude })
         }
       >
-        {nearby.data ? <LayerMarkers layers={layers} response={nearby.data.response} /> : null}
+        {nearby.data ? (
+          <LayerMarkers layers={layers} response={nearby.data.response} onSelect={setSelected} />
+        ) : null}
       </MapView>
       {devTools ? <DevPlacePicker store={store} /> : null}
       {client === null ? (
@@ -121,6 +125,9 @@ export function MapScreen({
           </Pressable>
         </View>
       ) : null}
+      {selected ? (
+        <FeatureSheet selected={selected} client={client} onClose={() => setSelected(null)} />
+      ) : null}
     </View>
   );
 }
@@ -128,16 +135,51 @@ export function MapScreen({
 function LayerMarkers({
   layers,
   response,
+  onSelect,
 }: {
   layers: readonly AnyMapLayer[];
   response: NearbyResponse;
+  onSelect: (selected: Selected) => void;
 }) {
   return layers.map((layer) =>
     layer
       .select(response)
       .map((feature) => (
-        <layer.Marker key={`${layer.id}:${layer.key(feature)}`} feature={feature} />
+        <layer.Marker
+          key={`${layer.id}:${layer.key(feature)}`}
+          feature={feature}
+          onPress={(f) => onSelect({ layer, feature: f })}
+        />
       )),
+  );
+}
+
+/** A tapped feature, shown in the bottom sheet. */
+interface Selected {
+  layer: AnyMapLayer;
+  feature: unknown;
+}
+
+const SHEET_SNAP_POINTS = ['45%', '90%'];
+
+/**
+ * The bottom sheet for a tapped feature (task 3.6): the layer draws the
+ * content; swiping down closes it.
+ */
+function FeatureSheet({
+  selected,
+  client,
+  onClose,
+}: {
+  selected: Selected;
+  client: ApiClient | null;
+  onClose: () => void;
+}) {
+  const { layer, feature } = selected;
+  return (
+    <BottomSheet index={0} snapPoints={SHEET_SNAP_POINTS} enablePanDownToClose onClose={onClose}>
+      <layer.Sheet key={`${layer.id}:${layer.key(feature)}`} feature={feature} client={client} />
+    </BottomSheet>
   );
 }
 

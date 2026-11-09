@@ -13,6 +13,7 @@
   "name": "S+U Wedding",
   "poles": [
     {
+      "description": "S-Bahnsteig Gleis 1",
       "directions": [
         {
           "color": "#DA6BA2",
@@ -232,6 +233,7 @@
       "platform": "1"
     },
     {
+      "description": "S-Bahnsteig Gleis 2",
       "directions": [
         {
           "color": "#DA6BA2",
@@ -442,6 +444,7 @@
       "platform": "2"
     },
     {
+      "description": "U Bahnsteig Gleis 1",
       "directions": [
         {
           "color": "#8C6DAB",
@@ -552,6 +555,7 @@
       "platform": "1"
     },
     {
+      "description": "U Bahnsteig Gleis 2",
       "directions": [
         {
           "color": "#8C6DAB",
@@ -662,6 +666,7 @@
       "platform": "2"
     },
     {
+      "description": "Bushalt Müllerstraße ht. Lindower Straße",
       "directions": [
         {
           "color": null,
@@ -791,6 +796,7 @@
       "platform": null
     },
     {
+      "description": "Bushalt Müllerstraße vor Lynarstraße",
       "directions": [
         {
           "color": null,

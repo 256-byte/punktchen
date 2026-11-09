@@ -160,10 +160,11 @@ expo-location ──► location store (zustand) ──► fetch policy (core) �
 
 `useNearby(client, params)` (`src/api/useNearby.ts`, task 3.2) is the TanStack Query hook for `/v1/nearby`:
 - Query key: the request with defaults filled in (`radius` 500, `layers` sorted), so one request has one cache entry and one ETag. `params` null (no position yet) sends nothing.
-- Each entry keeps `{ response, etag, checkedAt, clockOffsetMs }` (`src/api/nearby.ts`). A refetch sends the entry's ETag as `If-None-Match`; a `304` returns the same `response` object with a new `checkedAt`, so nothing that reads the response re-renders.
+- Each entry keeps `{ response, etag, checkedAt, clockOffsetMs }` (`Kept<T>`, `src/api/revalidate.ts`, shared with `useStation` for `/v1/stations/{id}` since 3.6). A refetch sends the entry's ETag as `If-None-Match`; a `304` returns the same `response` object with a new `checkedAt`, so nothing that reads the response re-renders.
 - New parameters keep showing the previous area until their answer arrives (`keepPreviousData`, `isPlaceholderData`).
 - No retries and 30 s `staleTime`: when to fetch is the fetch policy's job (§4.2, wired in 5.4).
 - Arrays go out as `layers=a,b` (OpenAPI `style: form, explode: false`), set once in `createApiClient`.
+- Path parameters are percent-encoded by openapi-fetch (`/v1/stations/de%3A11000%3A900009104`); the backend's `PathValue` decodes them (checked with curl, task 3.6).
 - To check in 5.3 on devices: iOS (`NSURLSession`) and Android (OkHttp) may answer a conditional request from their own HTTP cache; with an explicit `If-None-Match` they are expected to pass the `304` through.
 
 Location (task 3.3):
@@ -198,19 +199,21 @@ interface MapLayer<TFeature> {
   id: LayerId;                                  // "transit"
   select(response: NearbyResponse): TFeature[]; // pick this layer's features
   key(feature: TFeature): string;               // stable React key
-  Marker: React.ComponentType<{ feature: TFeature; now: number }>;
-  Sheet: React.ComponentType<{ feature: TFeature; now: number }>;
+  Marker: React.ComponentType<{ feature: TFeature; onPress: (f: TFeature) => void }>;
+  Sheet: React.ComponentType<{ feature: TFeature; client: ApiClient | null }>; // sheet content
   refresh: { minIntervalMs: number };
 }
 ```
 
 The map screen iterates over enabled layers; it does not know what a "departure" is.
 
-Built in task 3.4 (`src/layers/registry.ts`, `src/layers/index.ts`) with `id`, `select`, `key` and `Marker`; `Sheet` comes with the station sheet (3.6), `refresh` with the fetch policy (5.4). `defineLayer<T>()` hides a layer's feature type in the list (`AnyMapLayer`): the screen only hands a layer its own features.
+Built in task 3.4 (`src/layers/registry.ts`, `src/layers/index.ts`) with `id`, `select`, `key` and `Marker`; `Sheet` and the marker's `onPress` came with the station sheet (3.6), `refresh` comes with the fetch policy (5.4). The map screen owns the bottom sheet (`@gorhom/bottom-sheet`, snap points 45 % / 90 %, swipe down closes it) and renders the tapped layer's `Sheet` inside; the root layout wraps the app in `GestureHandlerRootView`. `defineLayer<T>()` hides a layer's feature type in the list (`AnyMapLayer`): the screen only hands a layer its own features.
 
 `now` is not a prop (task 3.5): a prop would re-render the map screen and every marker each second. Components read it from the clock store (`src/state/clock.ts`) with `useNow(select)`, which re-renders only when the selected value changes. One `setInterval` (1 s) ticks the store while the map is shown, plus a tick when the app returns to the foreground; "now" includes the server clock offset of the last `/v1/nearby` answer (ADR-0007).
 
 Transit layer (task 3.5, `src/layers/transit`): one feature per **pole** (`{ station, pole }`), drawn by `PoleMarker`: up to 4 rows (line badge, headsign, countdown to the next running departure), then "+N more". Only directions with an upcoming departure get a row (`markerRows`); the others — night lines by day, rail replacement outside its hours, suspended lines — are left to the station sheet (3.6), and a pole with none draws no marker (user decision 2026-11-09: the map answers "what comes next near me"). Badge colour = API `color`, else a per-mode default (`MODE_COLORS` in `src/core/directions.ts`; tram/bus/ferry from VBB's generic rows); badge text white unless white has < 3:1 contrast. Its accessibility label reads station and rows.
+
+Station sheet (task 3.6, `StationSheet`): the tapped pole's whole station from `/v1/stations/{id}` (`useStation`; until it loads, the `/v1/nearby` part). Per pole (titled by `poleTitle`: VBB's description without the bus/tram stop prefix, e.g. "Müllerstraße ht. Lindower Straße" or "S-Bahnsteig Gleis 1"; else "Platform N", else "Stop N"; DATA_MODEL §7 #28) the running directions with their next 3 departures (first one bold, cancelled ones struck through); then one "No departures soon" section with every direction that has nothing coming, once each, dimmed, with its platform (user decision 2026-11-09). Built by `sheetSignature`/`sheetModel` in `src/core/sheet.ts`: the clock selector returns one plain string per direction, so the sheet re-renders when a label changes, not every second.
 
 Map screen (`src/ui/MapScreen.tsx`, task 3.4):
 - Opens centred on the position (`initialRegion`, 500 m around it) and follows the device position until the user drags the map (`onPanDrag`; `isGesture` of `onRegionChangeComplete` is Google Maps only). In "map center" mode the camera never moves by itself.

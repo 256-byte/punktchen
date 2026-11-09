@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 3 — Mobile MVP (Phase 2 done 2026-11-09)
-- **Next task:** 3.6 Station sheet (`@gorhom/bottom-sheet`, all poles/directions/next departures)
+- **Next task:** 3.7 Attribution "Data: VBB (CC BY 4.0)" visible on the map
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -41,7 +41,7 @@
 | 3 | 3.3 Location | done | Denied → explanation + "Allow location"/"Open settings" + "Use map center"; fixes kept from 25 m moves; iPhone: prompt + map OK (user, 2026-11-09) |
 | 3 | 3.4 Map screen | done | Opens centred on the user, follows until a drag; layer registry with a plain station pin; request centre moves after > 150 m; iPhone: opens on the user, pins shown (user, 2026-11-09) |
 | 3 | 3.5 Transit layer markers | done | One marker per pole, up to 4 rows; labels re-render once a minute (Profiler test); iPhone: countdowns and "now" update correctly (user, 2026-11-09) |
-| 3 | 3.6 Station sheet | todo | List directions without an upcoming departure last (decision 2026-11-09) |
+| 3 | 3.6 Station sheet | done | Tap marker → whole station; idle directions last (decision 2026-11-09); poles titled from VBB descriptions (new `Pole.description`); iPhone: sheet opens, sections correct (user) |
 | 3 | 3.7 Attribution | todo | |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
@@ -87,6 +87,16 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 3.6
+- Done: tap a pole marker → bottom sheet with its station. `src/api/station.ts` (`fetchStation`, `useStation`: ETag revalidation, 30 s like useNearby); the 200/304/error handling of both endpoints moved to `src/api/revalidate.ts` (`Kept<T>`, `keepAnswer`). `src/core/sheet.ts` (pure: `sheetSignature` per direction, `sheetModel` → poles with running directions + idle list). `src/layers/transit/StationSheet.tsx` (header, "Platform N"/"Stop N" sections, next 3 departures, cancelled struck through, "No departures soon" at the bottom), `LineBadge.tsx` shared with the marker. Registry: `Marker` gets `onPress`, layers provide `Sheet`; `MapScreen` owns the `BottomSheet` (45 %/90 %, `enablePanDownToClose`). Root layout wrapped in `GestureHandlerRootView`.
+- Tests: Vitest `src/core/sheet.test.ts` (5; core coverage 100 %). Jest `tests/ui/station-sheet.test.tsx` (7): whole station with sections, labels, cancelled, idle section after the running ones; nearby part without a backend; error keeps it; "No departures in the next 90 minutes."; `fetchStation` 304 and 404; map: marker tap opens the sheet, `onClose` (swipe down) closes it. `@gorhom/bottom-sheet` is mocked for all Jest tests (`tests/ui/jest-setup.ts`, Reanimated has no native side in Jest). Typecheck, lint, all tests pass (Vitest 150, Jest 56).
+- Found: openapi-fetch percent-encodes path parameters (`de%3A11000%3A900009104`); the backend decodes them (curl → 200).
+- Manual check (user, iPhone, Expo Go, S+U Wedding): tapping a marker opens the sheet; S-Bahn platforms 1/2 (S15, S41/S42), U-Bahn platforms (U6 Alt-Mariendorf …) correct. Bus poles were titled "Stop 5", "Stop 6", and the U and S platforms both "Platform 1" → added pole descriptions (below).
+- Pole descriptions (user request, same task): contract first — `Pole.description` (GTFS `stop_desc`, nullable) in `api/openapi.yaml`; backend `NearbyPoles`/`StationPoles` select `stop_desc`, provider trims it (`nonEmpty`, nil if blank); goldens rewritten (Wedding: "U Bahnsteig Gleis 1", "Bushalt Müllerstraße ht. Lindower Straße", …); Go + TypeScript regenerated. App: `poleTitle` in `src/core/sheet.ts` drops the bus/tram stop prefix ("Bushalt ", "Tramsteig ", "Tram- u. Bushalt ", …) and keeps rail platforms, "Ersatzhalt …" and short bays ("Bussteig A3") as written; checked on all 9,628 served poles (8,543 shortened). DATA_MODEL §7 #28. Tests: Go `TestNonEmpty`, provider goldens, contract test; Vitest `poleTitle` (18 cases); sheet test uses a bus pole description. Backend: vet, tests, golangci-lint (0 issues) pass.
+- Known: the app logs "[Reanimated] Dependencies should only be used on the web and are always ignored on native" — from `@gorhom/bottom-sheet` internals (its `useAnimatedReaction`/`useDerivedValue` with dependency arrays under Reanimated 4); our code does not use Reanimated directly. Harmless; recheck after a bottom-sheet update.
+- New deps (+ why): `@gorhom/bottom-sheet` ^5.2.14 (the sheet; in the stack), `react-native-reanimated` 4.7.1, `react-native-gesture-handler` ~3.3.0 (its peers; in the stack), `react-native-worklets` 0.13.0 (Reanimated 4's peer, pinned to the SDK version so Expo Go matches). All with `npx expo install`.
+- Next: 3.7 attribution.
 
 ### 2026-11-09 — markers show running directions only (after 3.5, user decision)
 - Why: on the phone, busy areas showed many dimmed rows with "—". Around S+U Alexanderplatz (500 m, 18:19) 72 of 151 directions had no departure in the window: night lines N2/N5/N8/N40/N42/N60/N65 (~45 rows), rail replacement buses for M1/M2/M4/U2, regional RE2/RE7/RB14/RB23 (no stop there until 2026-12-13), short-turn or depot variants (S9 → Friedrichstr., 100 → Memhardstr., 200 → Bushafen), trams 12/M2. With 4 rows per marker, empty rows could also push running lines under "+N more" (1 of 49 poles at that time).
