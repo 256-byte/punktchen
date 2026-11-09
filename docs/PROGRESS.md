@@ -26,7 +26,7 @@
 | 1 | 1.2 Downloader | todo | |
 | 1 | 1.3 Streaming import | todo | |
 | 1 | 1.4 Indexes + in_scope | todo | |
-| 1 | 1.5 Derived tables | todo | |
+| 1 | 1.5 Derived tables | todo | Now includes `stations` + real Wedding subset fixture |
 | 1 | 1.6 Sanity checks + swap | todo | |
 | 1 | 1.7 Scheduler | todo | |
 | 1 | 1.8 Nearby query | todo | |
@@ -45,9 +45,10 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 | 2026-11-05 | Geohash cell cache keyed by provider versions | 0006 |
 | 2026-11-05 | Absolute timestamps, countdown on device | 0007 |
 | 2026-11-05 | Generic Provider/Layer system, transit only | 0008 |
-| 2026-11-08 | Default static feed `https://www.vbb.de/gtfs` (current, matches GTFS-RT); change detection by SHA-256 | — (config, DATA_MODEL §7 #15) |
+| 2026-11-08 | Default static feed `https://unternehmen.vbb.de/gtfs` (official link, current, matches GTFS-RT); change detection by SHA-256 | — (config, DATA_MODEL §7 #15) |
 | 2026-11-08 | GTFS-RT limit 7 req/min: CLAUDE.md rule 7 updated, poll interval floor 10 s | — (config, DATA_MODEL §7 #20) |
 | 2026-11-08 | User: keep config/docs in line with current upstream facts without asking first | — |
+| 2026-11-09 | PLAN updated from 1.1 findings (user approved): 1.2 SHA-256 skip criterion, `stations` table (DATA_MODEL §3.4), loop/ring rules, real Wedding subset fixture, 32 h window, line colours, new 4.0 coverage check, realtime = has `delay` | — (no architecture change) |
 
 ## Open questions
 
@@ -83,6 +84,8 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Requests to VBB: 2 static downloads, ~20 GTFS-RT requests over 75 min (all ≤ 7/min).
 - New deps (+ why): `github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs` v1.0.0 (in stack; decode GTFS-RT protobuf; also used by the Phase 4 poller), `google.golang.org/protobuf` (now direct; marshal trimmed fixtures).
 - Follow-up (user decision, same day): `DefaultGTFSURL` → `https://www.vbb.de/gtfs`; `MinGTFSRTPollInterval` 5 s → 10 s (+ boundary tests 9 s rejected / 10 s accepted); CLAUDE.md rule 7, ARCHITECTURE §2/§3.1/§3.3/§3.7, PLAN 4.1, `.env.example` updated (7 req/min, gzip, User-Agent, freshness from `header.timestamp`).
+- Follow-up 2026-11-09 (browser research): VBB's open-data page links `https://unternehmen.vbb.de/gtfs` (same file as www.vbb.de/gtfs, "2x wöchentlich") → made it the default. Also found: official line colors CSV, a staging GTFS-RT feed, and the feed's source code README: events with `time` but no `delay` are filled from the schedule, so only `delay` marks realtime (DATA_MODEL §7 #18). Second RT sample (23:27 UTC): bus share 36 %, U-Bahn/tram still ~1–3 %.
+- Plan update 2026-11-09 (user approved): PLAN 1.2, 1.4, 1.5, 1.8, 2.2, 2.4, 4.0 (new), 4.1–4.4 adjusted to the findings; DATA_MODEL §3.2 loop + `is_ring` rule, new §3.4 `stations`; ARCHITECTURE §3.4 realtime rule. Order of phases unchanged.
 - Next: 1.2.
 
 ### 2026-11-08 — task 0.10
