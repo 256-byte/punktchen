@@ -131,6 +131,18 @@ type GtfsTrip struct {
 	BikesAllowed         *int16
 }
 
+type GtfsTripInfo struct {
+	TripID            string
+	ServiceID         string
+	RouteID           string
+	DirectionID       *int16
+	Headsign          string
+	FirstStopSequence int32
+	LastStopSequence  int32
+	IsLoop            *bool
+	Instances         int64
+}
+
 type MetaFeedImport struct {
 	ID           int64
 	Source       string

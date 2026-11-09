@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 2 — Schedule-based API (started 2026-11-09)
-- **Next task:** 2.2 schedule window loader
+- **Next task:** 2.3 snapshot
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -31,7 +31,7 @@
 | 1 | 1.7 Scheduler | done | Dev DB now has the live schedule (startup import in Docker) |
 | 1 | 1.8 Nearby query | done | Wedding 500 m: median 2.8 ms on the full feed |
 | 2 | 2.1 Layer registry | done | Failing layer → `down`, others still served; race-clean (Docker) |
-| 2 | 2.2 Schedule window loader | todo | |
+| 2 | 2.2 Schedule window loader | done | Range loader `[from, to)`; new derived table `trip_info` + index `stop_times(departure_secs)` |
 | 2 | 2.3 Snapshot | todo | |
 | 2 | 2.4 Transit provider | todo | |
 | 2 | 2.5 API handlers | todo | |
@@ -74,6 +74,19 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 2.2
+- Done:
+  - `transit/departures`: `ServiceDay` (start = noon − 12 h Europe/Berlin, `At(secs)`), `dayRanges` (half-open window → one seconds range per service day; looks back as far as the feed's `max(departure_secs)` needs), `Loader.Load(ctx, from, to)` → `Window{From, To, ScheduleID, Departures}` sorted by time, `ByStop()`. Repeated strings are interned.
+  - A departure = boardable stop time: in-scope pole, `pickup_type` ≠ 1, not the trip's last stop, service runs that day (DATA_MODEL §3.6).
+  - sqlc queries `ScheduledDepartures` (one service day, seconds range), `MaxDepartureSecs`, `LiveScheduleID` (OID of the `gtfs` schema). Load runs in a read-only tx with `plan_cache_mode = force_custom_plan` (the generic plan was 5–10× slower) and retries if an import swaps the schedule in between (OID before ≠ after).
+  - Import: `trip_info` is now a kept derived table (DATA_MODEL §3.5, was a temp table) with `service_id`; new index `stop_times(departure_secs)`. Measured alternatives first: `unnest` over days, EXISTS for the last stop, an `UPDATE trips` (11.8 s) and a materialized CTE all gave worse plans or imports.
+  - `static/statictest`: test helper for other packages (fresh DB, load a zip or files, make it live); used by 2.3/2.4 later.
+  - Docs: ARCHITECTURE §3.2, DATA_MODEL §2, §3.5, §3.6, §7 #24, §8.
+- Tests: unit — service day start/At incl. both 2026 DST days, 24:30 → D+1 00:30, 31:17 → D+1 07:17, night trips across the switch (second 02:30 in autumn), `dayRanges` (midnight, fractional seconds, feeds past 48:00). Integration (`TestLoadWindow`, synthetic feed) — the PLAN cases with absolute times, filters (no pickup, out of scope, last stop), headsign fallback and `NoDirection`, adjacent windows add up exactly, `ErrNoSchedule`, new schedule id after an import. `TestLoadWindowWedding`: loader equals a plain-SQL definition on real data (5,313 and 1,629 departures). `TestImportRealFeed` passes with the new table/index (timings DATA_MODEL §7 #24). vet, golangci-lint 0 issues, static package tests green.
+- Data facts found: VBB night trips after midnight all belong to the previous service day (§7 #24).
+- New deps (+ why): none.
+- Next: 2.3 snapshot (load the window once, then extend it by 1-minute slices; full reload when `ScheduleID` changes).
 
 ### 2026-11-09 — task 2.1
 - Done:

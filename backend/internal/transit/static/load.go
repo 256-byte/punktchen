@@ -31,7 +31,7 @@ func toStaging(sql string) string {
 }
 
 // derivedTables are built by db/gtfs/derived.sql after loading.
-var derivedTables = []string{"service_dates", "pole_directions", "stations"}
+var derivedTables = []string{"service_dates", "trip_info", "pole_directions", "stations"}
 
 // Loader streams the CSV files of a GTFS zip into the staging schema.
 type Loader struct {

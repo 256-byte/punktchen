@@ -13,8 +13,10 @@ ALTER TABLE gtfs.calendar       ADD PRIMARY KEY (service_id);
 ALTER TABLE gtfs.calendar_dates ADD PRIMARY KEY (service_id, date);
 ALTER TABLE gtfs.stop_times     ADD PRIMARY KEY (trip_id, stop_sequence);
 
--- Departures of a pole in a time window (schedule window, ARCHITECTURE §3.2).
+-- Departures of a pole in a time window (station sheet).
 CREATE INDEX stop_times_stop_departure_idx ON gtfs.stop_times (stop_id, departure_secs);
+-- All departures in a time window (schedule window, ARCHITECTURE §3.2).
+CREATE INDEX stop_times_departure_idx      ON gtfs.stop_times (departure_secs);
 CREATE INDEX trips_service_idx             ON gtfs.trips (service_id);
 CREATE INDEX trips_route_idx               ON gtfs.trips (route_id);
 CREATE INDEX stops_parent_idx              ON gtfs.stops (parent_station);
