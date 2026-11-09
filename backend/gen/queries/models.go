@@ -69,6 +69,7 @@ type GtfsStop struct {
 	WheelchairBoarding *int16
 	LevelID            *string
 	PlatformCode       *string
+	InScope            bool
 	Geom               interface{}
 }
 
