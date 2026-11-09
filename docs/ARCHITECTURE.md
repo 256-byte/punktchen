@@ -129,11 +129,12 @@ type Provider interface {
   - `/v1/layers` lists the registry's layers; `/v1/nearby` goes through `layer.Registry.Nearby`; `/v1/stations/{id}` asks the transit provider directly (`TransitStations`). `cmd/server` builds the registry with the transit provider.
   - Validation the generated binding does not do: lat/lng ranges, radius 100–1000 (default 500), layer ids (default `transit`; unknown, empty or repeated → 400). All problems of a request are reported in one message.
   - A layer that fails (e.g. no departures before the first import) → still 200, layer `down` in `meta.layers`, no payload, not in `attribution`. Station sheet: 404 unknown, 503 `unavailable` without departures.
-  - `meta.layers.<id>.version` = the version the payload was built from; `Cache-Control: no-cache`. Not yet: `cell`, `ETag`/304, gzip (Phase 5).
+  - `meta.layers.<id>.version` = the version the payload was built from; `Cache-Control: no-cache`. Not yet: `ETag`/304, gzip (Phase 5).
   - Contract tests (`contract_test.go`): every endpoint on the Wedding fixture and on an empty state, each response (status, headers, body) validated against `api/openapi.yaml` with kin-openapi (JSON Schema 2020-12 for OpenAPI 3.1).
 - **Cell cache (ADR-0006):**
   - Snap request location to a geohash cell (precision 7, ~150 m × 150 m).
   - Query around the **cell center** with `radius + cell half-diagonal`; all users in the same cell share one response.
+  - Done in task 5.1 (`internal/geo/cell.go`, `GetNearby`): a Berlin cell is ~153 m × 93 m, half diagonal ~90 m (largest centre–corner distance, rounded up + 1 m for sphere vs. spheroid), so radius 500 searches ~590 m around the centre and a user may see stations up to ~680 m away. `meta.cell` carries the hash; `distanceMeters` is measured from the cell centre.
   - Cache key: `(layers, cell, radiusBucket, providerVersions)`. New snapshot → new key → old entries just expire (LRU + TTL safety net). No explicit invalidation code.
   - `ETag` = hash of the key. `If-None-Match` match → `304` with empty body.
   - Response bodies gzip-compressed.

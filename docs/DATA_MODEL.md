@@ -143,7 +143,7 @@ A **departure** is a stop time where riders can board: at an in-scope pole, `pic
 | GET | `/v1/stations/{stationId}` | one transit station with all poles and more departures (sheet) |
 | POST | `/internal/import` | dev-only: start a GTFS import (`LIVESTOP_DEV=true`, else 404); 202 at once, 409 while one runs |
 
-Rules: `radius` 100–1000 (default 500). `layers` comma-separated, default `transit`. Unknown layer → 400. All times ISO-8601 with offset, Europe/Berlin.
+Rules: `radius` 100–1000 (default 500). `layers` comma-separated, default `transit`. Unknown layer → 400. All times ISO-8601 with offset, Europe/Berlin. `/v1/nearby` answers for the centre of the request's geohash cell (precision 7) with `radius` + the cell's half diagonal (~90 m in Berlin; ADR-0006, task 5.1): `meta.cell` names the cell, `distanceMeters` is from its centre.
 
 ### 5.2 `/v1/nearby` response
 
@@ -151,7 +151,7 @@ Rules: `radius` 100–1000 (default 500). `layers` comma-separated, default `tra
 {
   "meta": {
     "generatedAt": "2026-11-05T14:30:12+01:00",
-    "cell": "u33dc9f",
+    "cell": "u33dbjh",
     "attribution": ["Data: VBB (CC BY 4.0)"],
     "layers": {
       "transit": { "version": 18342, "realtimeAgeSeconds": 11, "status": "ok" }

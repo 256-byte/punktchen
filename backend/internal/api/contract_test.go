@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -16,7 +17,10 @@ import (
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/getkin/kin-openapi/routers"
 	legacyrouter "github.com/getkin/kin-openapi/routers/legacy"
+	"github.com/mmcloughlin/geohash"
 
+	"github.com/256-byte/punktchen/backend/gen/openapi"
+	"github.com/256-byte/punktchen/backend/internal/geo"
 	"github.com/256-byte/punktchen/backend/internal/layer"
 	"github.com/256-byte/punktchen/backend/internal/platform"
 	"github.com/256-byte/punktchen/backend/internal/transit"
@@ -133,8 +137,11 @@ func TestContract(t *testing.T) {
 		{"layers", live, "/v1/layers", 200, nil},
 		{"nearby Wedding", live, "/v1/nearby?lat=52.5427&lng=13.366", 200, func(t *testing.T, body map[string]any) {
 			features := body["layers"].(map[string]any)["transit"].(map[string]any)["features"].([]any)
-			if len(features) != 6 {
-				t.Errorf("%d stations, want the 6 of the golden file", len(features))
+			// The 6 stations within 500 m of the point (transit golden file)
+			// plus 2 more: the search is 500 m + half diagonal around the
+			// cell centre (ADR-0006).
+			if len(features) != 8 {
+				t.Errorf("%d stations, want 8", len(features))
 			}
 			lm := body["meta"].(map[string]any)["layers"].(map[string]any)["transit"].(map[string]any)
 			if lm["version"] != float64(b.Current().Version) {
@@ -169,6 +176,58 @@ func TestContract(t *testing.T) {
 			}
 		})
 	}
+
+	// Task 5.1's acceptance: two users 50 m apart in the same cell get the
+	// identical response, and it holds every station within 500 m of each
+	// of them; a user in the next cell gets another one.
+	t.Run("same cell, same response", func(t *testing.T) {
+		cell := geo.CellAt(52.5427, 13.366)
+		users := [][2]float64{{cell.Lat - 0.0002, cell.Lng}, {cell.Lat + 0.00025, cell.Lng}}
+		if d := geo.DistanceMeters(users[0][0], users[0][1], users[1][0], users[1][1]); d < 49.5 || d > 50.5 {
+			t.Fatalf("users %.1f m apart", d)
+		}
+		raw := func(lat, lng float64) []byte {
+			t.Helper()
+			resp, err := http.Get(fmt.Sprintf("%s/v1/nearby?lat=%f&lng=%f", live, lat, lng))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = resp.Body.Close() }()
+			body, _ := io.ReadAll(resp.Body)
+			return body
+		}
+		first, second := raw(users[0][0], users[0][1]), raw(users[1][0], users[1][1])
+		if !bytes.Equal(first, second) {
+			t.Fatalf("different responses in one cell:\n%s\n%s", first, second)
+		}
+		var got openapi.NearbyResponse
+		if err := json.Unmarshal(first, &got); err != nil || got.Meta.Cell == nil || *got.Meta.Cell != cell.Hash {
+			t.Fatalf("cell %v, err %v", got.Meta.Cell, err)
+		}
+		served := map[string]bool{}
+		for _, f := range got.Layers.Transit.Features {
+			served[f.Id] = true
+		}
+		// What the exact points would get without snapping.
+		p := transit.NewProvider(pool, b)
+		for _, u := range users {
+			res, err := p.Nearby(context.Background(), layer.NearbyQuery{Center: layer.Location{Lat: u[0], Lng: u[1]}, RadiusMeters: 500})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, f := range res.Payload.(*openapi.TransitLayer).Features {
+				if !served[f.Id] {
+					t.Errorf("station %s within 500 m of %v is missing", f.Id, u)
+				}
+			}
+		}
+
+		box := geohash.BoundingBox(cell.Hash)
+		next := raw(box.MaxLat+0.0002, cell.Lng)
+		if err := json.Unmarshal(next, &got); err != nil || got.Meta.Cell == nil || *got.Meta.Cell == cell.Hash {
+			t.Errorf("next cell north: %v, err %v", got.Meta.Cell, err)
+		}
+	})
 
 	t.Run("the contract test catches violations", func(t *testing.T) {
 		// A response missing a required field must fail validation.

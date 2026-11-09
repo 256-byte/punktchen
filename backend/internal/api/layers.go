@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/256-byte/punktchen/backend/gen/openapi"
+	"github.com/256-byte/punktchen/backend/internal/geo"
 	"github.com/256-byte/punktchen/backend/internal/layer"
 	"github.com/256-byte/punktchen/backend/internal/platform"
 	"github.com/256-byte/punktchen/backend/internal/transit"
@@ -62,7 +63,11 @@ func (s *Server) GetNearby(ctx context.Context, req openapi.GetNearbyRequestObje
 	if msg != "" {
 		return badNearby(msg), nil
 	}
-	q := layer.NearbyQuery{Center: layer.Location{Lat: p.Lat, Lng: p.Lng}, RadiusMeters: float64(radius)}
+	// Snap to the cache cell (ADR-0006): everyone in the cell gets the
+	// answer for its centre, with the radius grown so that nothing within
+	// radius of the exact point is missed.
+	cell := geo.CellAt(p.Lat, p.Lng)
+	q := layer.NearbyQuery{Center: layer.Location{Lat: cell.Lat, Lng: cell.Lng}, RadiusMeters: cell.SearchRadius(float64(radius))}
 	comp, err := s.cfg.Layers.Nearby(ctx, q, ids)
 	switch {
 	case errors.Is(err, layer.ErrUnknownLayer), errors.Is(err, layer.ErrInvalidQuery):
@@ -72,6 +77,7 @@ func (s *Server) GetNearby(ctx context.Context, req openapi.GetNearbyRequestObje
 	}
 
 	body := openapi.NearbyResponse{Meta: s.meta(comp.Attribution)}
+	body.Meta.Cell = &cell.Hash
 	for _, l := range comp.Layers {
 		lm := layerMeta(l.Version, l.Health)
 		if l.Err != nil {
