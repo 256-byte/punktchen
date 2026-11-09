@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
-    "test": "vitest run && jest",
+    "test": "vitest run --coverage && jest",
     "test:core": "vitest run",
     "test:ui": "jest",
     "gen:api": "openapi-typescript ../api/openapi.yaml --output src/api/schema.gen.ts"
@@ -46,6 +46,7 @@
     "@jest/globals": "~30.5.0",
     "@testing-library/react-native": "^14.1.0",
     "@types/react": "~19.3.0",
+    "@vitest/coverage-v8": "^5.1.0",
     "eslint": "^9.39.5",
     "eslint-config-expo": "~58.0.4",
     "eslint-config-prettier": "^10.1.8",

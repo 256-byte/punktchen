@@ -124,7 +124,7 @@ npm --prefix mobile run gen:api              # TypeScript types → mobile/src/a
 npm --prefix mobile ci                       # install exact versions from package-lock.json
 npm --prefix mobile run typecheck
 npm --prefix mobile run lint                 # ESLint + Prettier check (`npm --prefix mobile run format` fixes formatting)
-npm --prefix mobile test                     # Vitest (src/core, tests/node) + Jest (UI)
+npm --prefix mobile test                     # Vitest (src/core, tests/node; fails if src/core coverage < 90 %) + Jest (UI)
 npm --prefix mobile start                    # Expo dev server: scan QR with Expo Go (iPhone) or press "a" (Android emulator)
 npm --prefix mobile start -- --clear         # after npm install or a mobile/.env change (Metro cache)
 cd mobile; npx expo install <package>; cd .. # add an Expo/RN dependency with the SDK-matched version

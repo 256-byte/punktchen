@@ -7,5 +7,13 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/core/**/*.test.ts', 'tests/node/**/*.test.ts'],
+    // `npm test` measures src/core coverage and fails below 90 % (PLAN 3.1).
+    coverage: {
+      provider: 'v8',
+      include: ['src/core/**/*.ts'],
+      exclude: ['src/core/**/*.test.ts'],
+      reporter: ['text'],
+      thresholds: { lines: 90, functions: 90, branches: 90, statements: 90 },
+    },
   },
 });
