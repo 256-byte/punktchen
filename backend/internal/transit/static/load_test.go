@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"context"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -69,12 +70,13 @@ func writeZip(t *testing.T, files map[string]string) string {
 		t.Fatal(err)
 	}
 	zw := zip.NewWriter(f)
-	for name, body := range files {
+	// Sorted, so the same files always give the same bytes (and SHA-256).
+	for _, name := range slices.Sorted(maps.Keys(files)) {
 		w, err := zw.Create(name)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := w.Write([]byte(body)); err != nil {
+		if _, err := w.Write([]byte(files[name])); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -99,8 +101,17 @@ func testScope(t *testing.T) geo.BBox {
 
 func newTestDB(t *testing.T) *pgxpool.Pool {
 	t.Helper()
+	_, pool := newTestDBWithURL(t)
+	return pool
+}
+
+// newTestDBWithURL starts a migrated database and also returns its URL, for
+// tests that need a second pool.
+func newTestDBWithURL(t *testing.T) (string, *pgxpool.Pool) {
+	t.Helper()
 	ctx := context.Background()
-	pool, err := platform.NewPool(ctx, pgtest.Start(t))
+	url := pgtest.Start(t)
+	pool, err := platform.NewPool(ctx, url)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +119,7 @@ func newTestDB(t *testing.T) *pgxpool.Pool {
 	if err := platform.Migrate(ctx, pool, db.Migrations, db.MigrationsDir, slog.New(slog.DiscardHandler)); err != nil {
 		t.Fatal(err)
 	}
-	return pool
+	return url, pool
 }
 
 func scalar[T any](t *testing.T, pool *pgxpool.Pool, query string, args ...any) T {
