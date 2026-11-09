@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 1 — Static GTFS (started 2026-11-08 with the user's OK while 0.9 is blocked)
-- **Next task:** 1.3
+- **Next task:** 1.4
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -24,7 +24,7 @@
 | 0 | 0.10 Real commands in CLAUDE.md | done | All commands run from the repo root; tested in Windows PowerShell 5.1 |
 | 1 | 1.1 Data exploration | done | DATA_MODEL §7 #1–#20; all (verify) items answered. Default GTFS URL and RT rate limit updated |
 | 1 | 1.2 Downloader | done | Changed zip stays `running` until the importer (1.3) closes it |
-| 1 | 1.3 Streaming import | todo | |
+| 1 | 1.3 Streaming import | done | Full VBB feed in ~9 s, peak Go memory 18 MB |
 | 1 | 1.4 Indexes + in_scope | todo | |
 | 1 | 1.5 Derived tables | todo | Now includes `stations` + real Wedding subset fixture |
 | 1 | 1.6 Sanity checks + swap | todo | |
@@ -68,6 +68,15 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-09 — task 1.3
+- Done:
+  - `backend/db/gtfs/schema.sql`: tables of schema `gtfs` (agency, routes, trips, stops, calendar, calendar_dates, stop_times) with all GTFS-reference columns, `*_secs` columns next to the raw times, `stops.geom` as a generated `geography(Point, 4326)` column. Embedded as `db.GTFSSchema`; also in `sqlc.yaml` so later queries are type-checked against `gtfs.*`. No keys/indexes yet (1.4, after loading).
+  - `internal/transit/static.Loader.Load(zip)`: one transaction: drop + recreate `gtfs_staging` (DDL with `gtfs.` → `gtfs_staging.`), then each file straight from the zip through `encoding/csv` into `pgx.CopyFrom`. Per-column conversion (text/int/float/0-1 bool/YYYYMMDD date/GTFS time → raw + seconds), empty → NULL, required columns checked, errors name file + line. Row counts returned and logged per table.
+  - Found while testing: a UTF-8 BOM in front of a quoted header (`"stop_id"`) breaks `encoding/csv` ("bare \" in non-quoted-field"); the BOM is now stripped from the byte stream before parsing.
+- Tests: unit (time parsing incl. `9:20:00` and `31:17:00`, value conversion, tables.go ↔ schema.sql column check, staging DDL rewrite). Integration on a hand-made zip: values, BOM, after-midnight times, NULLs, missing optional column, reload replaces staging, bad value → error with line and previous staging kept, missing column/file, non-zip. Real feed (`LIVESTOP_GTFS_ZIP`): current VBB zip 5,836,294 stop_times in 8.1 s, whole load 9 s, **peak Go memory 18 MB** (acceptance < 500 MB); the older mastscharf zip: 6.2 M rows, 22 MB. Command lines in CLAUDE.md checked in PowerShell 5.1. vet, golangci-lint 0 issues, `go generate` up to date.
+- New deps (+ why): none.
+- Next: 1.4 indexes + `in_scope`.
 
 ### 2026-11-09 — task 1.2
 - Done:

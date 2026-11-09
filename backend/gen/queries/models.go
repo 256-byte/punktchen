@@ -7,7 +7,98 @@ package queries
 import (
 	"encoding/json"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type GtfsAgency struct {
+	AgencyID       *string
+	AgencyName     string
+	AgencyUrl      *string
+	AgencyTimezone *string
+	AgencyLang     *string
+	AgencyPhone    *string
+	AgencyFareUrl  *string
+	AgencyEmail    *string
+}
+
+type GtfsCalendar struct {
+	ServiceID string
+	Monday    bool
+	Tuesday   bool
+	Wednesday bool
+	Thursday  bool
+	Friday    bool
+	Saturday  bool
+	Sunday    bool
+	StartDate pgtype.Date
+	EndDate   pgtype.Date
+}
+
+type GtfsCalendarDate struct {
+	ServiceID     string
+	Date          pgtype.Date
+	ExceptionType int16
+}
+
+type GtfsRoute struct {
+	RouteID        string
+	AgencyID       *string
+	RouteShortName *string
+	RouteLongName  *string
+	RouteDesc      *string
+	RouteType      int32
+	RouteUrl       *string
+	RouteColor     *string
+	RouteTextColor *string
+	RouteSortOrder *int32
+}
+
+type GtfsStop struct {
+	StopID             string
+	StopCode           *string
+	StopName           *string
+	StopDesc           *string
+	StopLat            *float64
+	StopLon            *float64
+	ZoneID             *string
+	StopUrl            *string
+	LocationType       *int16
+	ParentStation      *string
+	StopTimezone       *string
+	WheelchairBoarding *int16
+	LevelID            *string
+	PlatformCode       *string
+	Geom               interface{}
+}
+
+type GtfsStopTime struct {
+	TripID            string
+	StopSequence      int32
+	StopID            string
+	ArrivalTime       *string
+	ArrivalSecs       *int32
+	DepartureTime     *string
+	DepartureSecs     *int32
+	StopHeadsign      *string
+	PickupType        *int16
+	DropOffType       *int16
+	ShapeDistTraveled *float64
+	Timepoint         *int16
+}
+
+type GtfsTrip struct {
+	TripID               string
+	RouteID              string
+	ServiceID            string
+	TripHeadsign         *string
+	TripShortName        *string
+	DirectionID          *int16
+	BlockID              *string
+	ShapeID              *string
+	WheelchairAccessible *int16
+	BikesAllowed         *int16
+}
 
 type MetaFeedImport struct {
 	ID           int64
