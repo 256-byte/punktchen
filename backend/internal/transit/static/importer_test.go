@@ -2,6 +2,7 @@ package static
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http/httptest"
@@ -16,8 +17,11 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/256-byte/punktchen/backend/gen/openapi"
 	"github.com/256-byte/punktchen/backend/gen/queries"
+	"github.com/256-byte/punktchen/backend/internal/layer"
 	"github.com/256-byte/punktchen/backend/internal/platform"
+	"github.com/256-byte/punktchen/backend/internal/transit"
 	"github.com/256-byte/punktchen/backend/internal/transit/departures"
 )
 
@@ -503,5 +507,45 @@ func TestImportRealFeed(t *testing.T) {
 		}
 		slices.Sort(times)
 		t.Logf("%s: %d departures, median %s", c.name, count, times[len(times)/2])
+	}
+
+	// PLAN 2.4: transit features (two queries + building from the snapshot).
+	b := departures.NewBuilder(departures.BuilderConfig{Now: func() time.Time { return evening }}, loader, nil, slog.New(slog.DiscardHandler))
+	if _, err := b.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	p := transit.NewProvider(pool, b)
+	for _, c := range []struct {
+		name string
+		q    layer.NearbyQuery
+	}{
+		{"Wedding 500 m", layer.NearbyQuery{Center: layer.Location{Lat: wedding.Lat, Lng: wedding.Lng}, RadiusMeters: 500}},
+		{"Alexanderplatz 1000 m", layer.NearbyQuery{Center: layer.Location{Lat: alex.Lat, Lng: alex.Lng}, RadiusMeters: 1000}},
+	} {
+		var times []time.Duration
+		var res layer.Result
+		for range 25 {
+			start := time.Now()
+			r, err := p.Nearby(context.Background(), c.q)
+			if err != nil {
+				t.Fatal(err)
+			}
+			times = append(times, time.Since(start))
+			res = r
+		}
+		slices.Sort(times)
+		body, err := json.Marshal(res.Payload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tl := res.Payload.(*openapi.TransitLayer)
+		var dirs int
+		for _, s := range tl.Features {
+			for _, pl := range s.Poles {
+				dirs += len(pl.Directions)
+			}
+		}
+		t.Logf("transit nearby %s at 17:00: %d stations, %d directions, %d bytes JSON, median %s",
+			c.name, len(tl.Features), dirs, len(body), times[len(times)/2])
 	}
 }

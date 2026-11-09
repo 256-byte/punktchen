@@ -27,6 +27,8 @@ const (
 // often it moves. Zero values take the defaults.
 type BuilderConfig struct {
 	LookBack, LookAhead, Every time.Duration
+	// Now is the clock (default time.Now); tests fix it.
+	Now func() time.Time
 }
 
 // WindowLoader loads the departures of a time window (*Loader).
@@ -74,9 +76,12 @@ func NewBuilder(cfg BuilderConfig, loader WindowLoader, m *Metrics, log *slog.Lo
 	if cfg.Every <= 0 {
 		cfg.Every = DefaultRefreshEvery
 	}
+	if cfg.Now == nil {
+		cfg.Now = time.Now
+	}
 	return &Builder{
 		cfg: cfg, loader: loader, metrics: m, log: log,
-		now:     time.Now,
+		now:     cfg.Now,
 		reload:  make(chan struct{}, 1),
 		version: uint64(time.Now().UnixMilli()),
 	}

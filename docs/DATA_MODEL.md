@@ -75,7 +75,14 @@ What leaves from each pole. Used for markers and for showing directions with no 
 
 One row per (pole, route, direction, headsign) that has stop times; unserved poles have none (§7 #12). Indexes on `stop_id` and `station_id`.
 
-Terminal rule for the UI: at a terminal pole, arrivals that end there are **not** shown as departures; only the opposite direction is shown.
+Terminal rule: at a terminal pole, arrivals that end there are **not** shown as departures; only the opposite direction is shown.
+
+**API directions of a pole** (task 2.4, `transit.buildPole`; user decision 2026-11-09). Rows are many more than what riders see: at the Wedding area (500 m) 174 rows at 23 poles, mostly short-turn and night variants with no departure in the window (§7 #26). The API applies, in order:
+1. **Terminal:** a row with `is_terminal` and no departure in the window is left out (a rare continuing trip keeps it, flagged `isTerminal`).
+2. **Merge:** rows with the same label — mode, line, display headsign (without " (Berlin)"), ring flag — are one direction; departures are combined, sorted, cut to the limit. Example: S41 "Ringbahn S 41" from 10+ trip headsigns at one platform.
+3. **Trim:** per line and direction of travel (mode, line, `direction_id` of the label's most frequent row), only directions with departures are listed. If none has one, the most frequent (`trip_count`) is listed with an empty list, so a pole still shows which lines stop there (e.g. night lines in the afternoon). This hides empty variants like "U6 → U Seestr." while the U6 runs.
+
+Poles left without directions and stations left without poles are not returned. Wedding 500 m at 17:00: 174 rows → 51 directions.
 
 Loop trips (first station = last station, e.g. Ringbahn full circles, bus 365; §7 #11) never make a pole terminal: at their start and end station they are departures, not arrivals.
 
@@ -197,7 +204,12 @@ Rules: `radius` 100–1000 (default 500). `layers` comma-separated, default `tra
 ```
 
 - `predicted` and `delaySeconds` are null when `source = "scheduled"`.
-- Max 3 departures per direction in `/nearby`; max 10 in `/stations/{id}`.
+- Max 3 departures per direction in `/nearby`; max 10 in `/stations/{id}`. Departures start at the snapshot's time (`GeneratedAt`), not the request time, so a response depends only on the snapshot version; the app drops the ones that left since.
+- Which directions a pole lists: §3.2 "API directions of a pole".
+- `color`: the feed's `route_color`, else VBB's official line colour list (embedded, `backend/internal/transit/data/`, matched by agency, line and mode; §7 #25), else null.
+- `modes` (station) and directions are ordered by mode: regional, sbahn, ubahn, tram, bus, ferry, other; directions then by line (natural order: M4 < M10) and headsign.
+- Station names and headsigns drop VBB's locality suffix " (Berlin)" (§7 #3); other localities stay ("Rathaus (Potsdam)").
+- `/v1/nearby` lists only the poles inside the circle, nearest first; `/v1/stations/{id}` all served poles of the station in scope, ordered by their most important mode (rail platforms first), platform, id.
 - Station and pole IDs above are real VBB formats (§7 #3, #4); the `tripId` value is illustrative (real ones are numeric, e.g. `303041996`).
 
 ### 5.3 Errors
@@ -258,6 +270,8 @@ Evidence tool: `backend/internal/tools/gtfsexplore` (task 1.1, not shipped). Unl
 | 23 | **Nearby query (task 1.8)** `NearbyPoles` (`backend/db/queries/nearby.sql`): served, in-scope poles in a circle, grouped by station, nearest station first. "Wedding 500 m" (52.5427, 13.3660): 23 poles in 7 stations; S+U Wedding is **one** station with its 6 served poles (U `::1`/`::2`, S `:1:50`/`:1:51`, bus `::3`/`::4`; unserved `::5`/`::6`/`::8` left out); S Wedding/Martha-Ndumbe-Platz separate at 293 m. Speed on the full feed (GiST `stops_geom_idx` + `pole_directions_stop_idx`, no seq scan): median **2.8 ms** via pgx (prepared, warm); Alexanderplatz 1000 m (densest, max radius) 119 poles, 11.9 ms; the very first call after start ~90 ms (planning + cold cache). **Same name, two stations:** "U Reinickendorfer Str." is `de:11000:900008104` (bus) and `de:11000:900008102` (U-Bahn + bus), 200 m apart — DHID splits them, so the API will list both; how to present same-name neighbours is a Phase 2/3 UI question. | NearbyPoles on the dev DB (EXPLAIN ANALYZE) and in TestImportRealFeed / TestNearbyPolesWedding | 2026-11-09 |
 
 | 24 | **Schedule window (task 2.2).** Feed of 2026-11-08 (282,294 trips, 6,247,945 stop_times): 17:00 + 92 min → **88,665** boardable departures at in-scope poles; a 1-minute slice ~900; 00:15 + 92 min → 23,170. In the Wedding subset **all** 1,629 departures between 00:15 and 01:45 on a Tuesday belong to Monday's service day (coded 24:15–25:45): VBB's night network lives on the previous service day, so the window must always ask yesterday too. Loader = plain SQL definition (NOT EXISTS later stop, service day noon − 12 h in SQL) on the Wedding subset, both windows. Speed: dev DB 92-min window ~0.5 s, night window ~0.15 s, 1-minute slice ~70 ms; in the fresh test container right after the import 1.3 s / 1.0 s / 170 ms. | TestLoadWindowWedding, TestImportRealFeed, EXPLAIN ANALYZE on the dev DB | 2026-11-09 |
+| 25 | **VBB line colour list (`linienfarben.zip`, task 2.4).** 2,540-byte zip with `20260828-linienfarben.csv` (ISO-8859-1, CRLF, `;`), 155 rows: regional, S-Bahn, U-Bahn, plus city tram/bus lines of Brandenburg an der Havel, Cottbus, Frankfurt (Oder) and Potsdam; 3 generic rows without agency (`Tram` #E2001A, `Bus` #A5027D, `Fähre` #009BD5 — candidates for the app's per-mode defaults, task 7.1). Columns `Linie`, `agency_id`, `route_Type`, R/G/B, `background_Hex` (empty on 72 rows), text R/G/B. `agency_id` uses the GTFS ids (1 S-Bahn Berlin, 796 BVG, 108 DB Regio, …). Against the 2026-11-05 feed: 130 of 152 line rows match a route by (agency, short name, route_type); 9 regional rows say 100 where the feed says 106 (same mode), RB34/RB66 are buses (rail replacement) in the feed, others (S45, Brandenburg buses B–W under another agency) have no route. **Where a route has `route_color`, it equals the list (0 of 155 differ).** ⇒ key = (agency, line, mode). In-scope directions with a colour: S-Bahn 97.5 % → **100 %**, regional 91.4 % → 97.7 %, U-Bahn 100 %, tram 2.9 %, bus 2.6 %, ferry 0 % (unchanged). | psql on the dev DB with the CSV in a temp table | 2026-11-09 |
+| 26 | **Direction variants per pole.** `pole_directions` has a row per (route, direction_id, trip headsign), so one platform carries many variants: S+U Wedding S-Bahn platform 1 lists S41 "Ringbahn S 41" from 10+ trip headsigns, plus S41 to S Greifswalder Str./S Ostkreuz/S Treptower Park; U6 platform 2 has U Alt-Tegel, U Kurt-Schumacher-Platz and U Seestr.; bus poles have night variants (N6 to 4 destinations). Wedding subset, 500 m around U Wedding, Tue 2026-11-10 17:00: 174 rows at 23 poles, 121 distinct labels, **51** directions after the §3.2 rules (99 departures). That afternoon the U6 north of Wedding ran only to U Kurt-Schumacher-Platz in this feed (Alt-Tegel variant without departures). Full feed: Wedding 500 m 52 directions (26 KB JSON), Alexanderplatz 1000 m 27 stations / 297 directions (135 KB JSON uncompressed); transit `Nearby` median 4.5 ms / 12.1 ms. | TestProviderWeddingGolden (testdata/*.golden.json), TestImportRealFeed | 2026-11-09 |
 
 All Phase 1 **(verify)** items are answered. Fixtures: `backend/testdata/gtfsrt/` and `backend/testdata/gtfs/` (READMEs there).
 

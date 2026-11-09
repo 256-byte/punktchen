@@ -27,7 +27,7 @@ If something you are asked to do contradicts these documents, **stop and ask the
 8. **Times are absolute.** The API sends ISO-8601 timestamps with offset (`2026-11-05T14:32:00+01:00`). Countdowns are computed on the device. Never send "3 min".
 9. **Generic layers, single implementation.** The Provider/Layer system is generic (see ARCHITECTURE §3.5 backend, §4.4 mobile), but only the `transit` layer is implemented. Do not build `toilets`, `alerts` etc. before their phase.
 10. **`mobile/src/core` is pure TypeScript.** It must not import `react`, `react-native` or `expo-*`. Enforced by ESLint.
-11. **Never commit downloaded data.** GTFS zips, extracted CSVs, DB dumps stay out of git (see `.gitignore`). Small recorded fixtures for tests go in `backend/testdata/` and must stay under 5 MB each.
+11. **Never commit downloaded data.** GTFS zips, extracted CSVs, DB dumps stay out of git (see `.gitignore`). Small recorded fixtures for tests go in `backend/testdata/` and must stay under 5 MB each. One exception (user-approved 2026-11-09): VBB's line colour list `backend/internal/transit/data/linienfarben.csv` (14 KB, CC BY 4.0, embedded; source and update steps in the README next to it).
 12. **Tests are part of done.** Every task in PLAN.md has acceptance criteria; they must be verifiable by a test or a documented manual check.
 13. **Do not guess about the data.** VBB data has quirks (ID formats, extended route types, ring lines, times after 24:00). When unsure, inspect the real data and document the finding in `docs/DATA_MODEL.md` §7 "Verified facts".
 
