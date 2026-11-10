@@ -59,11 +59,16 @@ export function StationSheet({
         <PoleSection key={p.pole.id} pole={p} index={i} stale={stale} />
       ))}
       {model.poles.length === 0 && !loading ? (
-        <Text style={styles.note}>No departures in the next 90 minutes.</Text>
+        <Text style={styles.note}>
+          {stale
+            ? 'The saved departures have left. Newer ones load when the connection is back.'
+            : 'No departures in the next 90 minutes.'}
+        </Text>
       ) : null}
       {model.idle.length > 0 ? (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>No departures soon</Text>
+          {/* Stale data ran out: nothing is known about later departures (task 6.3). */}
+          <Text style={styles.sectionTitle}>{stale ? 'No newer data' : 'No departures soon'}</Text>
           {model.idle.map((r) => (
             <View key={r.key} style={[styles.row, styles.idle]}>
               <LineBadge direction={r.direction} size="large" />

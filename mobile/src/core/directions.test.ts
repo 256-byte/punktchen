@@ -124,3 +124,51 @@ describe('nextCells', () => {
     expect(nextCells([direction({ departures: [late] })], now)).toEqual(['l+3\t4 min']);
   });
 });
+
+describe('ten minutes without new data (task 6.3)', () => {
+  const at = (hhmm: string) => Date.parse(`2026-11-05T${hhmm}:00+01:00`);
+  const dep = (time: string, predicted: string | null = null): Direction['departures'][number] => ({
+    tripId: `t-${time}`,
+    serviceDate: '2026-11-05',
+    scheduled: `2026-11-05T${time}:00+01:00`,
+    predicted: predicted === null ? null : `2026-11-05T${predicted}:00+01:00`,
+    delaySeconds: predicted === null ? null : 120,
+    source: predicted === null ? 'scheduled' : 'realtime',
+    cancelled: false,
+  });
+  const direction = (line: string, departures: Direction['departures']): Direction => ({
+    line,
+    mode: 'bus',
+    color: null,
+    headsign: line,
+    isTerminal: false,
+    isRing: false,
+    departures,
+  });
+  // Fetched at 14:30, as /v1/nearby sends it: three departures per direction.
+  const fetched = [
+    direction('U6', [dep('14:32'), dep('14:37'), dep('14:42')]),
+    direction('M27', [dep('14:33'), dep('14:38', '14:40'), dep('14:53')]),
+    direction('247', [dep('14:31'), dep('14:36'), dep('14:39')]),
+    direction('N20', []),
+  ];
+  const labels = (now: number) =>
+    markerRows(fetched, nextCells(fetched, now)).rows.map(
+      (r) => `${r.direction.line} ${r.next.label}${r.next.delay ?? ''}`,
+    );
+
+  it('shows the data as fetched', () => {
+    expect(labels(at('14:30'))).toEqual(['U6 2 min', 'M27 3 min', '247 1 min']);
+  });
+
+  it('drops what has left and counts down to what is still to come', () => {
+    // 14:40: U6 14:32 and 14:37 are gone; M27 runs to its predicted 14:40
+    // ("now" for a minute); every 247 has left, so its row is gone.
+    expect(labels(at('14:40'))).toEqual(['U6 2 min', 'M27 now+2']);
+    expect(labels(at('14:41'))).toEqual(['U6 1 min', 'M27 12 min']);
+  });
+
+  it('shows nothing once every known departure has left', () => {
+    expect(labels(at('14:54'))).toEqual([]);
+  });
+});
