@@ -5,10 +5,13 @@ import { Marker } from 'react-native-maps';
 import { compactLines, type DetailLevel } from '@/core/clustering';
 import {
   type Direction,
+  directionHeadsign,
   directionKey,
   type MarkerRow,
   markerRows,
   nextCells,
+  nonTerminalDirections,
+  ringSymbol,
 } from '@/core/directions';
 import { cellDescription } from '@/core/realtime';
 import { type ClockStore, clockStore, useNow } from '@/state/clock';
@@ -48,7 +51,10 @@ export function PoleMarker({
   onPress?: (feature: PoleFeature) => void;
   clock?: ClockStore;
 }) {
-  const directions = feature.pole.directions;
+  const directions = useMemo(
+    () => nonTerminalDirections(feature.pole.directions, feature.station),
+    [feature.pole.directions, feature.station],
+  );
   const detail = feature.detail ?? 'poles';
   const poleCount = feature.poleCount ?? 1;
   const stationCount = feature.stationCount ?? 1;
@@ -129,11 +135,19 @@ export function PoleMarker({
 
 function Row({ row: { direction, next }, stale }: { row: MarkerRow; stale: boolean }) {
   const styles = useStyles();
+  const ring = ringSymbol(direction);
   return (
     <View style={styles.row}>
       <LineBadge direction={direction} />
       <Text style={styles.headsign} numberOfLines={1}>
-        {direction.headsign}
+        {ring ? (
+          <>
+            <Text style={styles.ringSymbol}>{`${ring} `}</Text>
+            {direction.headsign}
+          </>
+        ) : (
+          direction.headsign
+        )}
       </Text>
       <DepartureTime cell={next} style={styles.countdown} stale={stale} />
     </View>
@@ -147,7 +161,8 @@ function accessibilityText(feature: PoleFeature, rows: MarkerRow[], stale: boole
       ? `${feature.station.name} and ${stationCount - 1} nearby stops`
       : feature.station.name;
   const parts = rows.map(
-    (r) => `${r.direction.line} to ${r.direction.headsign}: ${cellDescription(r.next, stale)}`,
+    (r) =>
+      `${r.direction.line} to ${directionHeadsign(r.direction)}: ${cellDescription(r.next, stale)}`,
   );
   return [header, ...parts].join('. ');
 }
@@ -258,7 +273,15 @@ const useStyles = themedStyles(({ scheme, colors, fontSize, fontWeight, radius, 
   headsign: {
     flexShrink: 1,
     fontSize: fontSize.caption,
+    lineHeight: fontSize.bodyLarge,
     color: colors.text,
+  },
+  ringSymbol: {
+    // U+27F2/U+27F3 glyphs sit at ~65 % of the em box in the system symbol font;
+    // scaling up brings ⟳/⟲ to the cap height of the caption text.
+    fontSize: fontSize.headline,
+    lineHeight: fontSize.bodyLarge,
+    fontWeight: fontWeight.bold,
   },
   countdown: {
     marginLeft: 'auto',

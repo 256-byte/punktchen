@@ -4,6 +4,7 @@ import { Text, View } from 'react-native';
 
 import type { ApiClient } from '@/api/client';
 import { useStation } from '@/api/station';
+import { type Direction, ringSymbol } from '@/core/directions';
 import { poleTitle, type SheetPole, type SheetRow, sheetModel, sheetSignature } from '@/core/sheet';
 import { freshness } from '@/core/staleness';
 import { type ClockStore, clockStore, useDeviceNow, useNow } from '@/state/clock';
@@ -76,9 +77,7 @@ export function StationSheet({
           {model.idle.map((r) => (
             <View key={r.key} style={[styles.row, styles.idle]}>
               <LineBadge direction={r.direction} size="large" />
-              <Text style={styles.headsign} numberOfLines={1}>
-                {r.direction.headsign}
-              </Text>
+              <HeadsignText direction={r.direction} />
               {r.platform ? <Text style={styles.platform}>Pl. {r.platform}</Text> : null}
             </View>
           ))}
@@ -116,9 +115,7 @@ function DirectionRow({ row, stale }: { row: SheetRow; stale: boolean }) {
   return (
     <View style={styles.row}>
       <LineBadge direction={row.direction} size="large" />
-      <Text style={styles.headsign} numberOfLines={1}>
-        {row.direction.headsign}
-      </Text>
+      <HeadsignText direction={row.direction} />
       <View style={styles.times}>
         {row.departures.map((d, i) => (
           <DepartureTime
@@ -130,6 +127,23 @@ function DirectionRow({ row, stale }: { row: SheetRow; stale: boolean }) {
         ))}
       </View>
     </View>
+  );
+}
+
+function HeadsignText({ direction }: { direction: Direction }) {
+  const styles = useStyles();
+  const ring = ringSymbol(direction);
+  return (
+    <Text style={styles.headsign} numberOfLines={1}>
+      {ring ? (
+        <>
+          <Text style={styles.ringSymbol}>{`${ring} `}</Text>
+          {direction.headsign}
+        </>
+      ) : (
+        direction.headsign
+      )}
+    </Text>
   );
 }
 
@@ -171,7 +185,15 @@ const useStyles = themedStyles(({ colors, fontSize, fontWeight, opacity, space }
   headsign: {
     flex: 1,
     fontSize: fontSize.body,
+    lineHeight: fontSize.title,
     color: colors.text,
+  },
+  ringSymbol: {
+    // U+27F2/U+27F3 glyphs sit at ~65 % of the em box in the system symbol font;
+    // scaling up brings ⟳/⟲ to the cap height of the body text.
+    fontSize: fontSize.titleLarge,
+    lineHeight: fontSize.title,
+    fontWeight: fontWeight.bold,
   },
   platform: {
     fontSize: fontSize.footnote,

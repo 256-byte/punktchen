@@ -48,6 +48,86 @@ export function directionKey(d: Direction): string {
   return `${d.mode}|${d.line}|${d.headsign}|${d.isRing ? 'ring' : ''}`;
 }
 
+/**
+ * Clockwise (`⟳`, S41) or counter-clockwise (`⟲`, S42) symbol for a Ringbahn
+ * direction (`DATA_MODEL.md` §3.2, task 7.3); `null` for non-ring directions.
+ */
+export function ringSymbol(d: Pick<Direction, 'isRing' | 'line' | 'headsign'>): '⟳' | '⟲' | null {
+  if (!d.isRing) return null;
+  return d.line === 'S42' || /\bS\s*42\b/i.test(d.headsign) ? '⟲' : '⟳';
+}
+
+/**
+ * Display headsign of a direction: prefixes `⟳` (clockwise) or `⟲`
+ * (counter-clockwise) for Ringbahn lines (`isRing: true`, task 7.3).
+ */
+export function directionHeadsign(d: Pick<Direction, 'isRing' | 'line' | 'headsign'>): string {
+  const symbol = ringSymbol(d);
+  if (!symbol || d.headsign.startsWith('⟳') || d.headsign.startsWith('⟲')) {
+    return d.headsign;
+  }
+  return `${symbol} ${d.headsign}`;
+}
+
+/**
+ * Collects `(mode|line)` keys that have at least one non-terminal return
+ * direction whose headsign is not `stationName`.
+ */
+export function linesWithReturnDirection(
+  poles: readonly { directions: readonly Direction[] }[],
+  stationName: string,
+): Set<string> {
+  const lines = new Set<string>();
+  for (const pole of poles) {
+    for (const d of pole.directions) {
+      if (!d.isTerminal && d.headsign !== 'Fahrt endet hier' && d.headsign !== stationName) {
+        lines.add(`${d.mode}|${d.line}`);
+      }
+    }
+  }
+  return lines;
+}
+
+/**
+ * Whether a direction is a terminating arrival (`DATA_MODEL.md` §3.2, task 7.3):
+ * either flagged `isTerminal` by the API, carrying VBB's termination headsign
+ * `"Fahrt endet hier"`, or heading to `stationName` itself when the same
+ * `(mode, line)` also has a return direction leaving the station (multi-pole
+ * terminals such as S Wannsee where arriving buses call at a drop-off pole
+ * before the layover bay; loop lines like 114 whose only headsign is the
+ * station itself are kept).
+ */
+export function isTerminalDirection(
+  d: Pick<Direction, 'mode' | 'line' | 'headsign' | 'isTerminal'>,
+  stationName?: string,
+  returnLines?: ReadonlySet<string>,
+): boolean {
+  if (d.isTerminal || d.headsign === 'Fahrt endet hier') {
+    return true;
+  }
+  if (stationName && d.headsign === stationName && returnLines?.has(`${d.mode}|${d.line}`)) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Filters out terminating arrival directions (`DATA_MODEL.md` §3.2, task 7.3)
+ * so only return directions are shown at terminal stops. Returns `directions`
+ * unchanged when no direction is terminal.
+ */
+export function nonTerminalDirections(
+  directions: readonly Direction[],
+  station?: { name: string; poles?: readonly { directions: readonly Direction[] }[] },
+): Direction[] {
+  const poles = station?.poles && station.poles.length > 0 ? station.poles : [{ directions }];
+  const returnLines = station ? linesWithReturnDirection(poles, station.name) : undefined;
+  if (!directions.some((d) => isTerminalDirection(d, station?.name, returnLines))) {
+    return directions as Direction[];
+  }
+  return directions.filter((d) => !isTerminalDirection(d, station?.name, returnLines));
+}
+
 /** Rows on a marker; the rest are counted ("+2") and listed in the sheet (3.6). */
 export const MARKER_ROWS = 4;
 
@@ -58,10 +138,10 @@ export interface MarkerRow {
 }
 
 /**
- * The rows of a pole marker: only directions with an upcoming departure, in
- * API order, up to max; `more` counts the other running ones. Directions
- * without one (night lines by day, rail replacement outside its hours,
- * suspended lines) are left to the station sheet (user decision
+ * The rows of a pole marker: only non-terminal directions with an upcoming
+ * departure, in API order, up to max; `more` counts the other running ones.
+ * Directions without one (night lines by day, rail replacement outside its
+ * hours, suspended lines) are left to the station sheet (user decision
  * 2026-11-09). No rows: the pole has nothing coming, no marker.
  *
  * cells: nextCells() of the same directions.
@@ -73,6 +153,7 @@ export function markerRows(
 ): { rows: MarkerRow[]; more: number } {
   const running: MarkerRow[] = [];
   directions.forEach((direction, i) => {
+    if (isTerminalDirection(direction)) return;
     const cell = cells[i];
     if (cell != null) running.push({ direction, next: decodeCell(cell) });
   });
@@ -83,11 +164,12 @@ export function markerRows(
  * Each direction's next running departure as an encoded cell (countdown
  * "now" / "3 min" / "14:52", live or timetable, delay; see encodeCell);
  * null when none is left (e.g. a line suspended for weeks, or data too
- * old). Plain strings, so a clock selector over them re-renders only when
- * one changes.
+ * old) or when the direction is a terminal arrival (task 7.3). Plain strings,
+ * so a clock selector over them re-renders only when one changes.
  */
 export function nextCells(directions: readonly Direction[], now: number): (string | null)[] {
   return directions.map((d) => {
+    if (isTerminalDirection(d)) return null;
     const next = nextDeparture(d.departures, now);
     return next ? encodeCell(departureCell(next)) : null;
   });
