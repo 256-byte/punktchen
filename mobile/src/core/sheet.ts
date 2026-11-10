@@ -9,6 +9,9 @@ import {
   directionKey,
   isTerminalDirection,
   linesWithReturnDirection,
+  markerModes,
+  type Mode,
+  nonTerminalDirections,
 } from './directions';
 import { type DepartureCell, decodeCell, departureCell, encodeCell } from './realtime';
 import { MINUTE } from './time';
@@ -112,6 +115,16 @@ export function sheetModel(station: Station, signature: readonly string[]): Shee
     }
   }
   return { poles, idle: idle.filter((r) => !runningKeys.has(r.key)) };
+}
+
+/**
+ * Every mode that serves the station, for the icons in the sheet's title
+ * (task 7.10): all its poles, directions with nothing coming soon too (a
+ * night bus still stops here), terminal arrivals left out; in the order of
+ * markerModes (regional, S-Bahn, U-Bahn, tram, bus, ferry).
+ */
+export function stationModes(station: Pick<Station, 'name' | 'poles'>): Mode[] {
+  return markerModes(station.poles.flatMap((p) => nonTerminalDirections(p.directions, station)));
 }
 
 /**

@@ -67,7 +67,7 @@
 | 7 | 7.7 Marker rows ordered by next departure | done | Shown rows sorted soonest first, selection unchanged (user decision); station sheet sorted per platform, platform order kept; sort minute carried in `nextCells` / `sheetSignature`, no extra renders; markers checked on the iPhone (user), sheet to check |
 | 7 | 7.8 Combined stop popup | done | `stopGroups`: same station + main mode; rail ≤ 60 m, tram ≤ 50 m with a shared running line; bus stops never (user decision after the iPhone check); "Combine" switch on the map (default on); sections with a divider, up to 6 rows dealt per section; checked on 6 real areas (DATA_MODEL §7 #32); to check on the iPhone |
 | 7 | 7.9 Marker overlap avoidance | done | `layoutLabels` (greedy, nearest free spot, sideways first) on the map's own projection after each camera move; back in place when zoomed in; checked on the iPhone (user); no line/dot to the stop (user decision) |
-| 7 | 7.10 Mode icons in marker header | done | Header with mode icons + station name in every marker, all zoom levels; S/U drawn by us, tram/bus/RE/ferry Material Icons (Apache-2.0); new dep `react-native-svg`; to check on the iPhone |
+| 7 | 7.10 Mode icons in marker header | done | Header with mode icons + station name in every marker, all zoom levels, and in the station sheet title; S/U drawn by us, tram/bus/RE/ferry Material Icons (Apache-2.0); new dep `react-native-svg`; to check on the iPhone |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
 
@@ -126,7 +126,8 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
   - `PoleMarker`: every marker now starts with a header (icons, station name, "+N" merged stops) at every zoom level; before, only station clusters and compact pills had a name. Accessibility label: "<station>, <modes>. <rows>".
 - Tests: Vitest `directions.test.ts` (+1 `markerModes`); Jest `transit-markers.test.tsx` (+4: bus icon at street zoom; S-Bahn, U-Bahn, bus icons in order at poles / stations / compact zoom; labels with mode names).
 - New deps: `react-native-svg` 15.16.0 (`npx expo install`, included in Expo Go): draws the tram, bus, train and ferry pictograms; approved by the user (decision table, 2026-11-10).
-- Next: check on the iPhone. Phase 7 is complete again; nothing scheduled.
+- Station sheet (user request after the iPhone check): the title shows the icons of every mode serving the station (`stationModes` in `src/core/sheet.ts`: all poles, idle lines included, terminal arrivals left out), 22 pt, then the name; header label lists the modes. Tests: Vitest `sheet.test.ts` (+1), Jest `station-sheet.test.tsx` (title icons and label).
+- Next: Phase 7 is complete again; nothing scheduled.
 
 ### 2026-11-10 — task 7.9
 - Done:

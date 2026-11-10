@@ -236,7 +236,7 @@ describe('screens in light and dark mode', () => {
         <StationSheet feature={weddingFeature} client={null} clock={clock} />
       </QueryClientProvider>,
     );
-    expect(screen.getByRole('header', { name: 'S+U Wedding' })).toHaveStyle({
+    expect(screen.getByText('S+U Wedding')).toHaveStyle({
       color: themes.light.colors.text,
     });
     expect(screen.getByText(/Black: timetable only/)).toBeOnTheScreen();
@@ -247,7 +247,7 @@ describe('screens in light and dark mode', () => {
         <StationSheet feature={weddingFeature} client={null} clock={clock} />
       </QueryClientProvider>,
     );
-    expect(screen.getByRole('header', { name: 'S+U Wedding' })).toHaveStyle({
+    expect(screen.getByText('S+U Wedding')).toHaveStyle({
       color: themes.dark.colors.text,
     });
     expect(screen.getByLabelText('3 min, live, on time')).toHaveStyle({

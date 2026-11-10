@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import type { Departure } from './departures';
 import type { Direction } from './directions';
-import { type Pole, poleTitle, sheetModel, sheetSignature, type Station } from './sheet';
+import {
+  type Pole,
+  poleTitle,
+  sheetModel,
+  sheetSignature,
+  type Station,
+  stationModes,
+} from './sheet';
 
 const now = Date.parse('2026-11-05T14:30:00+01:00');
 /** Epoch minute of a time on the test day: the sort key in sheetSignature (task 7.7). */
@@ -80,6 +87,26 @@ describe('sheetSignature', () => {
     expect(sheetSignature(station, now + 61_000)).not.toEqual(
       sheetSignature(station, now + 40_000),
     );
+  });
+});
+
+describe('stationModes (task 7.10)', () => {
+  it('lists every mode that serves the station, idle lines too, without terminal arrivals', () => {
+    const wedding: Station = {
+      ...station,
+      poles: [
+        pole('bus', null, [direction('N20', 'S Oranienburger Str.', [])]), // night bus: idle now
+        pole('u', '1', [{ ...direction('U6', 'U Alt-Mariendorf', [dep('14:33')]), mode: 'ubahn' }]),
+        pole('s', '1', [
+          { ...direction('S41', 'Ringbahn S 41', [dep('14:32')]), mode: 'sbahn', isRing: true },
+        ]),
+        pole('tram', null, [
+          { ...direction('M13', 'Fahrt endet hier', [dep('14:40')]), mode: 'tram' }, // arrival only
+        ]),
+      ],
+    };
+    expect(stationModes(wedding)).toEqual(['sbahn', 'ubahn', 'bus']);
+    expect(stationModes({ name: 'Empty', poles: [] })).toEqual([]);
   });
 });
 
