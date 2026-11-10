@@ -424,6 +424,72 @@ describe('MapScreen layers', () => {
     ).toBeOnTheScreen();
   });
 
+  it('switches combined stops on and off at street zoom (task 7.8)', async () => {
+    const dep = {
+      tripId: '1',
+      serviceDate: '2026-11-05',
+      scheduled: new Date(Date.now() + 5 * 60_000).toISOString(),
+      predicted: null,
+      delaySeconds: null,
+      source: 'scheduled' as const,
+      cancelled: false,
+    };
+    const platform = (n: string, lat: number, headsign: string) => ({
+      id: `wedding::${n}`,
+      location: { lat, lng: 13.365 },
+      platform: n,
+      description: null,
+      directions: [
+        {
+          line: 'U6',
+          mode: 'ubahn' as const,
+          color: null,
+          headsign,
+          isTerminal: false,
+          isRing: false,
+          departures: [{ ...dep, tripId: n }],
+        },
+      ],
+    });
+    const wedding = {
+      id: 'de:11000:900009104',
+      kind: 'station' as const,
+      name: 'S+U Wedding',
+      location: { lat: 52.543, lng: 13.365 },
+      modes: ['ubahn' as const],
+      // U6 Gleis 1 and 2, 10 m apart.
+      poles: [platform('1', 52.543, 'Alt-Mariendorf'), platform('2', 52.54309, 'Alt-Tegel')],
+    };
+    answer = () =>
+      new Response(JSON.stringify(nearby(wedding)), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+    await renderMap(wedding.location);
+    await screen.findByText('Alt-Tegel');
+    await act(async () =>
+      map.props?.onRegionChangeComplete?.(
+        { latitude: 52.543, longitude: 13.365, latitudeDelta: 0.001, longitudeDelta: 0.001 },
+        {},
+      ),
+    );
+    // On by default: both platforms in one marker, as two sections.
+    const toggle = screen.getByRole('switch', { name: 'Combine stops' });
+    expect(toggle.props.accessibilityState).toEqual({ checked: true });
+    expect(screen.getAllByTestId('marker')).toHaveLength(1);
+    expect(screen.getByTestId('section-1')).toBeOnTheScreen();
+
+    // Off: one marker per platform, as before 7.8.
+    await fireEvent.press(toggle);
+    expect(toggle.props.accessibilityState).toEqual({ checked: false });
+    expect(screen.getAllByTestId('marker')).toHaveLength(2);
+    expect(screen.queryByTestId('section-1')).toBeNull();
+
+    await fireEvent.press(toggle);
+    expect(screen.getAllByTestId('marker')).toHaveLength(1);
+  });
+
   it('triggers haptic feedback on marker selection, 3D toggle, and retry (task 7.5)', async () => {
     const selectionSpy = jest.spyOn(haptics, 'hapticSelection');
     const lightSpy = jest.spyOn(haptics, 'hapticLight');

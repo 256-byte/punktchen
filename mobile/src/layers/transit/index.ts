@@ -1,5 +1,6 @@
 // The transit layer (the only layer, CLAUDE.md rule 9): one marker per pole
-// or station cluster depending on zoom (tasks 3.5, 7.2); tapping it opens
+// or station cluster depending on zoom (tasks 3.5, 7.2), or per combined stop
+// at street zoom (both platforms / street sides in one marker, 7.8); tapping it opens
 // the station sheet (task 3.6).
 import type { components } from '@/api/schema.gen';
 import { clusterStations, type DetailLevel } from '@/core/clustering';
@@ -21,12 +22,16 @@ export interface PoleFeature {
   stationCount?: number;
   /** Zoom detail level ('poles' | 'stations' | 'compact'; default: 'poles'). */
   detail?: DetailLevel;
+  /** Combined stop: poles drawn as sections divided by a line (task 7.8). */
+  sections?: Pole[];
 }
 
 export const transitLayer = defineLayer<PoleFeature>({
   id: 'transit',
-  select: (response, latitudeDelta) =>
-    clusterStations(response.layers.transit?.features ?? [], latitudeDelta),
+  select: (response, latitudeDelta, options) =>
+    clusterStations(response.layers.transit?.features ?? [], latitudeDelta, {
+      combineStops: options?.combineStops,
+    }),
   key: (f) => f.pole.id,
   Marker: PoleMarker,
   Sheet: StationSheet,

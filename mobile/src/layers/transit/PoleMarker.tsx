@@ -12,6 +12,7 @@ import {
   nextCells,
   nonTerminalDirections,
   ringSymbol,
+  sectionRows,
 } from '@/core/directions';
 import { cellDescription } from '@/core/realtime';
 import { type ClockStore, clockStore, useNow } from '@/state/clock';
@@ -53,17 +54,24 @@ export function PoleMarker({
   onPress?: (feature: PoleFeature) => void;
   clock?: ClockStore;
 }) {
-  const directions = useMemo(
-    () => nonTerminalDirections(feature.pole.directions, feature.station),
-    [feature.pole.directions, feature.station],
-  );
   const detail = feature.detail ?? 'poles';
+  // Combined stop (task 7.8): each pole is a section; otherwise one section.
+  const sectionDirections = useMemo(() => {
+    const poles = detail === 'poles' && feature.sections ? feature.sections : [feature.pole];
+    return poles.map((p) => nonTerminalDirections(p.directions, feature.station));
+  }, [detail, feature.sections, feature.pole, feature.station]);
+  const directions = useMemo(() => sectionDirections.flat(), [sectionDirections]);
   const poleCount = feature.poleCount ?? 1;
   const stationCount = feature.stationCount ?? 1;
   const styles = useStyles();
   const { scheme } = useTheme();
   const cells = useNow((now) => nextCells(directions, now), clock);
-  const { rows, more } = useMemo(() => markerRows(directions, cells), [directions, cells]);
+  const { sections, more } = useMemo(() => {
+    if (sectionDirections.length > 1) return sectionRows(sectionDirections, cells);
+    const single = markerRows(directions, cells);
+    return { sections: single.rows.length > 0 ? [single.rows] : [], more: single.more };
+  }, [sectionDirections, directions, cells]);
+  const rows = useMemo(() => sections.flat(), [sections]);
   const compact = useMemo(
     () => (detail === 'compact' ? compactLines(directions, cells) : null),
     [detail, directions, cells],
@@ -141,8 +149,16 @@ export function PoleMarker({
             ) : null}
           </View>
         ) : null}
-        {rows.map((r) => (
-          <Row key={directionKey(r.direction)} row={r} stale={stale} />
+        {sections.map((section, s) => (
+          <View
+            key={s}
+            style={s > 0 ? [styles.section, styles.divided] : styles.section}
+            testID={`section-${s}`}
+          >
+            {section.map((r) => (
+              <Row key={directionKey(r.direction)} row={r} stale={stale} />
+            ))}
+          </View>
         ))}
         {more > 0 ? <Text style={styles.more}>+{more} more</Text> : null}
       </View>
@@ -284,6 +300,15 @@ const useStyles = themedStyles(({ scheme, colors, fontSize, fontWeight, radius, 
     alignItems: 'center',
     flexWrap: 'wrap',
     gap: space.xs,
+  },
+  section: {
+    gap: 3, // same row spacing as the bubble (every section, the first one too)
+  },
+  divided: {
+    // Divider between the poles of a combined stop (task 7.8).
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    paddingTop: 3,
   },
   row: {
     flexDirection: 'row',
