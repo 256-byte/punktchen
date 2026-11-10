@@ -4,9 +4,9 @@
 
 ## Current status
 
-- **Active phase:** Phase 5 — Traffic & cache, all tasks done 2026-11-10; Phase 6 is next (Phase 4 done except 4.0's final step; exception, see Decisions 2026-11-09)
-- **Next task:** 4.0's final step, then 6.1 persisted query cache (4.0 waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
-- **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
+- **Active phase:** Phase 6 — Offline & resilience (Phase 5 done 2026-11-10; Phase 4 done except 4.0's final step; exception, see Decisions 2026-11-09)
+- **Next task:** 6.2 staleness UI; 4.0's final step in between (waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
+- **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
 
@@ -20,7 +20,7 @@
 | 0 | 0.6 sqlc | done | sqlc runs in Docker (pinned image); `go generate ./...` needs Docker |
 | 0 | 0.7 Expo app | done | Expo Go needs a signed-in Expo account on PC and phone (see session log) |
 | 0 | 0.8 Phone → backend networking | done | Restart Expo with `--clear` after installing packages |
-| 0 | 0.9 CI | blocked | Workflow merged (PR #1); jobs not started: GitHub account billing lock. Re-run when unlocked |
+| 0 | 0.9 CI | done | Workflow merged (PR #1); blocked by a GitHub billing lock until 2026-11-10; first green PR run: #40 (backend, mobile, contract) |
 | 0 | 0.10 Real commands in CLAUDE.md | done | All commands run from the repo root; tested in Windows PowerShell 5.1 |
 | 1 | 1.1 Data exploration | done | DATA_MODEL §7 #1–#20; all (verify) items answered. Default GTFS URL and RT rate limit updated |
 | 1 | 1.2 Downloader | done | Changed zip stays `running` until the importer (1.3) closes it |
@@ -55,6 +55,9 @@
 | 5 | 5.3 ETag/304 end-to-end, gzip | done | Weak ETags on nearby (cache key) and station (id + version); `curl` with `If-None-Match` → 304, 0 bytes (live); gzip 31.9 KB → 2.9 KB (Wedding) |
 | 5 | 5.4 Mobile fetch policy wired | done | `createFetchLoop` + `useNearby`; interim 30 s refetch removed; dev log per request with count per minute; iPhone: request log within the policy (user, 2026-11-09) |
 | 5 | 5.5 Performance numbers in README | done | README "Performance": client 2 req/min standing still (≤ 6), upstream 4/min; 1000 simulated apps: cache hit ratio 93.5 % in a crowd, 13.0 % spread out, p95 ≤ 6.9 ms; measured with the new `nearbyload` tool |
+| 6 | 6.1 Persisted query cache, instant render | done | Newest `/v1/nearby` answer kept in AsyncStorage; cold start opens the map at its place with its data, no location spinner, then revalidates; iPhone: force-quit and reopen shows the last departures at once (user, 2026-11-10) |
+| 6 | 6.2 Staleness UI | todo | |
+| 6 | 6.3 Drop past departures offline, countdown keeps running | todo | |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
 
@@ -102,6 +105,19 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-10 — task 6.1
+- CI: the GitHub billing lock is gone; PR #40 was the first green run (backend, mobile, contract). 0.9 is done.
+- Done: `src/api/persistence.ts` (what is kept: `lastNearbyQuery`, `lastNearbyCenter`, `shouldPersist`, `serializeClient`, `persistOptions`; max age 24 h, buster `v1`), `src/lib/queryPersister.ts` (AsyncStorage persister), `app/_layout.tsx` (`PersistQueryClientProvider`), `app/index.tsx` (nothing drawn while restoring; the kept answer's place goes to the gate), `LocationGate` (`lastPlace`: shown while permission or first fix is pending).
+- Decisions:
+  - Keep only the newest `/v1/nearby` answer: every 150 m move is a new query key, so keeping all would grow by 30–75 KB per place (Android's AsyncStorage holds 6 MB by default). Station sheets are not kept.
+  - Keep it whatever its status, written as successful: the default (successful queries only) would have removed the last good data from the device after the first failed refetch, i.e. exactly when offline.
+  - Open the map at the kept answer's place while the location is pending. Without it the cache would be restored but a cold start would still show "Finding your location…" until a fix arrived (acceptance: no spinner).
+- Tests (Jest `tests/ui/cold-start.test.tsx`): **acceptance — first run fetches and the answer reaches AsyncStorage; second run with no position and a server that does not answer shows the departures at once, no location screen, map at the last place, one request with the kept ETag; after the 304 the data stays; a device fix moves the map.** First start ever → location screen, no request. Only the newest nearby answer is dehydrated (older place and station left out). After a failed refetch the answer is still written, as successful and idle. Jest 65, Vitest 204, typecheck, lint, `expo install --check` pass.
+- Manual check (user, iPhone, Expo Go): departures shown, app force-quit and reopened → the map with the last departures at once, no "Finding your location…"; the dev log shows one `initial` request after the restart. Acceptance met. Offline: with Wi-Fi turned off while the app was open, "Could not load departures" appeared after a while (expected until 6.2's offline banner).
+- Note for 6.2's airplane mode test: Expo Go loads the JS bundle from the PC, so the app cannot be cold-started fully offline in development. Procedure: airplane mode with Wi-Fi on, open the app, then turn Wi-Fi off.
+- New deps (all in the CLAUDE.md stack): `@react-native-async-storage/async-storage` 2.2.0 (storage; in Expo Go), `@tanstack/react-query-persist-client` and `@tanstack/query-async-storage-persister` ^5.107 (persist/restore the query cache).
+- Next: 6.2 staleness UI.
 
 ### 2026-11-10 — task 5.5
 - Done: `backend/internal/tools/nearbyload` — simulates apps standing still against a running backend (one request per client every 30 s, start times spread, `If-None-Match` with the last ETag, `Accept-Encoding: gzip`), reports requests by status, latency p50/p95/max, transfer size and the cell cache's hit ratio (difference of `livestop_cache_hits_total` before and after). Talks only to our backend. README: new "Performance" section; stale status line ("Phase 0, nothing runnable") updated. Command added to CLAUDE.md §5.
