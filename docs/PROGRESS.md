@@ -4,8 +4,8 @@
 
 ## Current status
 
-- **Active phase:** Phase 7 — UI polish
-- **Next task:** 7.6 README screenshots/GIF, architecture diagram
+- **Active phase:** Phase 7 — UI polish (complete; MVP Phases 0–7 done)
+- **Next task:** none scheduled (later phases require user approval + ADR; see `docs/PLAN.md`)
 - **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
@@ -63,7 +63,7 @@
 | 7 | 7.3 Ring lines ⟳/⟲, terminal display | done | `ringSymbol` / `directionHeadsign` (`⟳` S41 clockwise, `⟲` S42 counter-clockwise), `isTerminalDirection` / `nonTerminalDirections` (drops `isTerminal`, `"Fahrt endet hier"`, and multi-pole station-name arrivals when a return direction exists while keeping loop lines like 114 at S Wannsee), and `sheetModel` omits directions from `idle` when already running on another platform; checked on the iPhone (user, 2026-11-10) |
 | 7 | 7.4 3D pitch toggle, buildings | done | `showsBuildings` + `pitchEnabled` on `MapView`; `"3D"` toggle (`PitchToggle` in `MapScreen.tsx` + `pitchCamera` in `src/core/geo.ts`, tilting to 50° with `altitude ≤ 750 m` on iOS and `zoom ≥ 16.5` on Android so 3D buildings render immediately, and keeping 3D across camera jumps); checked on the iPhone (user, 2026-11-10) |
 | 7 | 7.5 Empty/error states, haptics, accessibility labels | done | `nearbyEmptyState` in `src/core/directions.ts` ("No stops nearby" / "No departures nearby"); `src/lib/haptics.ts` (`hapticSelection` on marker tap / dev picker, `hapticLight` on 3D toggle / retry); VoiceOver `accessible`, `accessibilityRole="button"`, `accessibilityHint`, and full `accessibilityLabel` on `PoleMarker` (`<Marker>` + bubble) and `StationSheet` rows; checked on the iPhone (user, 2026-11-10) |
-| 7 | 7.6 README screenshots/GIF, architecture diagram | todo | |
+| 7 | 7.6 README screenshots/GIF, architecture diagram | done | Portfolio-ready `README.md` with animated/vector previews (`docs/assets/map-light-dark.svg`, `docs/assets/station-sheet-offline.svg`), Mermaid + ASCII architecture diagrams, and ADR summary table |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
 
@@ -112,6 +112,14 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-10 — task 7.6
+- Done:
+  - `docs/assets/map-light-dark.svg` and `docs/assets/station-sheet-offline.svg`: vector previews of the map screen in light mode (S+U Wedding with Ringbahn `⟳`/`⟲` and live countdown pulse) and dark mode with 3D buildings and hub clustering (S+U Alexanderplatz), plus the station bottom sheet (all platforms, cancelled trips, idle section) and offline staleness warning banner with dimmed live times.
+  - `README.md`: updated status to MVP complete (Phases 0–7), added the `Preview` section with the two SVG showcases, expanded `Why` and `Architecture` with a full Mermaid end-to-end architecture diagram and ADR summary table (ADRs 0001–0009), and kept the measured `Performance`, `How to run`, and `Offline check` sections.
+- Tests: documentation only (`npm --prefix mobile run lint` and `typecheck` pass).
+- New deps: none.
+- Next: Phase 7 complete (all MVP phases 0–7 done).
 
 ### 2026-11-10 — task 7.5
 - Done:

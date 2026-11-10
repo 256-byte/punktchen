@@ -2,33 +2,89 @@
 
 > Working name. Repository: `punktchen`.
 
-A map-first mobile app that shows **live departures** (bus, tram, U-Bahn, S-Bahn) directly on the stops around you in Berlin. Open the app, see every stop pole within ~500 m, each with its next departures per direction, counting down live.
+A map-first mobile app that shows **live departures** (regional rail, S-Bahn, U-Bahn, tram, bus, ferry) directly on the stops around you in Berlin and Brandenburg. Open the app, see the stops within ~500 m, each with its next departures per direction counting down live on the map.
 
-**Status:** in development. It runs locally: the backend serves live departures with realtime delays, and the app shows them on the map (Expo Go). Offline mode and UI polish are next. See [`docs/PROGRESS.md`](docs/PROGRESS.md).
+**Status:** MVP complete (Phases 0–7). The Go backend imports the full VBB static GTFS feed into PostgreSQL/PostGIS, merges live GTFS-RT delays every 15 s into an immutable in-memory snapshot, and serves geohash-cached responses with ETags. The React Native (Expo) app renders zoom-clustered live markers, Ringbahn (`⟳`/`⟲`) and terminal-filtered directions, a 3D building pitch toggle, full light/dark themes, VoiceOver labels, and offline countdown resilience. See [`docs/PROGRESS.md`](docs/PROGRESS.md).
+
+## Preview
+
+![LiveStop map view in light mode and dark 3D mode](docs/assets/map-light-dark.svg)
+
+![LiveStop station bottom sheet and offline staleness mode](docs/assets/station-sheet-offline.svg)
 
 ## Why
 
-Departure boards are usually one stop at a time, behind a search. LiveStop puts all of them on the map at once.
+Departure boards are usually one stop at a time, behind a search. LiveStop puts all of them on the map at once so you can compare walking to the bus stop across the street vs. the U-Bahn entrance around the corner at a glance.
 
-It is also a portfolio project. The focus is the **backend architecture**:
+It is also an engineering portfolio project focused on **backend scalability** and **resilient mobile state**:
 
-- one shared poller per upstream feed, so upstream traffic does not grow with users,
-- an immutable, versioned in-memory snapshot of schedule + realtime data,
-- a geohash cell cache with ETags, so nearby users share one response,
-- a contract-first API (OpenAPI) with generated Go and TypeScript code,
-- a generic layer system, so other map data can be added later without touching the core.
+- **Constant upstream load:** one shared poller per upstream feed (`≤ 6 req/min` for GTFS-RT, daily SHA-256 check for static GTFS), so upstream traffic never grows with connected users.
+- **Lock-free reads:** an immutable, versioned in-memory snapshot of the 2-hour schedule + realtime window swapped via `atomic.Pointer` ([ADR-0005](docs/adr/0005-in-memory-snapshot.md)).
+- **Zero-downtime daily imports:** streaming CSV import (~18 MB peak Go heap) into a staging schema followed by sanity checks and an atomic schema rename inside one transaction ([ADR-0004](docs/adr/0004-staging-schema-swap.md)).
+- **Spatial coalescing & caching:** requests snap to precision-7 geohash cells (~153 m × 153 m) with singleflight build coalescing, a 1024-entry LRU cache, weak ETags (`304 Not Modified`), and gzip ([ADR-0006](docs/adr/0006-geohash-cell-cache.md)).
+- **Offline-capable countdowns:** the API sends absolute ISO-8601 timestamps (`scheduled`, `predicted`) and `generatedAt`; the device computes countdowns against a server-corrected clock, persists the latest response in `AsyncStorage`, drops departed trips locally, and dims stale live times after 5 minutes ([ADR-0007](docs/adr/0007-countdown-on-device.md)).
+- **Contract-first API & generic layers:** `api/openapi.yaml` drives generated Go server types (`oapi-codegen`), TypeScript client types (`openapi-typescript`), and runtime contract tests (`kin-openapi`) behind a layer-agnostic `Provider` interface ([ADR-0003](docs/adr/0003-openapi-contract-first.md), [ADR-0008](docs/adr/0008-provider-layer-system.md)).
 
-## How it works
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph Upstream["VBB Open Data (CC BY 4.0)"]
+    GTFS["Static GTFS ZIP<br/>(daily SHA-256 check)"]
+    RT["GTFS-RT Protobuf<br/>(15 s poller, ETag + gzip)"]
+  end
+
+  subgraph Backend["Go Modular Monolith (cmd/server)"]
+    Importer["Streaming Importer<br/>gtfs_staging → sanity checks → atomic swap"]
+    DB[("PostgreSQL 16 + PostGIS<br/>poles, stations, stop_times,<br/>service_dates, trip_info")]
+    RTStore["Realtime Store<br/>trip-instance state<br/>(trip_id, start_date)"]
+    Builder["Snapshot Builder<br/>2 h schedule window + RT merge<br/>atomic.Pointer&lt;Snapshot&gt;"]
+    Registry["Layer Registry<br/>TransitProvider"]
+    Cache["Geohash-7 Cell Cache<br/>singleflight + 1024 LRU<br/>Weak ETag + gzip"]
+    API["HTTP API (:8080)<br/>/v1/nearby · /v1/stations/{id}<br/>/v1/layers · /v1/health"]
+  end
+
+  subgraph Mobile["React Native + Expo App"]
+    FetchLoop["Fetch Policy Loop<br/>150 m move · 30 s age<br/>10 s floor · ETag/304"]
+    Storage[("AsyncStorage<br/>persisted cache")]
+    Clock["1 Hz Clock Store<br/>server offset correction"]
+    Core["Pure TS Core (≥ 90% cov)<br/>clustering · directions (⟳/⟲)<br/>realtime · staleness · sheet"]
+    UI["MapView (2D/3D, Light/Dark)<br/>PoleMarker + StationSheet"]
+  end
+
+  GTFS --> Importer --> DB
+  DB --> Builder
+  RT --> RTStore --> Builder
+  Builder --> Registry
+  DB --> Registry
+  Registry --> Cache --> API
+  API <-->|"JSON + ETag / 304"| FetchLoop
+  FetchLoop <--> Storage
+  FetchLoop --> Core
+  Clock --> Core --> UI
+```
 
 ```
-VBB GTFS (daily) ──► import ──► PostgreSQL + PostGIS
-VBB GTFS-RT (15 s) ──► merge with schedule ──► Snapshot ──► /v1/nearby ──► mobile app
+VBB GTFS (daily)   ──► streaming import ──► PostgreSQL + PostGIS ──┐
+                                                                   ├──► Snapshot (atomic.Pointer) ──► Geohash-7 LRU Cache ──► /v1/nearby ──► Mobile App
+VBB GTFS-RT (15 s) ──► trip-instance store ────────────────────────┘
 ```
 
-- **Backend:** Go, single binary (modular monolith), PostgreSQL + PostGIS, Docker Compose.
-- **Mobile:** React Native + Expo, TypeScript. Countdowns are computed on the device from absolute timestamps, so the app keeps working offline.
+### Key design decisions
 
-Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md), decisions in [`docs/adr/`](docs/adr/).
+| ADR | Decision | Summary |
+|---|---|---|
+| [0001](docs/adr/0001-tech-stack-and-monorepo.md) | Tech stack & monorepo | Go 1.24, PostgreSQL 16 + PostGIS, React Native + Expo (TypeScript) in one repository |
+| [0002](docs/adr/0002-modular-monolith.md) | Modular monolith | One Go binary (`cmd/server`) runs the importer, GTFS-RT poller, snapshot builder, and HTTP server |
+| [0003](docs/adr/0003-openapi-contract-first.md) | Contract-first OpenAPI | `api/openapi.yaml` is the single source of truth; Go and TS types are generated and checked in CI |
+| [0004](docs/adr/0004-staging-schema-swap.md) | Staging schema swap | Static GTFS imports into `gtfs_staging`, validates row counts, and swaps schemas atomically |
+| [0005](docs/adr/0005-in-memory-snapshot.md) | Immutable snapshot | Readers load `atomic.Pointer[Snapshot]` with zero locks; builders publish a fresh copy per tick/feed |
+| [0006](docs/adr/0006-geohash-cell-cache.md) | Geohash cell cache | Coordinates snap to precision-7 geohash cells expanded by ~90 m; `If-None-Match` returns `304` |
+| [0007](docs/adr/0007-countdown-on-device.md) | Countdowns on device | Server sends absolute timestamps; device ticks at 1 Hz and re-renders markers only when a label changes |
+| [0008](docs/adr/0008-provider-layer-system.md) | Generic layer system | Backend `Provider` and mobile `MapLayer<T>` registries decouple the map from transit-specific logic |
+| [0009](docs/adr/0009-postgis-for-spatial.md) | PostGIS spatial queries | `ST_DWithin` on `GEOGRAPHY(Point, 4326)` with a GIST index (~2.8 ms median for 500 m at Wedding) |
+
+Full specifications: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md), [`docs/PLAN.md`](docs/PLAN.md), [`docs/PROGRESS.md`](docs/PROGRESS.md).
 
 ## Performance
 
@@ -76,10 +132,10 @@ go -C backend run ./internal/tools/nearbyload -users 1000 -spread 3000
 
 | Path | Content |
 |---|---|
-| `api/` | `openapi.yaml` — the API contract |
-| `backend/` | Go server (`cmd/`, `internal/`, `db/`, generated code in `gen/`) |
-| `mobile/` | Expo app (`app/` screens, `src/` logic and UI) |
-| `docs/` | plan, architecture, data model, progress, ADRs |
+| `api/` | `openapi.yaml` — the OpenAPI 3.0 contract |
+| `backend/` | Go server (`cmd/server`, `internal/{api,cache,layer,platform,transit}`, `db/{migrations,queries}`, `gen/`) |
+| `mobile/` | Expo app (`app/` routes, `src/core/` pure TS domain logic, `src/layers/` map layers, `src/ui/` screens & tokens) |
+| `docs/` | `PLAN.md`, `ARCHITECTURE.md`, `DATA_MODEL.md`, `PROGRESS.md`, `adr/`, `assets/` |
 
 ## How to run
 
