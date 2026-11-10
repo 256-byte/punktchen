@@ -1,8 +1,12 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { badgeColor, type Direction, textColorOn } from '@/core/directions';
+import { themedStyles } from '@/ui/theme';
 
-/** The line name on its colour (marker rows and the station sheet). */
+/**
+ * The line name on its colour (marker rows and the station sheet). The
+ * line colours are the same in light and dark mode (task 7.1).
+ */
 export function LineBadge({
   direction,
   size = 'small',
@@ -10,6 +14,7 @@ export function LineBadge({
   direction: Pick<Direction, 'line' | 'color' | 'mode'>;
   size?: 'small' | 'large';
 }) {
+  const styles = useStyles();
   const background = badgeColor(direction);
   return (
     <View style={[styles.badge, size === 'large' && styles.large, { backgroundColor: background }]}>
@@ -26,25 +31,25 @@ export function LineBadge({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles(({ fontSize, fontWeight, radius, space }) => ({
   badge: {
     minWidth: 30,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 4,
+    paddingHorizontal: space.xs,
+    paddingVertical: 1, // optical: keeps the marker rows compact
+    borderRadius: radius.xs,
     alignItems: 'center',
   },
   large: {
     minWidth: 44,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xxs,
+    borderRadius: radius.sm,
   },
   line: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: fontSize.caption,
+    fontWeight: fontWeight.bold,
   },
   lineLarge: {
-    fontSize: 15,
+    fontSize: fontSize.body,
   },
-});
+}));

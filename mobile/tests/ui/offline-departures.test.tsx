@@ -7,7 +7,7 @@ import type { NearbyResponse } from '@/api/nearby';
 import type { Departure } from '@/core/departures';
 import type { Direction } from '@/core/directions';
 import { MINUTE, SECOND } from '@/core/time';
-import { STALE_GREY } from '@/layers/transit/DepartureTime';
+import { themes } from '@/ui/tokens';
 import { createLocationStore } from '@/state/location';
 import { MapScreen } from '@/ui/MapScreen';
 
@@ -125,7 +125,7 @@ describe('ten minutes without a connection (task 6.3)', () => {
     // M27: +4 has left; the next one still counts down to its last predicted
     // time (+12), shown as outdated.
     const m27 = screen.getByLabelText(/^[12] min, outdated live time, 2 min late$/);
-    expect(m27).toHaveStyle({ color: STALE_GREY });
+    expect(m27).toHaveStyle({ color: themes.light.colors.stale });
     // 247: every known departure has left. Its row is gone; nothing is made up.
     expect(screen.queryByText('S Nordbahnhof')).toBeNull();
     expect(screen.queryByText('now')).toBeNull();

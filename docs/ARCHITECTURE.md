@@ -256,6 +256,11 @@ Map screen (`src/ui/MapScreen.tsx`, task 3.4):
 - Developer tool (development builds only, `__DEV__`): "Dev: place" (`src/ui/DevPlacePicker.tsx`) jumps to one of the spot-check stations (task 2.6) or back to "My location". It uses the location store's `lookAt(place)`: map-centre mode at that place plus a `jump` the map follows once. iOS has no way for an app to fake the GPS position, so this is how other parts of Berlin are tested on a phone.
 - Expo Go has the native maps module (Apple Maps on iOS, Google Maps on Android). A development or store build for Android will need a Google Maps API key in `app.json` (not needed before Phase 7).
 
+Design tokens and light/dark mode (task 7.1, `src/ui/tokens.ts`, `src/ui/theme.ts`):
+- `tokens.ts` defines the colour roles (`Colors`) for `light` and `dark`, the type scale (`fontSize`, `fontWeight`), spacing (`space`), corner radii (`radius`) and opacities (`opacity`). Every text token meets WCAG AA (4.5:1) on `background` and `surface` of its mode (`contrastRatio` in `src/core/color.ts`, checked in `tests/ui/theme.test.tsx`).
+- `useTheme()` reads `useColorScheme()` from the system (`app.json` has `userInterfaceStyle: "automatic"`); `themedStyles(make)` builds both `StyleSheet` objects once at module load and returns the active one, so styles stay stable across renders.
+- `MapView` receives `userInterfaceStyle={scheme}`, `BottomSheet` uses `surface` and `handle`, `PoleMarker` adds a hairline border in dark mode (where a shadow does not show) and refreshes its native snapshot when the scheme changes, and `StationSheet`'s colour legend names "White" or "Black" for timetable times depending on the mode. Line badge colours stay the same in both modes (the lines' own identity).
+
 ### 4.5 Map performance rules
 
 - Re-render markers only when the **displayed minute** changes, not every second. (`PoleMarker` selects its labels from the clock store; tested with a React Profiler: no render for 59 ticks, one when a label changes.)

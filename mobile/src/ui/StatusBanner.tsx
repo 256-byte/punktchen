@@ -4,6 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type Failure, statusBanner } from '@/core/staleness';
 import { type ClockStore, clockStore, useDeviceNow } from '@/state/clock';
 
+import { themedStyles } from './theme';
+
 type Props = {
   /** Device time of the shown data's last 200 or 304 (`Kept.checkedAt`). */
   checkedAt: number;
@@ -24,6 +26,7 @@ type Props = {
  */
 export function StatusBanner({ checkedAt, failure, onRetry, retrying, clock = clockStore }: Props) {
   const insets = useSafeAreaInsets();
+  const styles = useStyles();
   const banner = useDeviceNow((now) => statusBanner(checkedAt, now, failure), clock);
   if (banner === null) {
     return null;
@@ -59,61 +62,65 @@ export function StatusBanner({ checkedAt, failure, onRetry, retrying, clock = cl
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    alignItems: 'center',
-    pointerEvents: 'box-none',
-  },
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    maxWidth: '100%',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    shadowColor: '#000000',
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
-  },
-  warning: {
-    backgroundColor: '#fffaeb',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#b54708',
-  },
-  text: {
-    flexShrink: 1,
-  },
-  title: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#333333',
-  },
-  detail: {
-    fontSize: 12,
-    color: '#555555',
-  },
-  warningText: {
-    color: '#93370d',
-  },
-  retry: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    backgroundColor: '#1f6feb',
-  },
-  retryLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  pressed: {
-    opacity: 0.6,
-  },
-});
+const useStyles = themedStyles(
+  ({ scheme, colors, fontSize, fontWeight, opacity, radius, space }) => ({
+    container: {
+      position: 'absolute',
+      left: space.lg,
+      right: space.lg,
+      alignItems: 'center',
+      pointerEvents: 'box-none',
+    },
+    banner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space.lg,
+      maxWidth: '100%',
+      paddingVertical: space.sm,
+      paddingHorizontal: space.lg,
+      borderRadius: radius.lg,
+      backgroundColor: colors.overlay,
+      borderWidth: scheme === 'dark' ? StyleSheet.hairlineWidth : 0,
+      borderColor: colors.border,
+      shadowColor: colors.shadow,
+      shadowOpacity: 0.15,
+      shadowRadius: 3,
+      shadowOffset: { width: 0, height: 1 },
+      elevation: 2,
+    },
+    warning: {
+      backgroundColor: colors.warningSurface,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.warningBorder,
+    },
+    text: {
+      flexShrink: 1,
+    },
+    title: {
+      fontSize: fontSize.footnote,
+      fontWeight: fontWeight.semibold,
+      color: colors.text,
+    },
+    detail: {
+      fontSize: fontSize.caption,
+      color: colors.textSecondary,
+    },
+    warningText: {
+      color: colors.warningText,
+    },
+    retry: {
+      paddingVertical: space.sm,
+      paddingHorizontal: space.ml,
+      borderRadius: radius.md,
+      backgroundColor: colors.accent,
+    },
+    retryLabel: {
+      fontSize: fontSize.footnote,
+      fontWeight: fontWeight.semibold,
+      color: colors.onAccent,
+    },
+    pressed: {
+      opacity: opacity.pressed,
+    },
+  }),
+);

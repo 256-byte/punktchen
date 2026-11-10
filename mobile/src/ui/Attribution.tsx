@@ -1,5 +1,7 @@
-import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Text, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { themedStyles } from './theme';
 
 /**
  * Data attribution (task 3.7, ARCHITECTURE §6): the response's
@@ -7,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
  * is shown; nothing when there is nothing to attribute.
  */
 export function Attribution({ lines, style }: { lines: readonly string[]; style?: ViewStyle }) {
+  const styles = useStyles();
   if (lines.length === 0) {
     return null;
   }
@@ -20,6 +23,7 @@ export function Attribution({ lines, style }: { lines: readonly string[]; style?
 /** On the map: bottom right (Apple Maps keeps its "Legal" link bottom left). */
 export function MapAttribution({ lines }: { lines: readonly string[] }) {
   const insets = useSafeAreaInsets();
+  const styles = useStyles();
   return (
     <Attribution
       lines={lines}
@@ -28,19 +32,19 @@ export function MapAttribution({ lines }: { lines: readonly string[] }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles(({ colors, fontSize, radius, space }) => ({
   map: {
     position: 'absolute',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xxs,
+    borderRadius: radius.xs,
+    backgroundColor: colors.overlaySubtle,
   },
   passThrough: {
     pointerEvents: 'none',
   },
   text: {
-    fontSize: 11,
-    color: '#333333',
+    fontSize: fontSize.micro,
+    color: colors.textSecondary,
   },
-});
+}));

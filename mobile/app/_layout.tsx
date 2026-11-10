@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { persistOptions } from '@/api/persistence';
 import { queryPersister } from '@/lib/queryPersister';
+import { useTheme } from '@/ui/theme';
 
 export default function RootLayout() {
   // The newest /v1/nearby answer is kept on the device and restored on
@@ -15,11 +16,18 @@ export default function RootLayout() {
     const client = new QueryClient();
     return { queryClient: client, options: persistOptions(client, queryPersister) };
   });
+  const { colors } = useTheme();
   return (
     // Gestures (bottom sheet) need the root view around the whole app.
-    <GestureHandlerRootView style={styles.root}>
+    <GestureHandlerRootView style={[styles.root, { backgroundColor: colors.background }]}>
       <PersistQueryClientProvider client={queryClient} persistOptions={options}>
-        <Stack screenOptions={{ headerShown: false }} />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            // Light or dark with the system (task 7.1), also while a screen is empty.
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        />
       </PersistQueryClientProvider>
     </GestureHandlerRootView>
   );

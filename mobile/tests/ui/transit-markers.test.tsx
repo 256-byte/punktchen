@@ -6,7 +6,7 @@ import type { NearbyResponse } from '@/api/nearby';
 import type { Departure } from '@/core/departures';
 import type { Direction } from '@/core/directions';
 import { type PoleFeature, transitLayer } from '@/layers/transit';
-import { LATE_RED, LIVE_GREEN } from '@/layers/transit/DepartureTime';
+import { themes } from '@/ui/tokens';
 import { PoleMarker, TRACK_CHANGES_MS } from '@/layers/transit/PoleMarker';
 import { type ClockStore, createClockStore, useClockTicker } from '@/state/clock';
 
@@ -120,11 +120,13 @@ describe('PoleMarker', () => {
 
     const late = screen.getByLabelText('5 min, live, 2 min late'); // by its predicted time
     expect(late).toHaveTextContent('5 min +2');
-    expect(late).toHaveStyle({ color: LATE_RED });
-    expect(screen.getByLabelText('6 min, live, on time')).toHaveStyle({ color: LIVE_GREEN });
+    expect(late).toHaveStyle({ color: themes.light.colors.late });
+    expect(screen.getByLabelText('6 min, live, on time')).toHaveStyle({
+      color: themes.light.colors.live,
+    });
     const timetable = screen.getByLabelText('8 min, timetable');
     expect(timetable).toHaveTextContent('8 min');
-    expect(timetable).toHaveStyle({ color: '#111111' });
+    expect(timetable).toHaveStyle({ color: themes.light.colors.text });
   });
 
   it('counts the running directions that do not fit', async () => {

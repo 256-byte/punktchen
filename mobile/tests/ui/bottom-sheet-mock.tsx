@@ -2,7 +2,7 @@
 // BottomSheet renders its children and records its props, so tests can
 // "swipe it down" by calling onClose.
 import type { ReactNode } from 'react';
-import { ScrollView, View } from 'react-native';
+import { ScrollView, type StyleProp, View, type ViewStyle } from 'react-native';
 
 type SheetProps = {
   children?: ReactNode;
@@ -10,6 +10,8 @@ type SheetProps = {
   index?: number;
   snapPoints?: (string | number)[];
   enablePanDownToClose?: boolean;
+  backgroundStyle?: StyleProp<ViewStyle>;
+  handleIndicatorStyle?: StyleProp<ViewStyle>;
 };
 
 export const sheet = { props: null as SheetProps | null };

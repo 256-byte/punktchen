@@ -4,8 +4,8 @@
 
 ## Current status
 
-- **Active phase:** Phase 6 — Offline & resilience: all tasks done (6.1–6.3). Phase 7 (UI polish) starts when the user says so
-- **Next task:** 7.1 design tokens, light/dark mode (Phase 7)
+- **Active phase:** Phase 7 — UI polish
+- **Next task:** 7.2 marker clustering / zoom-based detail level
 - **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
@@ -58,6 +58,12 @@
 | 6 | 6.1 Persisted query cache, instant render | done | Newest `/v1/nearby` answer kept in AsyncStorage; cold start opens the map at its place with its data, no location spinner, then revalidates; iPhone: force-quit and reopen shows the last departures at once (user, 2026-11-10) |
 | 6 | 6.2 Staleness UI | done | `StatusBanner` at the top of the map ("Updated X ago", warning after 5 min, "No connection — showing last known data" + "Try again"); live times grey when stale; airplane mode test in the README, simulated in Jest; checked on the iPhone (user) |
 | 6 | 6.3 Drop past departures offline, countdown keeps running | done | Already true by design (labels come from the kept answer and the clock); proven by a 10 min offline test on the map screen; sheet says "No newer data" when stale data runs out |
+| 7 | 7.1 Design tokens, light/dark mode | done | `tokens.ts` + `theme.ts` (`useTheme`, `themedStyles`); WCAG AA contrast checked for all text tokens in both modes; map, markers, sheet, banner and location screens follow the system appearance; checked on the iPhone in light and dark mode (user, 2026-11-10) |
+| 7 | 7.2 Marker clustering / zoom-based detail level | todo | |
+| 7 | 7.3 Ring lines ⟳/⟲, terminal display | todo | |
+| 7 | 7.4 3D pitch toggle, buildings | todo | |
+| 7 | 7.5 Empty/error states, haptics, accessibility labels | todo | |
+| 7 | 7.6 README screenshots/GIF, architecture diagram | todo | |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
 
@@ -106,6 +112,17 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-10 — task 7.1
+- Done: `src/core/color.ts` (`relativeLuminance`, `contrastRatio`; `textColorOn` in `directions.ts` now uses `relativeLuminance`), `src/ui/tokens.ts` (light and dark `Colors`, `fontSize`, `fontWeight`, `space`, `radius`, `opacity`, `themes`), `src/ui/theme.ts` (`useTheme`, `schemeOf`, `themedStyles` — builds both `StyleSheet` sets once at module load). Migrated all UI and layer components (`DepartureTime`, `LineBadge`, `PoleMarker`, `StationSheet`, `StatusBanner`, `Attribution`, `BackendStatus`, `DevPlacePicker`, `LocationGate`, `MapScreen`, `app/_layout.tsx`) to design tokens. `MapView` gets `userInterfaceStyle={scheme}`, `BottomSheet` gets themed `backgroundStyle` and `handleIndicatorStyle`, `PoleMarker` gets a hairline border on dark maps and refreshes `tracksViewChanges` when the scheme flips, and `StationSheet`'s legend says "White: timetable only" in dark mode.
+- Decisions:
+  - Follow the system appearance (`useColorScheme`, `userInterfaceStyle: "automatic"` in `app.json`) without an in-app toggle: the app matches the rest of the phone.
+  - Line badge colours (`color` from VBB or `MODE_COLORS`) stay identical in light and dark mode: they are the lines' identity on Berlin signs.
+  - Every text token (`text`, `textSecondary`, `textTertiary`, `accentText`, `danger`, `success`, `live`, `late`, `stale`) meets WCAG AA (≥ 4.5:1) on both `background` and `surface` in both modes, and `stale` keeps ≥ 2:1 contrast against `text` so outdated live times never look like timetable times.
+- Tests: Vitest `color.test.ts` (7: luminance, contrast ratios, invalid hex); core coverage 100 % lines/statements. Jest `tests/ui/theme.test.tsx` (33): WCAG AA contrast for every text token on `background` and `surface` in light and dark mode, button/warning/inverse pairs, stale vs. text separation, warning border 3:1, `schemeOf`, `useTheme`/`themedStyles` stability across mode switches, and component rendering in light + dark mode (`PoleMarker` bubble/text/live colours + `tracksViewChanges` on switch, `StationSheet` dark colours + "White: timetable only" legend, `MapScreen` `userInterfaceStyle="dark"` + bottom sheet background/handle, `StatusBanner` warning colours, `LocationGate` dark colours).
+- Manual check (user, iPhone, Expo Go): light and dark mode checked on device, working as expected.
+- New deps: none.
+- Next: 7.2 marker clustering / zoom-based detail level.
 
 ### 2026-11-10 — task 6.3
 - Finding: dropping past departures and the running countdown did not need new logic. Since 3.1/3.5 every label is computed from the kept answer and the clock store (`upcomingDepartures`, `nextCells`, `sheetSignature`), and the 1 s ticker does not depend on requests. The task was to prove it for the offline case and to fix what read wrongly there.

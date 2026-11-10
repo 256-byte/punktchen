@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import type { LatLng } from '@/core/geo';
 import type { LocationStore } from '@/state/location';
+
+import { themedStyles } from './theme';
 
 /**
  * Places to jump to while testing on a phone (development builds only): the
@@ -23,6 +25,7 @@ export const DEV_PLACES: readonly { name: string; center: LatLng }[] = [
  */
 export function DevPlacePicker({ store }: { store: LocationStore }) {
   const [open, setOpen] = useState(false);
+  const styles = useStyles();
   const choose = (action: () => void) => {
     action();
     setOpen(false);
@@ -54,6 +57,7 @@ export function DevPlacePicker({ store }: { store: LocationStore }) {
 }
 
 function Item({ label, onPress }: { label: string; onPress: () => void }) {
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -65,45 +69,46 @@ function Item({ label, onPress }: { label: string; onPress: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles(({ colors, fontSize, fontWeight, opacity, radius, space }) => ({
   container: {
     position: 'absolute',
     top: 124, // below the status banner (task 6.2)
-    right: 12,
+    right: space.lg,
     alignItems: 'flex-end',
     pointerEvents: 'box-none',
-    gap: 6,
+    gap: space.sm,
   },
   toggle: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    backgroundColor: 'rgba(17, 17, 17, 0.8)',
+    paddingVertical: space.sm,
+    paddingHorizontal: space.ml,
+    borderRadius: radius.md,
+    backgroundColor: colors.inverseSurface,
+    opacity: 0.85,
   },
   toggleLabel: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '600',
+    color: colors.onInverse,
+    fontSize: fontSize.footnote,
+    fontWeight: fontWeight.semibold,
   },
   list: {
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.97)',
-    paddingVertical: 4,
-    shadowColor: '#000000',
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    paddingVertical: space.xs,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.2,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 1 },
     elevation: 4,
   },
   item: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingVertical: space.md,
+    paddingHorizontal: space.lg,
   },
   itemLabel: {
-    fontSize: 15,
-    color: '#111111',
+    fontSize: fontSize.body,
+    color: colors.text,
   },
   pressed: {
-    opacity: 0.6,
+    opacity: opacity.pressed,
   },
-});
+}));

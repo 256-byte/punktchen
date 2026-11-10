@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import type { LatLng } from '@/core/geo';
 import type { LocationView } from '@/core/location';
 import { requestLocationAccess } from '@/lib/location';
 import { locationStore, type LocationStore, useLocationView } from '@/state/location';
+
+import { themedStyles, useTheme } from './theme';
 
 type Ready = Extract<LocationView, { kind: 'ready' }>;
 
@@ -26,6 +28,8 @@ type Props = {
  */
 export function LocationGate({ children, lastPlace = null, store = locationStore }: Props) {
   const view = useLocationView(store);
+  const styles = useStyles();
+  const { colors } = useTheme();
   const pickMapCenter = () => store.getState().chooseMapCenter();
 
   switch (view.kind) {
@@ -37,7 +41,7 @@ export function LocationGate({ children, lastPlace = null, store = locationStore
       }
       return (
         <View style={styles.container}>
-          <ActivityIndicator />
+          <ActivityIndicator color={colors.textSecondary} />
           <Text style={styles.body}>Finding your location…</Text>
           <Button label="Use map center instead" onPress={pickMapCenter} secondary />
         </View>
@@ -74,6 +78,7 @@ function Button({
   onPress: () => void;
   secondary?: boolean;
 }) {
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -89,48 +94,50 @@ function Button({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles(({ colors, fontSize, fontWeight, opacity, radius, space }) => ({
   container: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    padding: 32,
+    gap: space.lg,
+    padding: space.xxxl,
+    backgroundColor: colors.background,
   },
   title: {
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: fontSize.titleLarge,
+    fontWeight: fontWeight.bold,
+    color: colors.text,
   },
   body: {
-    fontSize: 16,
+    fontSize: fontSize.bodyLarge,
     textAlign: 'center',
-    opacity: 0.8,
+    color: colors.textSecondary,
   },
   hint: {
-    fontSize: 14,
+    fontSize: fontSize.callout,
     textAlign: 'center',
-    opacity: 0.6,
+    color: colors.textTertiary,
   },
   button: {
     minWidth: 220,
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    backgroundColor: '#1f6feb',
+    paddingVertical: space.lg,
+    paddingHorizontal: space.xxl,
+    borderRadius: radius.lg,
+    backgroundColor: colors.accent,
   },
   buttonSecondary: {
     backgroundColor: 'transparent',
   },
   buttonLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
+    fontSize: fontSize.bodyLarge,
+    fontWeight: fontWeight.semibold,
+    color: colors.onAccent,
   },
   buttonLabelSecondary: {
-    color: '#1f6feb',
+    color: colors.accentText,
   },
   pressed: {
-    opacity: 0.6,
+    opacity: opacity.pressed,
   },
-});
+}));

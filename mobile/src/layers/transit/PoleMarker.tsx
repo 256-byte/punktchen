@@ -11,6 +11,8 @@ import {
 } from '@/core/directions';
 import { cellDescription } from '@/core/realtime';
 import { type ClockStore, clockStore, useNow } from '@/state/clock';
+import { themedStyles, useTheme } from '@/ui/theme';
+import type { ColorScheme } from '@/ui/tokens';
 
 import { DepartureTime } from './DepartureTime';
 import type { PoleFeature } from './index';
@@ -25,7 +27,8 @@ export const TRACK_CHANGES_MS = 500;
  * delay (4.5). Directions with nothing coming are left out (station sheet,
  * 3.6); a pole with none draws no marker. Re-renders when a cell changes
  * (about once a minute), not on every tick (ARCHITECTURE §4.5). With stale
- * data live countdowns are greyed out (6.2).
+ * data live countdowns are greyed out (6.2). Colours follow light/dark
+ * mode (7.1).
  */
 export function PoleMarker({
   feature,
@@ -41,9 +44,11 @@ export function PoleMarker({
   clock?: ClockStore;
 }) {
   const directions = feature.pole.directions;
+  const styles = useStyles();
+  const { scheme } = useTheme();
   const cells = useNow((now) => nextCells(directions, now), clock);
   const { rows, more } = useMemo(() => markerRows(directions, cells), [directions, cells]);
-  const tracks = useTracksViewChanges(directions, cells, stale);
+  const tracks = useTracksViewChanges(directions, cells, stale, scheme);
 
   if (rows.length === 0) {
     return null;
@@ -66,6 +71,7 @@ export function PoleMarker({
 }
 
 function Row({ row: { direction, next }, stale }: { row: MarkerRow; stale: boolean }) {
+  const styles = useStyles();
   return (
     <View style={styles.row}>
       <LineBadge direction={direction} />
@@ -87,14 +93,19 @@ function accessibilityText(feature: PoleFeature, rows: MarkerRow[], stale: boole
 /**
  * tracksViewChanges for a custom marker (Google Maps; Apple Maps ignores
  * it): on after the content changed, off again shortly after, so the map
- * does not redraw the marker every frame (ARCHITECTURE §4.5).
+ * does not redraw the marker every frame (ARCHITECTURE §4.5). A switch
+ * between light and dark mode is a content change too (task 7.1).
  */
 function useTracksViewChanges(
   directions: Direction[],
   cells: (string | null)[],
   stale: boolean,
+  scheme: ColorScheme,
 ): boolean {
-  const content = useMemo(() => ({ directions, cells, stale }), [directions, cells, stale]);
+  const content = useMemo(
+    () => ({ directions, cells, stale, scheme }),
+    [directions, cells, stale, scheme],
+  );
   const [tracking, setTracking] = useState(true);
   const [seen, setSeen] = useState(content);
   if (seen !== content) {
@@ -109,16 +120,19 @@ function useTracksViewChanges(
   return tracking;
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles(({ scheme, colors, fontSize, fontWeight, radius, space }) => ({
   bubble: {
     minWidth: 120,
     maxWidth: 220,
-    paddingVertical: 4,
-    paddingHorizontal: 6,
-    borderRadius: 8,
-    backgroundColor: '#ffffff',
-    gap: 3,
-    shadowColor: '#000000',
+    paddingVertical: space.xs,
+    paddingHorizontal: space.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    gap: 3, // optical: four rows stay compact
+    // A shadow does not show on a dark map: an edge does.
+    borderWidth: scheme === 'dark' ? StyleSheet.hairlineWidth : 0,
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
     shadowOpacity: 0.2,
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 1 },
@@ -127,22 +141,22 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: space.sm,
   },
   headsign: {
     flexShrink: 1,
-    fontSize: 12,
-    color: '#111111',
+    fontSize: fontSize.caption,
+    color: colors.text,
   },
   countdown: {
     marginLeft: 'auto',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: fontSize.caption,
+    fontWeight: fontWeight.semibold,
     fontVariant: ['tabular-nums'],
-    color: '#111111',
+    color: colors.text,
   },
   more: {
-    fontSize: 11,
-    color: '#555555',
+    fontSize: fontSize.micro,
+    color: colors.textSecondary,
   },
-});
+}));
