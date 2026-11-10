@@ -187,6 +187,30 @@ describe('cold start (task 6.1)', () => {
     expect(map.animateToRegion).toHaveBeenLastCalledWith(regionAround(NORTH, START_RADIUS_M), 400);
   });
 
+  it('started without a connection, shows the last data and says so (task 6.2)', async () => {
+    fake.lastKnown = position(WEDDING.lat, WEDDING.lng, Date.now());
+    const first = await startApp();
+    expect(await screen.findByText('S Jungfernheide')).toBeOnTheScreen();
+    await waitFor(async () => expect(await stored()).toContain('S Jungfernheide'), {
+      timeout: 3000,
+    });
+    await first.unmount();
+
+    // Airplane mode: no position, and every request fails.
+    fake.lastKnown = null;
+    locationStore.setState({ permission: { status: 'unknown', canAskAgain: true }, fix: null });
+    mockServer.requests = [];
+    mockServer.answer = () => Promise.reject(new TypeError('Network request failed'));
+    await startApp();
+
+    expect(await screen.findByText('S Jungfernheide')).toBeOnTheScreen();
+    expect(await screen.findByText('No connection — showing last known data')).toBeOnTheScreen();
+    expect(screen.getByText('updated just now')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
+    expect(screen.queryByText('Could not load departures')).toBeNull();
+    expect(screen.queryByText('Finding your location…')).toBeNull();
+  });
+
   it('waits for the location on the very first start', async () => {
     await startApp();
     expect(await screen.findByText('Finding your location…')).toBeOnTheScreen();

@@ -8,6 +8,7 @@ import {
   delayMinutes,
   delayText,
   encodeCell,
+  isLive,
 } from './realtime';
 
 describe('delayMinutes', () => {
@@ -81,6 +82,33 @@ describe('cellDescription', () => {
     [{ label: '3 min', state: 'cancelled', delay: null }, '3 min, cancelled'],
   ])('%o → %s', (cell, text) => {
     expect(cellDescription(cell)).toBe(text);
+  });
+
+  it('reads live values of stale data as outdated', () => {
+    expect(cellDescription({ label: '3 min', state: 'late', delay: '+2' }, true)).toBe(
+      '3 min, outdated live time, 2 min late',
+    );
+    expect(cellDescription({ label: 'now', state: 'onTime', delay: null }, true)).toBe(
+      'now, outdated live time, on time',
+    );
+    expect(cellDescription({ label: '14:52', state: 'scheduled', delay: null }, true)).toBe(
+      '14:52, timetable',
+    );
+    expect(cellDescription({ label: '3 min', state: 'cancelled', delay: null }, true)).toBe(
+      '3 min, cancelled',
+    );
+  });
+});
+
+describe('isLive', () => {
+  it('is true for the realtime states only', () => {
+    expect((['scheduled', 'onTime', 'early', 'late', 'cancelled'] as const).map(isLive)).toEqual([
+      false,
+      true,
+      true,
+      true,
+      false,
+    ]);
   });
 });
 

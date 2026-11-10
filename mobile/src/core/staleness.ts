@@ -30,3 +30,55 @@ export function updatedAgoLabel(checkedAt: number, now: number): string {
   }
   return `updated ${Math.floor(minutes / 60)} h ago`;
 }
+
+/**
+ * Why the last request failed. unreachable: no HTTP answer (no network, the
+ * server down, a timeout). server: the backend answered with an error.
+ */
+export type Failure = 'unreachable' | 'server';
+
+/** The line above the map that says how far the shown data can be trusted. */
+export interface StatusBanner {
+  title: string;
+  /** Second line; null if the title says it all. */
+  detail: string | null;
+  /** true: something is wrong (requests fail, or the data is stale). */
+  warning: boolean;
+}
+
+export const STALE_HINT = 'live times may be out of date';
+
+/**
+ * What to say about data last checked at `checkedAt` (ARCHITECTURE §4.3).
+ * Nothing while it is fresh and requests work; "Updated X ago" from 60 s;
+ * a warning from 5 min, when live values are greyed out; and as soon as a
+ * request fails, that the last known data is shown, whatever its age.
+ */
+export function statusBanner(
+  checkedAt: number,
+  now: number,
+  failure: Failure | null,
+): StatusBanner | null {
+  const updated = updatedAgoLabel(checkedAt, now);
+  const age = freshness(checkedAt, now);
+  if (failure !== null) {
+    const what = failure === 'unreachable' ? 'No connection' : 'Server problem';
+    return {
+      title: `${what} — showing last known data`,
+      detail: age === 'stale' ? `${updated}, ${STALE_HINT}` : updated,
+      warning: true,
+    };
+  }
+  switch (age) {
+    case 'fresh':
+      return null;
+    case 'aging':
+      return { title: capitalized(updated), detail: null, warning: false };
+    case 'stale':
+      return { title: capitalized(updated), detail: capitalized(STALE_HINT), warning: true };
+  }
+}
+
+function capitalized(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}

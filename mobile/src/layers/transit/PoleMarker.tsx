@@ -24,14 +24,18 @@ export const TRACK_CHANGES_MS = 500;
  * headsign, countdown (task 3.5) coloured live or timetable, with its
  * delay (4.5). Directions with nothing coming are left out (station sheet,
  * 3.6); a pole with none draws no marker. Re-renders when a cell changes
- * (about once a minute), not on every tick (ARCHITECTURE §4.5).
+ * (about once a minute), not on every tick (ARCHITECTURE §4.5). With stale
+ * data live countdowns are greyed out (6.2).
  */
 export function PoleMarker({
   feature,
   onPress,
+  stale = false,
   clock = clockStore,
 }: {
   feature: PoleFeature;
+  /** The data is older than 5 min (ARCHITECTURE §4.3). */
+  stale?: boolean;
   /** Tap: open the station sheet (task 3.6). */
   onPress?: (feature: PoleFeature) => void;
   clock?: ClockStore;
@@ -39,7 +43,7 @@ export function PoleMarker({
   const directions = feature.pole.directions;
   const cells = useNow((now) => nextCells(directions, now), clock);
   const { rows, more } = useMemo(() => markerRows(directions, cells), [directions, cells]);
-  const tracks = useTracksViewChanges(directions, cells);
+  const tracks = useTracksViewChanges(directions, cells, stale);
 
   if (rows.length === 0) {
     return null;
@@ -51,9 +55,9 @@ export function PoleMarker({
       tracksViewChanges={tracks}
       onPress={onPress ? () => onPress(feature) : undefined}
     >
-      <View style={styles.bubble} accessibilityLabel={accessibilityText(feature, rows)}>
+      <View style={styles.bubble} accessibilityLabel={accessibilityText(feature, rows, stale)}>
         {rows.map((r) => (
-          <Row key={directionKey(r.direction)} row={r} />
+          <Row key={directionKey(r.direction)} row={r} stale={stale} />
         ))}
         {more > 0 ? <Text style={styles.more}>+{more} more</Text> : null}
       </View>
@@ -61,21 +65,21 @@ export function PoleMarker({
   );
 }
 
-function Row({ row: { direction, next } }: { row: MarkerRow }) {
+function Row({ row: { direction, next }, stale }: { row: MarkerRow; stale: boolean }) {
   return (
     <View style={styles.row}>
       <LineBadge direction={direction} />
       <Text style={styles.headsign} numberOfLines={1}>
         {direction.headsign}
       </Text>
-      <DepartureTime cell={next} style={styles.countdown} />
+      <DepartureTime cell={next} style={styles.countdown} stale={stale} />
     </View>
   );
 }
 
-function accessibilityText(feature: PoleFeature, rows: MarkerRow[]) {
+function accessibilityText(feature: PoleFeature, rows: MarkerRow[], stale: boolean) {
   const parts = rows.map(
-    (r) => `${r.direction.line} to ${r.direction.headsign}: ${cellDescription(r.next)}`,
+    (r) => `${r.direction.line} to ${r.direction.headsign}: ${cellDescription(r.next, stale)}`,
   );
   return [feature.station.name, ...parts].join('. ');
 }
@@ -85,8 +89,12 @@ function accessibilityText(feature: PoleFeature, rows: MarkerRow[]) {
  * it): on after the content changed, off again shortly after, so the map
  * does not redraw the marker every frame (ARCHITECTURE §4.5).
  */
-function useTracksViewChanges(directions: Direction[], cells: (string | null)[]): boolean {
-  const content = useMemo(() => ({ directions, cells }), [directions, cells]);
+function useTracksViewChanges(
+  directions: Direction[],
+  cells: (string | null)[],
+  stale: boolean,
+): boolean {
+  const content = useMemo(() => ({ directions, cells, stale }), [directions, cells, stale]);
   const [tracking, setTracking] = useState(true);
   const [seen, setSeen] = useState(content);
   if (seen !== content) {

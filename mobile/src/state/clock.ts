@@ -19,7 +19,9 @@ export interface ClockState {
   setOffset(offsetMs: number): void;
 }
 
-export function createClockStore(deviceNow: () => number = Date.now) {
+// () => Date.now(), not Date.now: looked up per call, so a replaced Date
+// (Jest fake timers) is followed by the app-wide store too.
+export function createClockStore(deviceNow: () => number = () => Date.now()) {
   return createStore<ClockState>()((set, get) => ({
     now: deviceNow(),
     offsetMs: 0,
@@ -44,6 +46,20 @@ export function useNow<T>(select: (now: number) => T, store: ClockStore = clockS
   return useStore(
     store,
     useShallow((s) => select(s.now)),
+  );
+}
+
+/**
+ * Like useNow, but from the device clock without the server correction: for
+ * the age of data, which counts from device times (`Kept.checkedAt`).
+ */
+export function useDeviceNow<T>(
+  select: (deviceNow: number) => T,
+  store: ClockStore = clockStore,
+): T {
+  return useStore(
+    store,
+    useShallow((s) => select(s.now - s.offsetMs)),
   );
 }
 

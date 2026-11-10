@@ -5,7 +5,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { ApiClient } from '@/api/client';
 import { useStation } from '@/api/station';
 import { poleTitle, type SheetPole, type SheetRow, sheetModel, sheetSignature } from '@/core/sheet';
-import { type ClockStore, clockStore, useNow } from '@/state/clock';
+import { freshness } from '@/core/staleness';
+import { type ClockStore, clockStore, useDeviceNow, useNow } from '@/state/clock';
 import { Attribution } from '@/ui/Attribution';
 
 import { DepartureTime } from './DepartureTime';
@@ -16,15 +17,19 @@ import { LineBadge } from './LineBadge';
  * The station sheet (task 3.6): all poles of the tapped pole's station
  * (/v1/stations/{id}), each with its running directions and their next
  * departures; directions with nothing coming at the bottom (user decision
- * 2026-11-09). Until the station loads it shows what /v1/nearby had.
+ * 2026-11-09). Until the station loads it shows what /v1/nearby had. Live
+ * times of data older than 5 min are greyed out (task 6.2): by the age of
+ * the station answer, or of the /v1/nearby one (`stale`) while that is shown.
  */
 export function StationSheet({
   feature,
   client,
+  stale: nearbyStale = false,
   clock = clockStore,
 }: {
   feature: PoleFeature;
   client: ApiClient | null;
+  stale?: boolean;
   clock?: ClockStore;
 }) {
   const query = useStation(client, feature.station.id);
@@ -32,6 +37,12 @@ export function StationSheet({
   const signature = useNow((now) => sheetSignature(station, now), clock);
   const model = useMemo(() => sheetModel(station, signature), [station, signature]);
   const loading = query.isPending && client !== null;
+  const checkedAt = query.data?.checkedAt;
+  const ownStale = useDeviceNow(
+    (now) => (checkedAt === undefined ? null : freshness(checkedAt, now) === 'stale'),
+    clock,
+  );
+  const stale = ownStale ?? nearbyStale;
 
   return (
     <BottomSheetScrollView contentContainerStyle={styles.content}>
@@ -45,7 +56,7 @@ export function StationSheet({
         </Text>
       ) : null}
       {model.poles.map((p, i) => (
-        <PoleSection key={p.pole.id} pole={p} index={i} />
+        <PoleSection key={p.pole.id} pole={p} index={i} stale={stale} />
       ))}
       {model.poles.length === 0 && !loading ? (
         <Text style={styles.note}>No departures in the next 90 minutes.</Text>
@@ -66,7 +77,9 @@ export function StationSheet({
       ) : null}
       {model.poles.length > 0 ? (
         <Text style={styles.legend}>
-          Green: live, on time. Red: live and late (+2 = 2 min). Black: timetable only.
+          {stale
+            ? 'Grey: live times from more than 5 minutes ago, may be out of date. Black: timetable only.'
+            : 'Green: live, on time. Red: live and late (+2 = 2 min). Black: timetable only.'}
         </Text>
       ) : null}
       <Attribution lines={query.data?.response.meta.attribution ?? []} />
@@ -74,19 +87,19 @@ export function StationSheet({
   );
 }
 
-function PoleSection({ pole, index }: { pole: SheetPole; index: number }) {
+function PoleSection({ pole, index, stale }: { pole: SheetPole; index: number; stale: boolean }) {
   const title = poleTitle(pole.pole, index);
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
       {pole.rows.map((r) => (
-        <DirectionRow key={r.key} row={r} />
+        <DirectionRow key={r.key} row={r} stale={stale} />
       ))}
     </View>
   );
 }
 
-function DirectionRow({ row }: { row: SheetRow }) {
+function DirectionRow({ row, stale }: { row: SheetRow; stale: boolean }) {
   return (
     <View style={styles.row}>
       <LineBadge direction={row.direction} size="large" />
@@ -95,7 +108,12 @@ function DirectionRow({ row }: { row: SheetRow }) {
       </Text>
       <View style={styles.times}>
         {row.departures.map((d, i) => (
-          <DepartureTime key={i} cell={d} style={[styles.time, i === 0 && styles.next]} />
+          <DepartureTime
+            key={i}
+            cell={d}
+            style={[styles.time, i === 0 && styles.next]}
+            stale={stale}
+          />
         ))}
       </View>
     </View>

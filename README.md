@@ -132,6 +132,16 @@ The app runs in **Expo Go** and talks to the backend on your PC over the local n
 
 Mobile checks: `cd mobile; npm run typecheck; npm run lint; npm test`. After changing `api/openapi.yaml`: `npm run gen:api`. All commands: [`CLAUDE.md` §5](CLAUDE.md#5-commands).
 
+### Offline check (airplane mode)
+
+What the app does without a connection ([ARCHITECTURE §4.3](docs/ARCHITECTURE.md)). In Expo Go the JavaScript comes from the PC, so open the app before cutting the connection.
+
+1. Open the app on Wi-Fi and wait for the departures.
+2. Turn on airplane mode (Wi-Fi off as well). Within about 35 s a line at the top says **No connection — showing last known data**, with "updated just now" and a "Try again" button. Markers and countdowns stay and keep counting.
+3. Wait. The second line counts up ("updated 3 min ago"). After 5 minutes it adds "live times may be out of date", and green and red times turn grey on the markers and in the station sheet; black timetable times stay as they are.
+4. Turn airplane mode off and tap "Try again" (or wait up to a minute): the line goes away and the colours return.
+5. Cold start without a backend: `docker compose stop backend`, force-quit the app and open it again. The map shows the last departures at once, then the "No connection" line within a few seconds. `docker compose start backend` brings it back.
+
 ## Data & licence
 
 - Transit data: [VBB](https://www.vbb.de/) GTFS and GTFS-RT, licensed **CC BY 4.0**. Data: VBB (CC BY 4.0).

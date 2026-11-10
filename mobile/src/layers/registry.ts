@@ -15,10 +15,22 @@ export interface MapLayer<TFeature> {
   select(response: NearbyResponse): TFeature[];
   /** Stable React key of a feature. */
   key(feature: TFeature): string;
-  /** What the map draws for a feature (a react-native-maps Marker); onPress opens its sheet. */
-  Marker: ComponentType<{ feature: TFeature; onPress: (feature: TFeature) => void }>;
-  /** Content of the bottom sheet for a tapped feature (the map screen owns the sheet). */
-  Sheet: ComponentType<{ feature: TFeature; client: ApiClient | null }>;
+  /**
+   * What the map draws for a feature (a react-native-maps Marker); onPress
+   * opens its sheet. stale: the /v1/nearby data is older than 5 min, so
+   * values that were live are shown as last known (ARCHITECTURE §4.3).
+   */
+  Marker: ComponentType<{
+    feature: TFeature;
+    onPress: (feature: TFeature) => void;
+    stale: boolean;
+  }>;
+  /**
+   * Content of the bottom sheet for a tapped feature (the map screen owns
+   * the sheet). stale: as for Marker; for what the sheet shows from the
+   * feature itself, before or without data of its own.
+   */
+  Sheet: ComponentType<{ feature: TFeature; client: ApiClient | null; stale: boolean }>;
 }
 
 /**

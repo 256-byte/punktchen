@@ -11,6 +11,11 @@ import type { EffectiveDeparture } from './departures';
  */
 export type DepartureState = 'scheduled' | 'onTime' | 'early' | 'late' | 'cancelled';
 
+/** Realtime states: the ones that are greyed out once the data is stale. */
+export function isLive(state: DepartureState): boolean {
+  return state === 'onTime' || state === 'early' || state === 'late';
+}
+
 export interface DepartureCell {
   /** Countdown to the effective (predicted ?? scheduled) time: "now", "3 min", "14:52". */
   label: string;
@@ -49,19 +54,24 @@ export function departureCell(
   return { label: d.label, state, delay: delayText(minutes) };
 }
 
-/** Screen reader text: "3 min, live, 2 min late", "14:52, timetable", "3 min, cancelled". */
-export function cellDescription(c: DepartureCell): string {
+/**
+ * Screen reader text: "3 min, live, 2 min late", "14:52, timetable",
+ * "3 min, cancelled". stale: the data is older than 5 min, so what was live
+ * is read as "outdated live time" (ARCHITECTURE §4.3).
+ */
+export function cellDescription(c: DepartureCell, stale = false): string {
+  const live = stale ? 'outdated live time' : 'live';
   switch (c.state) {
     case 'scheduled':
       return `${c.label}, timetable`;
     case 'cancelled':
       return `${c.label}, cancelled`;
     case 'onTime':
-      return `${c.label}, live, on time`;
+      return `${c.label}, ${live}, on time`;
     case 'late':
     case 'early': {
       const n = Math.abs(Number(c.delay?.slice(1)));
-      return `${c.label}, live, ${n} min ${c.state}`;
+      return `${c.label}, ${live}, ${n} min ${c.state}`;
     }
   }
 }
