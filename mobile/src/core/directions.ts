@@ -5,6 +5,7 @@ import type { components } from '../api/schema.gen';
 import { relativeLuminance } from './color';
 import { nextDeparture } from './departures';
 import { type DepartureCell, decodeCell, departureCell, encodeCell } from './realtime';
+import { MINUTE } from './time';
 
 export type Direction = components['schemas']['Direction'];
 export type Mode = components['schemas']['Mode'];
@@ -139,10 +140,16 @@ export interface MarkerRow {
 
 /**
  * The rows of a pole marker: only non-terminal directions with an upcoming
- * departure, in API order, up to max; `more` counts the other running ones.
- * Directions without one (night lines by day, rail replacement outside its
- * hours, suspended lines) are left to the station sheet (user decision
- * 2026-11-09). No rows: the pole has nothing coming, no marker.
+ * departure, up to max; `more` counts the other running ones. Directions
+ * without one (night lines by day, rail replacement outside its hours,
+ * suspended lines) are left to the station sheet (user decision 2026-11-09).
+ * No rows: the pole has nothing coming, no marker.
+ *
+ * Which directions get a row follows the given order (API order, or the
+ * mode-first merge of a cluster, task 7.2); the shown rows are then ordered
+ * by their next departure, soonest on top ("now", "3 min", "21:44"; task
+ * 7.7). Equal minutes keep the given order. The order moves with the clock,
+ * because the cells do.
  *
  * cells: nextCells() of the same directions.
  */
@@ -151,28 +158,44 @@ export function markerRows(
   cells: readonly (string | null)[],
   max = MARKER_ROWS,
 ): { rows: MarkerRow[]; more: number } {
-  const running: MarkerRow[] = [];
+  const running: { row: MarkerRow; minute: number }[] = [];
   directions.forEach((direction, i) => {
     if (isTerminalDirection(direction)) return;
     const cell = cells[i];
-    if (cell != null) running.push({ direction, next: decodeCell(cell) });
+    if (cell == null) return;
+    const { minute, encoded } = splitNextCell(cell);
+    running.push({ row: { direction, next: decodeCell(encoded) }, minute });
   });
-  return { rows: running.slice(0, max), more: Math.max(0, running.length - max) };
+  const shown = running.slice(0, max).sort((a, b) => a.minute - b.minute); // stable
+  return { rows: shown.map((r) => r.row), more: Math.max(0, running.length - max) };
 }
 
 /**
- * Each direction's next running departure as an encoded cell (countdown
- * "now" / "3 min" / "14:52", live or timetable, delay; see encodeCell);
- * null when none is left (e.g. a line suspended for weeks, or data too
- * old) or when the direction is a terminal arrival (task 7.3). Plain strings,
- * so a clock selector over them re-renders only when one changes.
+ * Each direction's next running departure as a plain string: the epoch minute
+ * of its effective time (the sort key of markerRows, task 7.7), "|", and the
+ * encoded cell (countdown "now" / "3 min" / "14:52", live or timetable, delay;
+ * see encodeCell). null when none is left (e.g. a line suspended for weeks,
+ * or data too old) or when the direction is a terminal arrival (task 7.3).
+ * Plain strings, so a clock selector over them re-renders only when one
+ * changes: the minute changes with the departure, not with the clock.
  */
 export function nextCells(directions: readonly Direction[], now: number): (string | null)[] {
   return directions.map((d) => {
     if (isTerminalDirection(d)) return null;
     const next = nextDeparture(d.departures, now);
-    return next ? encodeCell(departureCell(next)) : null;
+    if (!next) return null;
+    return `${Math.floor(next.effectiveAt / MINUTE)}|${encodeCell(departureCell(next))}`;
   });
+}
+
+/** Sort minute and encoded cell of a nextCells() string (encoded cells have no "|"). */
+function splitNextCell(cell: string): { minute: number; encoded: string } {
+  const bar = cell.indexOf('|');
+  const minute = bar > 0 ? Number(cell.slice(0, bar)) : NaN;
+  if (Number.isNaN(minute)) {
+    return { minute: Number.MAX_SAFE_INTEGER, encoded: cell };
+  }
+  return { minute, encoded: cell.slice(bar + 1) };
 }
 
 export interface NearbyEmptyState {

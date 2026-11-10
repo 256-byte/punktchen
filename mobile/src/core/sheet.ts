@@ -11,6 +11,7 @@ import {
   linesWithReturnDirection,
 } from './directions';
 import { type DepartureCell, decodeCell, departureCell, encodeCell } from './realtime';
+import { MINUTE } from './time';
 
 export type Station = components['schemas']['Station'];
 export type Pole = components['schemas']['Pole'];
@@ -20,11 +21,12 @@ export const SHEET_DEPARTURES = 3;
 
 /**
  * One string per direction of the station (poles in order, then their
- * directions): its next departures as encoded cells (countdown, live or
- * timetable, delay, cancelled; task 4.5), joined by "|"; "" when no
- * running departure is left or when the direction is a terminal arrival
- * (task 7.3). Plain strings, so a clock selector over it (useNow) changes
- * only when a label changes.
+ * directions): the epoch minute of its next running departure (the sort key
+ * of sheetModel, task 7.7), then its next departures as encoded cells
+ * (countdown, live or timetable, delay, cancelled; task 4.5), all joined by
+ * "|"; "" when no running departure is left or when the direction is a
+ * terminal arrival (task 7.3). Plain strings, so a clock selector over it
+ * (useNow) changes only when a label or the next departure changes.
  */
 export function sheetSignature(station: Station, now: number, max = SHEET_DEPARTURES): string[] {
   const returnLines = linesWithReturnDirection(station.poles, station.name);
@@ -34,13 +36,12 @@ export function sheetSignature(station: Station, now: number, max = SHEET_DEPART
         return '';
       }
       const upcoming = upcomingDepartures(d.departures, now);
-      if (!upcoming.some((e) => !e.cancelled)) {
+      const next = upcoming.find((e) => !e.cancelled);
+      if (!next) {
         return '';
       }
-      return upcoming
-        .slice(0, max)
-        .map((e) => encodeCell(departureCell(e)))
-        .join('|');
+      const cells = upcoming.slice(0, max).map((e) => encodeCell(departureCell(e)));
+      return [Math.floor(next.effectiveAt / MINUTE), ...cells].join('|');
     }),
   );
 }
@@ -64,7 +65,7 @@ export interface IdleRow {
 }
 
 export interface SheetModel {
-  /** Poles with at least one running direction, in API order. */
+  /** Poles with at least one running direction, in API order; rows soonest first. */
   poles: SheetPole[];
   /** Directions with nothing coming, once each, in order of appearance. */
   idle: IdleRow[];
@@ -84,7 +85,7 @@ export function sheetModel(station: Station, signature: readonly string[]): Shee
   const runningKeys = new Set<string>();
   let i = 0;
   for (const pole of station.poles) {
-    const rows: SheetRow[] = [];
+    const rows: { row: SheetRow; minute: number }[] = [];
     for (const direction of pole.directions) {
       const sig = signature[i++] ?? '';
       if (isTerminalDirection(direction, station.name, returnLines)) {
@@ -93,14 +94,21 @@ export function sheetModel(station: Station, signature: readonly string[]): Shee
       const key = directionKey(direction);
       if (sig !== '') {
         runningKeys.add(key);
-        rows.push({ key, direction, departures: sig.split('|').map(decodeCell) });
+        const [minute, ...cells] = sig.split('|');
+        rows.push({
+          row: { key, direction, departures: cells.map(decodeCell) },
+          minute: Number(minute),
+        });
       } else if (!seenIdle.has(key)) {
         seenIdle.add(key);
         idle.push({ key, direction, platform: pole.platform });
       }
     }
     if (rows.length > 0) {
-      poles.push({ pole, rows });
+      // Platforms keep their order; within one, the soonest direction comes first
+      // (task 7.7, user decision 2026-11-10). Stable: equal minutes keep API order.
+      rows.sort((a, b) => a.minute - b.minute);
+      poles.push({ pole, rows: rows.map((r) => r.row) });
     }
   }
   return { poles, idle: idle.filter((r) => !runningKeys.has(r.key)) };

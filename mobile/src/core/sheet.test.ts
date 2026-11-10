@@ -5,6 +5,8 @@ import type { Direction } from './directions';
 import { type Pole, poleTitle, sheetModel, sheetSignature, type Station } from './sheet';
 
 const now = Date.parse('2026-11-05T14:30:00+01:00');
+/** Epoch minute of a time on the test day: the sort key in sheetSignature (task 7.7). */
+const minuteOf = (hhmm: string) => Date.parse(`2026-11-05T${hhmm}:00+01:00`) / 60_000;
 
 function dep(time: string, cancelled = false): Departure {
   return {
@@ -64,10 +66,10 @@ const station: Station = {
 describe('sheetSignature', () => {
   it('encodes each direction’s next departures: live, delay, cancelled', () => {
     expect(sheetSignature(station, now)).toEqual([
-      's\t2 min|l+2\t9 min|s\t12 min', // the late one by its predicted time
+      `${minuteOf('14:32')}|s\t2 min|l+2\t9 min|s\t12 min`, // the late one by its predicted time
       '',
       '',
-      'c\t3 min|s\t13 min',
+      `${minuteOf('14:43')}|c\t3 min|s\t13 min`, // sort minute: the next one that runs
       '',
       '',
     ]);
@@ -105,6 +107,31 @@ describe('sheetModel', () => {
       '247 -',
       'RE2 2',
     ]);
+  });
+
+  it('orders the directions of each platform by next departure, platforms unchanged (task 7.7)', () => {
+    const busy: Station = {
+      ...station,
+      poles: [
+        pole('gleis2', '2', [
+          direction('M10', 'Warschauer Str.', [dep('21:44')]),
+          direction('M27', 'S Jungfernheide', [dep('14:40')]),
+          direction('247', 'S Nordbahnhof', [dep('14:31', true), dep('14:30')]), // "now"
+          direction('120', 'U Leopoldplatz', [dep('14:30')]), // same minute: API order
+        ]),
+        pole('gleis1', '1', [
+          direction('142', 'S Ostbahnhof', [dep('14:50')]),
+          direction('147', 'S Ostbahnhof', [dep('14:35'), dep('15:10')]),
+        ]),
+      ],
+    };
+    const rows = (at: number) =>
+      sheetModel(busy, sheetSignature(busy, at)).poles.map(
+        (p) => `${p.pole.id}: ${p.rows.map((r) => r.direction.line).join(' ')}`,
+      );
+    expect(rows(now)).toEqual(['gleis2: 247 120 M27 M10', 'gleis1: 147 142']);
+    // 14:37: 247 and 120 have left; 147's next is 15:10, so 142 (14:50) moves up.
+    expect(rows(now + 7 * 60_000)).toEqual(['gleis2: M27 M10', 'gleis1: 142 147']);
   });
 
   it('copes with a missing signature (all idle)', () => {

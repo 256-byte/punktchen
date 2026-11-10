@@ -99,8 +99,11 @@ describe('PoleMarker', () => {
     expect(screen.queryByText('N20')).toBeNull(); // nothing soon (night line): sheet only
     expect(screen.queryByText('—')).toBeNull();
     expect(screen.queryByText(/more$/)).toBeNull();
+    // Soonest departure first (task 7.7), not API order.
     const markerButton = screen.getByLabelText(
-      /^S\+U Wedding\. M27 to S Jungfernheide: 3 min, timetable\. 247 to/,
+      'S+U Wedding. 120 to U Leopoldplatz: 1 min, timetable. ' +
+        'M27 to S Jungfernheide: 3 min, timetable. 142 to S Ostbahnhof: 10 min, timetable. ' +
+        '247 to S Nordbahnhof: 15:45, timetable',
     );
     expect(markerButton).toBeOnTheScreen();
     expect(markerButton.props.accessible).toBe(true);
@@ -163,6 +166,14 @@ describe('PoleMarker', () => {
     expect(screen.getByText('M27')).toBeOnTheScreen();
   });
 
+  it('keeps the rows ordered by next departure as the clock moves (task 7.7)', async () => {
+    const lines = () => screen.getAllByText(/^(M27|247|120|142)$/).map((n) => n.props.children);
+    await render(<PoleMarker feature={f} clock={clock} />);
+    expect(lines()).toEqual(['120', 'M27', '142', '247']); // 14:31, 14:33, 14:40, 15:45
+    await at(t0 + 4 * 60_000); // 14:34: 120 and M27 14:33 have left; M27 next 14:43
+    expect(lines()).toEqual(['142', 'M27', '247']); // 14:40, 14:43, 15:45
+  });
+
   it('counts down with the clock and moves on to the next departure', async () => {
     await render(<PoleMarker feature={f} clock={clock} />);
     await at(t0 + 60_000);
@@ -222,7 +233,7 @@ describe('PoleMarker', () => {
     expect(screen.getByText('+2')).toBeOnTheScreen();
     expect(
       screen.getByLabelText(
-        /^S\+U Alexanderplatz and 2 nearby stops\. M27 to S Jungfernheide: 3 min, timetable\./,
+        /^S\+U Alexanderplatz and 2 nearby stops\. 120 to U Leopoldplatz: 1 min, timetable\./,
       ),
     ).toBeOnTheScreen();
   });

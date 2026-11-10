@@ -102,6 +102,10 @@ Goal: see live-counting pins around you on the iPhone.
 | 7.4 | 3D pitch toggle, buildings | Works on iOS and Android |
 | 7.5 | Empty/error states, haptics, accessibility labels | VoiceOver reads marker content |
 | 7.6 | README screenshots/GIF, architecture diagram | Portfolio-ready README |
+| 7.7 | Marker rows ordered by next departure (added 2026-11-10, user request) | Soonest on top ("now", "10 min", "21:44"), order follows the clock; which directions are shown stays as in 7.2 |
+| 7.8 | Combined stop popup: both directions of one stop in one marker, sections with a divider (added 2026-11-10) | At street zoom: S+U Wedding S-Bahn Gleis 1+2 one marker, U Leopoldplatz U6+U9 one marker, bus pairs sharing a line one marker; S and U Wedding never merged, Gerichtstr. 247/M27 stay apart; other zoom levels unchanged |
+| 7.9 | Markers never overlap: pushed aside when zoomed out, back in place when zoomed in (added 2026-11-10) | No overlapping bubbles at Alexanderplatz density at any zoom; each displaced bubble still points to its stop |
+| 7.10 | Mode icons (S, U, tram, bus) next to the stop name in every marker, own drawings (added 2026-11-10) | Correct icons at every zoom level, cluster headers list all modes of the merged stops |
 
 ## Later (not scheduled — needs user approval + ADR before starting)
 
