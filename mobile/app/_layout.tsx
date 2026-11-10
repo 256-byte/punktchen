@@ -1,17 +1,26 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { Stack } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { persistOptions } from '@/api/persistence';
+import { queryPersister } from '@/lib/queryPersister';
+
 export default function RootLayout() {
-  const [queryClient] = useState(() => new QueryClient());
+  // The newest /v1/nearby answer is kept on the device and restored on
+  // start (task 6.1).
+  const [{ queryClient, options }] = useState(() => {
+    const client = new QueryClient();
+    return { queryClient: client, options: persistOptions(client, queryPersister) };
+  });
   return (
     // Gestures (bottom sheet) need the root view around the whole app.
     <GestureHandlerRootView style={styles.root}>
-      <QueryClientProvider client={queryClient}>
+      <PersistQueryClientProvider client={queryClient} persistOptions={options}>
         <Stack screenOptions={{ headerShown: false }} />
-      </QueryClientProvider>
+      </PersistQueryClientProvider>
     </GestureHandlerRootView>
   );
 }

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import type { LatLng } from '@/core/geo';
 import type { LocationView } from '@/core/location';
 import { requestLocationAccess } from '@/lib/location';
 import { locationStore, type LocationStore, useLocationView } from '@/state/location';
@@ -10,6 +11,11 @@ type Ready = Extract<LocationView, { kind: 'ready' }>;
 type Props = {
   /** Rendered once there is a position to look around. */
   children: (ready: Ready) => ReactNode;
+  /**
+   * Where the kept /v1/nearby answer was fetched for (task 6.1): shown
+   * while the permission or the first fix is pending, instead of waiting.
+   */
+  lastPlace?: LatLng | null;
   store?: LocationStore;
 };
 
@@ -18,7 +24,7 @@ type Props = {
  * the user chose. Without the location permission it explains why the app
  * asks and offers the map centre instead (task 3.3).
  */
-export function LocationGate({ children, store = locationStore }: Props) {
+export function LocationGate({ children, lastPlace = null, store = locationStore }: Props) {
   const view = useLocationView(store);
   const pickMapCenter = () => store.getState().chooseMapCenter();
 
@@ -26,6 +32,9 @@ export function LocationGate({ children, store = locationStore }: Props) {
     case 'ready':
       return children(view);
     case 'checking':
+      if (lastPlace !== null) {
+        return children({ kind: 'ready', position: lastPlace, source: 'lastKnown' });
+      }
       return (
         <View style={styles.container}>
           <ActivityIndicator />

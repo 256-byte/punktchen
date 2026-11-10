@@ -13,3 +13,8 @@ jest.mock(
   () =>
     jest.requireActual<typeof import('./bottom-sheet-mock')>('./bottom-sheet-mock').bottomSheetMock,
 );
+
+// AsyncStorage (persisted query cache): the library's in-memory Jest mock.
+jest.mock('@react-native-async-storage/async-storage', () =>
+  jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+);
