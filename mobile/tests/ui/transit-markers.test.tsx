@@ -101,7 +101,7 @@ describe('PoleMarker', () => {
     expect(screen.queryByText(/more$/)).toBeNull();
     // Soonest departure first (task 7.7), not API order.
     const markerButton = screen.getByLabelText(
-      'S+U Wedding. 120 to U Leopoldplatz: 1 min, timetable. ' +
+      'S+U Wedding, Bus. 120 to U Leopoldplatz: 1 min, timetable. ' +
         'M27 to S Jungfernheide: 3 min, timetable. 142 to S Ostbahnhof: 10 min, timetable. ' +
         '247 to S Nordbahnhof: 15:45, timetable',
     );
@@ -163,7 +163,7 @@ describe('PoleMarker', () => {
       longitude: 13.37,
     });
     await act(async () =>
-      fireEvent(screen.getByLabelText(/^S\+U Wedding\. 120/, { exact: false }), 'layout', {
+      fireEvent(screen.getByLabelText(/^S\+U Wedding, Bus\. 120/, { exact: false }), 'layout', {
         nativeEvent: { layout: { x: 0, y: 0, width: 180, height: 96 } },
       }),
     );
@@ -242,7 +242,7 @@ describe('PoleMarker', () => {
       borderTopColor: themes.light.colors.border,
     });
     expect(
-      screen.getByLabelText(/^S\+U Wedding\. S15 to S\+U Hauptbahnhof: 1 min/),
+      screen.getByLabelText(/^S\+U Wedding, S-Bahn\. S15 to S\+U Hauptbahnhof: 1 min/),
     ).toBeOnTheScreen();
   });
 
@@ -305,7 +305,7 @@ describe('PoleMarker', () => {
     expect(screen.getByText('+2')).toBeOnTheScreen();
     expect(
       screen.getByLabelText(
-        /^S\+U Alexanderplatz and 2 nearby stops\. 120 to U Leopoldplatz: 1 min, timetable\./,
+        /^S\+U Alexanderplatz and 2 nearby stops, Bus\. 120 to U Leopoldplatz: 1 min, timetable\./,
       ),
     ).toBeOnTheScreen();
   });
@@ -330,13 +330,42 @@ describe('PoleMarker', () => {
     // 5 running lines (M27, 247, 120, 142, U6): 4 badges + "+1".
     expect(
       screen.getByLabelText(
-        'S+U Alexanderplatz and 1 nearby stops. Lines: M27, 247, 120, 142, and 1 more',
+        'S+U Alexanderplatz and 1 nearby stops, Bus. Lines: M27, 247, 120, 142, and 1 more',
       ),
     ).toBeOnTheScreen();
     // No headsigns or countdowns at compact zoom.
     expect(screen.queryByText('S Jungfernheide')).toBeNull();
     expect(screen.queryByText('3 min')).toBeNull();
   });
+
+  const headerIcons = () =>
+    within(screen.getByTestId('marker-header'))
+      .queryAllByTestId(/^mode-icon-/)
+      .map((n) => n.props.testID);
+
+  it('shows the bus icon next to the name of a bus stop at street zoom (task 7.10)', async () => {
+    await render(<PoleMarker feature={f} clock={clock} />);
+    expect(headerIcons()).toEqual(['mode-icon-bus']);
+    expect(within(screen.getByTestId('marker-header')).getByText('S+U Wedding')).toBeOnTheScreen();
+  });
+
+  it.each(['poles', 'stations', 'compact'] as const)(
+    'shows every mode of a merged marker, rail first, at %s zoom (task 7.10)',
+    async (detail) => {
+      const hub: PoleFeature = {
+        ...feature([
+          direction('120', 'U Leopoldplatz', [dep('14:31')]),
+          { ...direction('U6', 'U Alt-Mariendorf', [dep('14:33')]), mode: 'ubahn' },
+          { ...direction('S41', 'Ringbahn S 41', [dep('14:35')]), mode: 'sbahn', isRing: true },
+        ]),
+        poleCount: 3,
+        detail,
+      };
+      await render(<PoleMarker feature={hub} clock={clock} />);
+      expect(headerIcons()).toEqual(['mode-icon-sbahn', 'mode-icon-ubahn', 'mode-icon-bus']);
+      expect(screen.getByLabelText(/^S\+U Wedding, S-Bahn, U-Bahn, Bus\./)).toBeOnTheScreen();
+    },
+  );
 
   it('shows ⟳/⟲ on Ringbahn lines and hides terminal arrival directions (task 7.3)', async () => {
     const ringAndTerminal = feature([
@@ -364,10 +393,11 @@ describe('PoleMarker', () => {
     expect(screen.getByText('⟳ Ringbahn S 41')).toBeOnTheScreen();
     expect(screen.getByText('⟲ Ringbahn S 42')).toBeOnTheScreen();
     expect(screen.getByText('U Alt-Mariendorf')).toBeOnTheScreen();
-    expect(screen.queryByText('S+U Wedding')).toBeNull();
+    // The terminal arrival "→ S+U Wedding" has no row; the name is only in the header.
+    expect(screen.getAllByText('S+U Wedding')).toHaveLength(1);
     expect(
       screen.getByLabelText(
-        /^S\+U Wedding\. S41 to ⟳ Ringbahn S 41: 2 min, timetable\. S42 to ⟲ Ringbahn S 42: 4 min, timetable\. U6 to U Alt-Mariendorf: 5 min, timetable$/,
+        /^S\+U Wedding, S-Bahn, U-Bahn\. S41 to ⟳ Ringbahn S 41: 2 min, timetable\. S42 to ⟲ Ringbahn S 42: 4 min, timetable\. U6 to U Alt-Mariendorf: 5 min, timetable$/,
       ),
     ).toBeOnTheScreen();
   });

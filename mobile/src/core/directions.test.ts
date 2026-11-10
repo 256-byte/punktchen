@@ -9,6 +9,7 @@ import {
   isTerminalDirection,
   linesWithReturnDirection,
   MARKER_ROWS,
+  markerModes,
   markerRows,
   MODE_COLORS,
   nearbyEmptyState,
@@ -295,6 +296,23 @@ describe('sectionRows (task 7.8)', () => {
     );
     expect(lines(r)).toEqual([['U6 2 min']]);
     expect(sectionRows([[direction({})]], [null])).toEqual({ sections: [], more: 0 });
+  });
+});
+
+describe('markerModes (task 7.10)', () => {
+  it('lists each mode once, rail first, without terminal arrivals or "other"', () => {
+    expect(
+      markerModes([
+        direction({ line: '120', mode: 'bus' }),
+        direction({ line: 'U6', mode: 'ubahn' }),
+        direction({ line: 'S41', mode: 'sbahn' }),
+        direction({ line: '147', mode: 'bus' }),
+        direction({ line: 'M13', mode: 'tram', isTerminal: true }),
+        direction({ line: 'X', mode: 'other' }),
+      ]),
+    ).toEqual(['sbahn', 'ubahn', 'bus']);
+    expect(markerModes([direction({ line: 'F10', mode: 'ferry' })])).toEqual(['ferry']);
+    expect(markerModes([])).toEqual([]);
   });
 });
 

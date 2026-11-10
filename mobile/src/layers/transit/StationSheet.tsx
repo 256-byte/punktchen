@@ -4,9 +4,16 @@ import { Text, View } from 'react-native';
 
 import type { ApiClient } from '@/api/client';
 import { useStation } from '@/api/station';
-import { type Direction, directionHeadsign, ringSymbol } from '@/core/directions';
+import { type Direction, directionHeadsign, MODE_NAMES, ringSymbol } from '@/core/directions';
 import { cellDescription } from '@/core/realtime';
-import { poleTitle, type SheetPole, type SheetRow, sheetModel, sheetSignature } from '@/core/sheet';
+import {
+  poleTitle,
+  type SheetPole,
+  type SheetRow,
+  sheetModel,
+  sheetSignature,
+  stationModes,
+} from '@/core/sheet';
 import { freshness } from '@/core/staleness';
 import { type ClockStore, clockStore, useDeviceNow, useNow } from '@/state/clock';
 import { Attribution } from '@/ui/Attribution';
@@ -16,6 +23,7 @@ import type { ColorScheme } from '@/ui/tokens';
 import { DepartureTime } from './DepartureTime';
 import type { PoleFeature } from './index';
 import { LineBadge } from './LineBadge';
+import { ModeIcon } from './ModeIcon';
 
 /**
  * The station sheet (task 3.6): all poles of the tapped pole's station
@@ -40,6 +48,7 @@ export function StationSheet({
   const station = query.data?.response.station ?? feature.station;
   const signature = useNow((now) => sheetSignature(station, now), clock);
   const model = useMemo(() => sheetModel(station, signature), [station, signature]);
+  const modes = useMemo(() => stationModes(station), [station]);
   const loading = query.isPending && client !== null;
   const checkedAt = query.data?.checkedAt;
   const ownStale = useDeviceNow(
@@ -52,9 +61,23 @@ export function StationSheet({
 
   return (
     <BottomSheetScrollView contentContainerStyle={styles.content}>
-      <Text style={styles.title} accessibilityRole="header">
-        {station.name}
-      </Text>
+      {/* Every mode that stops here, then the name (task 7.10). */}
+      <View
+        style={styles.titleRow}
+        accessible
+        accessibilityRole="header"
+        accessibilityLabel={[station.name, ...modes.map((m) => MODE_NAMES[m])].join(', ')}
+        testID="sheet-title"
+      >
+        {modes.length > 0 ? (
+          <View style={styles.titleIcons}>
+            {modes.map((m) => (
+              <ModeIcon key={m} mode={m} size={SHEET_ICON_SIZE} />
+            ))}
+          </View>
+        ) : null}
+        <Text style={styles.title}>{station.name}</Text>
+      </View>
       {loading ? <Text style={styles.note}>Loading all platforms…</Text> : null}
       {query.isError ? (
         <Text style={[styles.note, styles.error]} accessibilityRole="alert">
@@ -93,6 +116,9 @@ export function StationSheet({
     </BottomSheetScrollView>
   );
 }
+
+/** Mode icons in the sheet's title: the height of its capital letters and a bit more. */
+const SHEET_ICON_SIZE = 22;
 
 /** The colour legend under the departures; timetable times are the text colour. */
 function legend(stale: boolean, scheme: ColorScheme): string {
@@ -159,7 +185,18 @@ const useStyles = themedStyles(({ colors, fontSize, fontWeight, opacity, space }
     paddingBottom: space.xxxl,
     gap: space.lg,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: space.sm,
+  },
+  titleIcons: {
+    flexDirection: 'row',
+    gap: space.xs,
+  },
   title: {
+    flexShrink: 1,
     fontSize: fontSize.title,
     fontWeight: fontWeight.bold,
     color: colors.text,

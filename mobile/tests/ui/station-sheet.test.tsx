@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 
 import { ApiError, createApiClient, type ApiClientOptions } from '@/api/client';
@@ -142,7 +142,15 @@ describe('StationSheet', () => {
     expect(decodeURIComponent(new URL(requests[0]!.url).pathname)).toBe(
       '/v1/stations/de:11000:900009104',
     );
-    expect(screen.getByRole('header', { name: 'S+U Wedding' })).toBeOnTheScreen();
+    // Title: icons of every mode that stops here (idle RE2 too), then the name (task 7.10).
+    expect(
+      screen.getByRole('header', { name: 'S+U Wedding, Regional train, S-Bahn, Bus' }),
+    ).toBeOnTheScreen();
+    expect(
+      within(screen.getByTestId('sheet-title'))
+        .getAllByTestId(/^mode-icon-/)
+        .map((n) => n.props.testID),
+    ).toEqual(['mode-icon-regional', 'mode-icon-sbahn', 'mode-icon-bus']);
     expect(screen.queryByText('Loading all platforms…')).toBeNull();
 
     expect(screen.getByText('Platform 1')).toBeOnTheScreen();
@@ -301,7 +309,7 @@ describe('MapScreen with the sheet', () => {
     await fireEvent.press(marker);
     expect(screen.getByTestId('bottom-sheet')).toBeOnTheScreen();
     expect(sheet.props?.enablePanDownToClose).toBe(true);
-    expect(screen.getByRole('header', { name: 'S+U Wedding' })).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: /^S\+U Wedding/ })).toBeOnTheScreen();
     await waitFor(() =>
       expect(requests.some((r) => new URL(r.url).pathname.startsWith('/v1/stations/'))).toBe(true),
     );
