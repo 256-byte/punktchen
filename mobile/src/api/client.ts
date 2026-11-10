@@ -2,6 +2,8 @@
 // this backend, never to VBB directly (CLAUDE.md rule 6).
 import createClient from 'openapi-fetch';
 
+import type { Failure } from '@/core/staleness';
+
 import type { components, paths } from './schema.gen';
 
 export type Health = components['schemas']['Health'];
@@ -37,6 +39,11 @@ export class ApiError extends Error {
     super(message);
     this.name = 'ApiError';
   }
+}
+
+/** Why a request failed: without an HTTP status the backend was not reached. */
+export function failureOf(error: unknown): Failure {
+  return error instanceof ApiError && error.status !== undefined ? 'server' : 'unreachable';
 }
 
 export async function fetchHealth(client: ApiClient, signal?: AbortSignal): Promise<Health> {

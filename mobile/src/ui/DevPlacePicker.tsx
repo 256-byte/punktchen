@@ -68,7 +68,7 @@ function Item({ label, onPress }: { label: string; onPress: () => void }) {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 60,
+    top: 124, // below the status banner (task 6.2)
     right: 12,
     alignItems: 'flex-end',
     pointerEvents: 'box-none',

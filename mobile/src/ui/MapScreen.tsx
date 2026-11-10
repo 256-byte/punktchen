@@ -4,21 +4,23 @@ import BottomSheet from '@gorhom/bottom-sheet';
 import MapView from 'react-native-maps';
 import { useStore } from 'zustand';
 
-import type { ApiClient } from '@/api/client';
+import { type ApiClient, failureOf } from '@/api/client';
 import type { NearbyResponse } from '@/api/nearby';
 import { useNearby } from '@/api/useNearby';
 import type { ApiBaseUrl } from '@/core/apiBaseUrl';
 import { nextRequestCenter } from '@/core/fetchPolicy';
 import { type LatLng, regionAround } from '@/core/geo';
 import type { LocationView } from '@/core/location';
+import { freshness } from '@/core/staleness';
 import { mapLayers } from '@/layers';
 import type { AnyMapLayer } from '@/layers/registry';
-import { type ClockStore, clockStore, useClockTicker } from '@/state/clock';
+import { type ClockStore, clockStore, useClockTicker, useDeviceNow } from '@/state/clock';
 import { locationStore, type LocationStore } from '@/state/location';
 
 import { MapAttribution } from './Attribution';
 import { BackendStatus } from './BackendStatus';
 import { DevPlacePicker } from './DevPlacePicker';
+import { StatusBanner } from './StatusBanner';
 
 /** The map opens showing this radius around the user (the /v1/nearby default). */
 export const START_RADIUS_M = 500;
@@ -41,7 +43,8 @@ type Props = {
  * until the user pans; reports its centre to the location store (used in
  * "map center" mode); draws the registered layers' features from
  * /v1/nearby around the request centre; runs the 1 s clock ticker for
- * the countdowns (task 3.5).
+ * the countdowns (task 3.5). Says how old the data is and when requests
+ * fail (`StatusBanner`), and tells the layers when it is stale (task 6.2).
  */
 export function MapScreen({
   position,
@@ -86,6 +89,15 @@ export function MapScreen({
   const offsetMs = nearby.data?.clockOffsetMs ?? 0;
   useEffect(() => clock.getState().setOffset(offsetMs), [clock, offsetMs]);
 
+  // Data age (ARCHITECTURE §4.3). Changes when the 5 min line is crossed,
+  // so the markers do not re-render with the clock.
+  const checkedAt = nearby.data?.checkedAt;
+  const stale = useDeviceNow(
+    (now) => checkedAt !== undefined && freshness(checkedAt, now) === 'stale',
+    clock,
+  );
+  const failure = nearby.isError ? failureOf(nearby.error) : null;
+
   return (
     <View style={styles.container}>
       <MapView
@@ -101,7 +113,12 @@ export function MapScreen({
         }
       >
         {nearby.data ? (
-          <LayerMarkers layers={layers} response={nearby.data.response} onSelect={setSelected} />
+          <LayerMarkers
+            layers={layers}
+            response={nearby.data.response}
+            stale={stale}
+            onSelect={setSelected}
+          />
         ) : null}
       </MapView>
       <MapAttribution lines={nearby.data?.response.meta.attribution ?? []} />
@@ -110,6 +127,15 @@ export function MapScreen({
         <View style={styles.status}>
           <BackendStatus baseUrl={baseUrl} client={client} />
         </View>
+      ) : checkedAt !== undefined ? (
+        // With data on the map a failure is a line at the top, not a dialog.
+        <StatusBanner
+          checkedAt={checkedAt}
+          failure={failure}
+          onRetry={nearby.refresh}
+          retrying={nearby.isFetching}
+          clock={clock}
+        />
       ) : nearby.isError ? (
         <View style={styles.status}>
           <Text style={styles.statusHeading}>Could not load departures</Text>
@@ -128,7 +154,12 @@ export function MapScreen({
         </View>
       ) : null}
       {selected ? (
-        <FeatureSheet selected={selected} client={client} onClose={() => setSelected(null)} />
+        <FeatureSheet
+          selected={selected}
+          client={client}
+          stale={stale}
+          onClose={() => setSelected(null)}
+        />
       ) : null}
     </View>
   );
@@ -137,10 +168,12 @@ export function MapScreen({
 function LayerMarkers({
   layers,
   response,
+  stale,
   onSelect,
 }: {
   layers: readonly AnyMapLayer[];
   response: NearbyResponse;
+  stale: boolean;
   onSelect: (selected: Selected) => void;
 }) {
   return layers.map((layer) =>
@@ -150,6 +183,7 @@ function LayerMarkers({
         <layer.Marker
           key={`${layer.id}:${layer.key(feature)}`}
           feature={feature}
+          stale={stale}
           onPress={(f) => onSelect({ layer, feature: f })}
         />
       )),
@@ -171,16 +205,23 @@ const SHEET_SNAP_POINTS = ['45%', '90%'];
 function FeatureSheet({
   selected,
   client,
+  stale,
   onClose,
 }: {
   selected: Selected;
   client: ApiClient | null;
+  stale: boolean;
   onClose: () => void;
 }) {
   const { layer, feature } = selected;
   return (
     <BottomSheet index={0} snapPoints={SHEET_SNAP_POINTS} enablePanDownToClose onClose={onClose}>
-      <layer.Sheet key={`${layer.id}:${layer.key(feature)}`} feature={feature} client={client} />
+      <layer.Sheet
+        key={`${layer.id}:${layer.key(feature)}`}
+        feature={feature}
+        client={client}
+        stale={stale}
+      />
     </BottomSheet>
   );
 }

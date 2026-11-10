@@ -205,7 +205,19 @@ Wired in task 5.4 (`src/core/fetchLoop.ts`, `useNearby`):
   - Cold start (`app/index.tsx`, `LocationGate`): nothing is drawn while the cache is read (milliseconds). Then, while the permission or the first fix is pending, the map opens where the kept answer was fetched for (`lastNearbyCenter`, source `lastKnown`) instead of the "Finding your location…" screen. That place is the kept query's key, so the map has its data in the first render, and the fetch loop revalidates it at once with its ETag. When the device's position arrives the map follows it; more than 150 m away is a new request (the old area stays shown meanwhile). First start ever, or data older than 24 h: the location screen as before.
   - The kept answer includes the place it was requested for (the user's last request centre). It stays on the device.
 - Departures in the past are dropped locally (`src/core/departures.ts`: one minute after their effective time, DATA_MODEL §9).
-- Data age (since the last 200 or 304) < 60 s: normal. 60 s – 5 min: show "updated X ago". > 5 min: dimmed realtime values, show scheduled time emphasis. No network: banner "offline — showing last known data".
+- Data age (since the last 200 or 304) < 60 s: normal. 60 s – 5 min: show "updated X ago". > 5 min: dimmed realtime values, show scheduled time emphasis. No network: banner "no connection — showing last known data".
+  - Done in task 6.2. `statusBanner(checkedAt, now, failure)` in `src/core/staleness.ts` decides the text; `StatusBanner` (`src/ui/StatusBanner.tsx`) shows it at the top of the map:
+
+    | Data age | Requests work | Last request failed |
+    |---|---|---|
+    | < 60 s | nothing | "No connection — showing last known data" / "updated just now" + "Try again" |
+    | 60 s – 5 min | "Updated 3 min ago" | same title / "updated 3 min ago" |
+    | > 5 min | "Updated 7 min ago" / "Live times may be out of date" (warning colours) | same title / "updated 7 min ago, live times may be out of date" |
+
+  - **A failure is shown at once, whatever the age**: the next request is at most 30 s away, so the line appears within ~35 s of losing the connection and goes with the first answer (retries follow the backoff; "Try again" skips it). With data on the map a failure is this one line, not the "Could not load departures" box; the box is left for the case without any data.
+  - **No network is inferred, not measured**: a request that ends without an HTTP status (no network, server down, 5 s timeout) is `unreachable` → "No connection"; an HTTP error is `server` → "Server problem" (`failureOf` in `src/api/client.ts`). No connectivity library: what matters is whether *our backend* answers, and a phone on Wi-Fi without internet would read as online.
+  - **Ages use the device clock.** `checkedAt` is a device time, so the age is read with `useDeviceNow` (the clock store's time minus the server correction, ADR-0007). The banner re-renders when its text changes (once a minute).
+  - **Stale (> 5 min):** the map screen computes one boolean and hands it to the layers (`stale` prop of `Marker` and `Sheet`, §4.4); it changes only when the 5 min line is crossed. In the transit layer live countdowns (on time, early, late) turn grey with their delay still shown, timetable times keep their colour — they are what still holds — and cancelled stays red and struck through. Screen readers hear "outdated live time". A marker redraws its native snapshot when `stale` flips. The station sheet uses the age of its own `/v1/stations/{id}` answer once it has one, and its legend line explains the grey.
 - Device clock: if `meta.generatedAt` and the device time differ by more than 30 s when a response arrives, "now" is corrected by that offset (`clockOffset` in `src/core/time.ts`, ADR-0007).
 
 ### 4.4 Layer registry (mobile)
@@ -215,8 +227,8 @@ interface MapLayer<TFeature> {
   id: LayerId;                                  // "transit"
   select(response: NearbyResponse): TFeature[]; // pick this layer's features
   key(feature: TFeature): string;               // stable React key
-  Marker: React.ComponentType<{ feature: TFeature; onPress: (f: TFeature) => void }>;
-  Sheet: React.ComponentType<{ feature: TFeature; client: ApiClient | null }>; // sheet content
+  Marker: React.ComponentType<{ feature: TFeature; onPress: (f: TFeature) => void; stale: boolean }>;
+  Sheet: React.ComponentType<{ feature: TFeature; client: ApiClient | null; stale: boolean }>; // sheet content; stale: data older than 5 min (§4.3)
   refresh: { minIntervalMs: number };
 }
 ```
@@ -237,7 +249,7 @@ Map screen (`src/ui/MapScreen.tsx`, task 3.4):
 - Opens centred on the position (`initialRegion`, 500 m around it) and follows the device position until the user drags the map (`onPanDrag`; `isGesture` of `onRegionChangeComplete` is Google Maps only). In "map center" mode the camera never moves by itself.
 - Reports its centre to the location store on every `onRegionChangeComplete`, so "map center" mode looks where the map is.
 - Requests `/v1/nearby` for a request centre that moves only after > 150 m (`nextRequestCenter`), so small moves and pans reuse one query (and its ETag).
-- Without a configured backend it shows `BackendStatus`; a failed request shows the message with "Try again".
+- Without a configured backend it shows `BackendStatus`. A failed request without any data shows the message with "Try again"; with data on the map it is a line in the `StatusBanner` at the top (§4.3, task 6.2).
 - Data attribution (task 3.7, §6): `meta.attribution` of the shown answer, bottom right on the map (Apple Maps' "Legal" is bottom left) and at the end of the station sheet (`src/ui/Attribution.tsx`).
 - Developer tool (development builds only, `__DEV__`): "Dev: place" (`src/ui/DevPlacePicker.tsx`) jumps to one of the spot-check stations (task 2.6) or back to "My location". It uses the location store's `lookAt(place)`: map-centre mode at that place plus a `jump` the map follows once. iOS has no way for an app to fake the GPS position, so this is how other parts of Berlin are tested on a phone.
 - Expo Go has the native maps module (Apple Maps on iOS, Google Maps on Android). A development or store build for Android will need a Google Maps API key in `app.json` (not needed before Phase 7).

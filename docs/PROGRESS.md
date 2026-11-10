@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 6 — Offline & resilience (Phases 0–5 done; 4.0 closed 2026-11-10)
-- **Next task:** 6.2 staleness UI
+- **Next task:** 6.3 drop past departures offline, countdown keeps running
 - **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
@@ -56,7 +56,7 @@
 | 5 | 5.4 Mobile fetch policy wired | done | `createFetchLoop` + `useNearby`; interim 30 s refetch removed; dev log per request with count per minute; iPhone: request log within the policy (user, 2026-11-09) |
 | 5 | 5.5 Performance numbers in README | done | README "Performance": client 2 req/min standing still (≤ 6), upstream 4/min; 1000 simulated apps: cache hit ratio 93.5 % in a crowd, 13.0 % spread out, p95 ≤ 6.9 ms; measured with the new `nearbyload` tool |
 | 6 | 6.1 Persisted query cache, instant render | done | Newest `/v1/nearby` answer kept in AsyncStorage; cold start opens the map at its place with its data, no location spinner, then revalidates; iPhone: force-quit and reopen shows the last departures at once (user, 2026-11-10) |
-| 6 | 6.2 Staleness UI | todo | |
+| 6 | 6.2 Staleness UI | done | `StatusBanner` at the top of the map ("Updated X ago", warning after 5 min, "No connection — showing last known data" + "Try again"); live times grey when stale; airplane mode test in the README, simulated in Jest; checked on the iPhone (user) |
 | 6 | 6.3 Drop past departures offline, countdown keeps running | todo | |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
@@ -106,6 +106,19 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-10 — task 6.2 (done)
+- Done: `statusBanner` + `Failure` in `src/core/staleness.ts` (what to say for an age and a failure), `isLive` and `cellDescription(cell, stale)` in `src/core/realtime.ts`, `failureOf` in `src/api/client.ts`, `useDeviceNow` in `src/state/clock.ts`, new `src/ui/StatusBanner.tsx`, `MapScreen` (banner instead of the error box when there is data; `stale` to the layers), layer registry (`stale` prop on `Marker` and `Sheet`), `PoleMarker` / `StationSheet` / `DepartureTime` (live times grey when stale, legend line). Dev place picker moved below the banner.
+- Decisions:
+  - No connectivity library (NetInfo): "no connection" = the last request ended without an HTTP status. It answers the question that matters (does our backend answer?), needs no dependency, and a Wi-Fi without internet does not read as online. An HTTP error reads "Server problem".
+  - The failure line appears with the first failed request, not only once the data is old: in airplane mode that is within ~35 s. One failed request on a bad connection shows it for up to 10 s; accepted, because it is true at that moment.
+  - "Dimmed realtime values, scheduled time emphasis" (ARCHITECTURE §4.3) is done as: live countdowns grey (delay still shown), timetable times unchanged, cancelled unchanged. The countdown still runs to the last predicted time; 6.3 deals with departures that have passed.
+  - Wording "No connection" instead of the plan's "offline": the cause may be the server, not the phone.
+- Tests: Vitest `staleness.test.ts` (+5: silent while fresh, age from 60 s, warning after 5 min, failure at any age, server vs. unreachable), `realtime.test.ts` (+2); core coverage 100 % statements. Jest `tests/ui/staleness.test.tsx` (7): banner texts with a server clock 4 days off and no re-render between minutes; `failureOf`; marker and sheet grey when stale, marker redraws; **MapScreen: connection lost → data stays, "No connection" line, age counts up, live times grey after 5 min, "Try again" recovers**; without data the old error box. `cold-start.test.tsx` (+1): **app started without a connection shows the kept departures and the "No connection" line** (the airplane mode test, simulated).
+- Found on the way: the app-wide clock store kept the `Date.now` function it was created with, so it did not follow Jest's fake clock (markers and data disagreed in tests using fake timers). Now `() => Date.now()`; no change on a device.
+- Manual check (documented: README "Offline check (airplane mode)"): done on the iPhone by the user, looks fine.
+- New deps: none.
+- Next: 6.3 (drop past departures offline).
 
 ### 2026-11-10 — task 4.0 (done)
 - Done: `gtfsexplore coverage` on the Tuesday samples (08:03 and 12:30 Berlin, 2 each, recorded by the user) and again on the 7 older ones. DATA_MODEL §7 #19 rewritten (coverage per mode at four times instead of the mix of TripUpdates), #18 corrected ("delay on ~24 %" is over all events; 91–96 % on running trips). ARCHITECTURE §3.3: "coverage is low" replaced by the measured numbers. PLAN 4.0 names the tool that exists (`coverage`).
