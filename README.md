@@ -4,7 +4,7 @@
 
 A map-first mobile app that shows **live departures** (bus, tram, U-Bahn, S-Bahn) directly on the stops around you in Berlin. Open the app, see every stop pole within ~500 m, each with its next departures per direction, counting down live.
 
-**Status:** early development (Phase 0 — skeleton & tooling). Nothing runnable yet. See [`docs/PROGRESS.md`](docs/PROGRESS.md).
+**Status:** in development. It runs locally: the backend serves live departures with realtime delays, and the app shows them on the map (Expo Go). Offline mode and UI polish are next. See [`docs/PROGRESS.md`](docs/PROGRESS.md).
 
 ## Why
 
@@ -29,6 +29,48 @@ VBB GTFS-RT (15 s) ──► merge with schedule ──► Snapshot ──► /v
 - **Mobile:** React Native + Expo, TypeScript. Countdowns are computed on the device from absolute timestamps, so the app keeps working offline.
 
 Details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md), decisions in [`docs/adr/`](docs/adr/).
+
+## Performance
+
+Measured on the dev machine (Windows, backend and PostGIS in Docker Compose) on Tuesday 2026-11-10, 08:04–08:09, the morning peak: 116,000 departures in the snapshot, live VBB realtime. Latency is measured on the same machine, without a network.
+
+**Upstream.** One poller asks VBB 4 times a minute (limit: 7), whatever the number of users.
+
+**One app.** The fetch policy ([`ARCHITECTURE.md` §4.2](docs/ARCHITECTURE.md)) decides when to ask:
+
+| Situation | Requests per minute |
+|---|---|
+| Standing still, app open | 2 (data older than 30 s) |
+| Moving, departures leaving, errors | at most 6 (never within 10 s of the last request) |
+| App in the background | 0 |
+
+**The server under 1000 apps.** `nearbyload` simulates apps standing still: one request every 30 s each, with the ETag of the last answer and gzip. Two runs of 2 minutes, 33 requests per second:
+
+| | A crowd: 1000 apps within 300 m | Spread out: 1000 apps within 3 km |
+|---|---|---|
+| Cache cells used | 30 | 787 |
+| Requests | 3,999 | 3,999 |
+| Cell cache hit ratio | **93.5 %** | 13.0 % |
+| Answers built | 257 | 3,459 |
+| Latency of a 200 (p50 / p95) | 2.3 ms / 5.7 ms | 4.1 ms / 6.9 ms |
+| Answer size, gzip (median) | 6.5 KB | 2.8 KB |
+| 304 Not Modified | 0.6 % | 0.6 % |
+
+What the numbers say:
+
+- **The cache works where people are.** A crowd shares a few cells, and 93.5 % of its lookups are answered from the cache. People spread over the city rarely share a cell, but a miss is cheap: one indexed PostGIS query plus a lookup in the in-memory snapshot, about 4 ms.
+- **A burst costs one build.** 1000 requests for one cell at the same moment build the answer once; the others wait for it (`TestNearbyLoad`).
+- **304s are rare while realtime flows.** Every applied VBB feed makes a new snapshot version (every 14 s in these runs), and the ETag follows the version, so an app that asks every 30 s almost always gets new data. When VBB's feed paused (around midnight), the version changed once a minute and 50 % of the requests were 304s. An ETag from the content of a cell would do better; that is not built.
+- **gzip saves about 91 %.** Alexanderplatz, 500 m: 74.7 KB → 6.5 KB. Wedding: 32.3 KB → 2.9 KB.
+- **Snapshots are cheap to rebuild.** Loading the whole 2-hour window from the database: 1.9 s (at start and after an import). Moving the window each minute: 111 ms. Merging a new realtime feed into 116,000 departures: 46 ms. Readers never wait: a new snapshot replaces the old one atomically.
+- **Memory:** about 250 MB for the backend at the morning peak.
+
+Run it yourself against the Compose stack:
+
+```powershell
+go -C backend run ./internal/tools/nearbyload -users 1000 -spread 300
+go -C backend run ./internal/tools/nearbyload -users 1000 -spread 3000
+```
 
 ## Repository layout
 
