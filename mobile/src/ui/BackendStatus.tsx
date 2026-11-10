@@ -4,6 +4,8 @@ import type { ApiClient } from '@/api/client';
 import { useHealth } from '@/api/health';
 import type { ApiBaseUrl } from '@/core/apiBaseUrl';
 
+import { themedStyles } from './theme';
+
 type Props = {
   baseUrl: ApiBaseUrl;
   client: ApiClient | null;
@@ -11,6 +13,7 @@ type Props = {
 
 /** Shows whether the app reaches the backend (GET /v1/health). */
 export function BackendStatus({ baseUrl, client }: Props) {
+  const styles = useStyles();
   if (!baseUrl.ok || client === null) {
     return (
       <View style={styles.box}>
@@ -27,6 +30,7 @@ export function BackendStatus({ baseUrl, client }: Props) {
 
 function HealthResult({ url, client }: { url: string; client: ApiClient }) {
   const health = useHealth(client);
+  const styles = useStyles();
 
   return (
     <View style={styles.box}>
@@ -62,31 +66,32 @@ function HealthResult({ url, client }: { url: string; client: ApiClient }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles(({ colors, fontSize, fontWeight, opacity, radius, space }) => ({
   box: {
     alignSelf: 'stretch',
-    marginHorizontal: 24,
-    marginTop: 32,
-    padding: 16,
-    borderRadius: 12,
+    marginHorizontal: space.xxl,
+    marginTop: space.xxxl,
+    padding: space.xl,
+    borderRadius: radius.xl,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#999',
-    gap: 6,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    gap: space.sm,
   },
-  heading: { fontSize: 18, fontWeight: '600' },
-  good: { color: '#1a7f37' },
-  bad: { color: '#cf222e' },
-  detail: { fontSize: 14 },
-  hint: { fontSize: 13, opacity: 0.7 },
-  url: { fontSize: 12, opacity: 0.5, marginTop: 4 },
+  heading: { fontSize: fontSize.headline, fontWeight: fontWeight.semibold, color: colors.text },
+  good: { color: colors.success },
+  bad: { color: colors.danger },
+  detail: { fontSize: fontSize.callout, color: colors.text },
+  hint: { fontSize: fontSize.footnote, color: colors.textSecondary },
+  url: { fontSize: fontSize.caption, color: colors.textTertiary, marginTop: space.xs },
   button: {
-    marginTop: 8,
+    marginTop: space.md,
     alignSelf: 'flex-start',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#0969da',
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.accent,
   },
-  pressed: { opacity: 0.6 },
-  buttonText: { color: '#fff', fontWeight: '600' },
-});
+  pressed: { opacity: opacity.pressed },
+  buttonText: { color: colors.onAccent, fontWeight: fontWeight.semibold },
+}));

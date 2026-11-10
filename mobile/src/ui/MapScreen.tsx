@@ -21,6 +21,7 @@ import { MapAttribution } from './Attribution';
 import { BackendStatus } from './BackendStatus';
 import { DevPlacePicker } from './DevPlacePicker';
 import { StatusBanner } from './StatusBanner';
+import { themedStyles, useTheme } from './theme';
 
 /** The map opens showing this radius around the user (the /v1/nearby default). */
 export const START_RADIUS_M = 500;
@@ -45,6 +46,7 @@ type Props = {
  * /v1/nearby around the request centre; runs the 1 s clock ticker for
  * the countdowns (task 3.5). Says how old the data is and when requests
  * fail (`StatusBanner`), and tells the layers when it is stale (task 6.2).
+ * Map, sheet and boxes follow the system's light or dark mode (task 7.1).
  */
 export function MapScreen({
   position,
@@ -97,6 +99,8 @@ export function MapScreen({
     clock,
   );
   const failure = nearby.isError ? failureOf(nearby.error) : null;
+  const styles = useStyles();
+  const { scheme } = useTheme();
 
   return (
     <View style={styles.container}>
@@ -104,6 +108,8 @@ export function MapScreen({
         ref={map}
         style={StyleSheet.absoluteFill}
         initialRegion={initialRegion}
+        // Light or dark map with the system (task 7.1): Apple Maps and Google Maps.
+        userInterfaceStyle={scheme}
         showsUserLocation={followsDevice}
         onPanDrag={() => {
           following.current = false;
@@ -214,8 +220,16 @@ function FeatureSheet({
   onClose: () => void;
 }) {
   const { layer, feature } = selected;
+  const styles = useStyles();
   return (
-    <BottomSheet index={0} snapPoints={SHEET_SNAP_POINTS} enablePanDownToClose onClose={onClose}>
+    <BottomSheet
+      index={0}
+      snapPoints={SHEET_SNAP_POINTS}
+      enablePanDownToClose
+      onClose={onClose}
+      backgroundStyle={styles.sheetBackground}
+      handleIndicatorStyle={styles.sheetHandle}
+    >
       <layer.Sheet
         key={`${layer.id}:${layer.key(feature)}`}
         feature={feature}
@@ -236,42 +250,49 @@ function useRequestCenter(position: LatLng): LatLng {
   return next;
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles(({ colors, fontSize, fontWeight, opacity, radius, space }) => ({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   status: {
     position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 32,
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    gap: 6,
+    left: space.xl,
+    right: space.xl,
+    bottom: space.xxxl,
+    padding: space.xl,
+    borderRadius: radius.xl,
+    backgroundColor: colors.overlay,
+    gap: space.sm,
   },
   statusHeading: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#b42318',
+    fontSize: fontSize.bodyLarge,
+    fontWeight: fontWeight.semibold,
+    color: colors.danger,
   },
   statusDetail: {
-    fontSize: 14,
-    opacity: 0.8,
+    fontSize: fontSize.callout,
+    color: colors.textSecondary,
   },
   retry: {
     alignSelf: 'flex-start',
-    marginTop: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    backgroundColor: '#1f6feb',
+    marginTop: space.xs,
+    paddingVertical: space.md,
+    paddingHorizontal: space.lg,
+    borderRadius: radius.md,
+    backgroundColor: colors.accent,
   },
   retryLabel: {
-    color: '#ffffff',
-    fontWeight: '600',
+    color: colors.onAccent,
+    fontWeight: fontWeight.semibold,
   },
   pressed: {
-    opacity: 0.6,
+    opacity: opacity.pressed,
   },
-});
+  sheetBackground: {
+    backgroundColor: colors.surface,
+  },
+  sheetHandle: {
+    backgroundColor: colors.handle,
+  },
+}));

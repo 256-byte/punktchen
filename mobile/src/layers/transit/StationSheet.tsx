@@ -1,6 +1,6 @@
 import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import type { ApiClient } from '@/api/client';
 import { useStation } from '@/api/station';
@@ -8,6 +8,8 @@ import { poleTitle, type SheetPole, type SheetRow, sheetModel, sheetSignature } 
 import { freshness } from '@/core/staleness';
 import { type ClockStore, clockStore, useDeviceNow, useNow } from '@/state/clock';
 import { Attribution } from '@/ui/Attribution';
+import { themedStyles, useTheme } from '@/ui/theme';
+import type { ColorScheme } from '@/ui/tokens';
 
 import { DepartureTime } from './DepartureTime';
 import type { PoleFeature } from './index';
@@ -43,6 +45,8 @@ export function StationSheet({
     clock,
   );
   const stale = ownStale ?? nearbyStale;
+  const styles = useStyles();
+  const { scheme } = useTheme();
 
   return (
     <BottomSheetScrollView contentContainerStyle={styles.content}>
@@ -80,19 +84,22 @@ export function StationSheet({
           ))}
         </View>
       ) : null}
-      {model.poles.length > 0 ? (
-        <Text style={styles.legend}>
-          {stale
-            ? 'Grey: live times from more than 5 minutes ago, may be out of date. Black: timetable only.'
-            : 'Green: live, on time. Red: live and late (+2 = 2 min). Black: timetable only.'}
-        </Text>
-      ) : null}
+      {model.poles.length > 0 ? <Text style={styles.legend}>{legend(stale, scheme)}</Text> : null}
       <Attribution lines={query.data?.response.meta.attribution ?? []} />
     </BottomSheetScrollView>
   );
 }
 
+/** The colour legend under the departures; timetable times are the text colour. */
+function legend(stale: boolean, scheme: ColorScheme): string {
+  const plain = scheme === 'dark' ? 'White' : 'Black';
+  return stale
+    ? `Grey: live times from more than 5 minutes ago, may be out of date. ${plain}: timetable only.`
+    : `Green: live, on time. Red: live and late (+2 = 2 min). ${plain}: timetable only.`;
+}
+
 function PoleSection({ pole, index, stale }: { pole: SheetPole; index: number; stale: boolean }) {
+  const styles = useStyles();
   const title = poleTitle(pole.pole, index);
   return (
     <View style={styles.section}>
@@ -105,6 +112,7 @@ function PoleSection({ pole, index, stale }: { pole: SheetPole; index: number; s
 }
 
 function DirectionRow({ row, stale }: { row: SheetRow; stale: boolean }) {
+  const styles = useStyles();
   return (
     <View style={styles.row}>
       <LineBadge direction={row.direction} size="large" />
@@ -125,65 +133,65 @@ function DirectionRow({ row, stale }: { row: SheetRow; stale: boolean }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = themedStyles(({ colors, fontSize, fontWeight, opacity, space }) => ({
   content: {
-    paddingHorizontal: 16,
-    paddingBottom: 32,
-    gap: 12,
+    paddingHorizontal: space.xl,
+    paddingBottom: space.xxxl,
+    gap: space.lg,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111111',
+    fontSize: fontSize.title,
+    fontWeight: fontWeight.bold,
+    color: colors.text,
   },
   note: {
-    fontSize: 14,
-    color: '#555555',
+    fontSize: fontSize.callout,
+    color: colors.textSecondary,
   },
   error: {
-    color: '#b42318',
+    color: colors.danger,
   },
   section: {
-    gap: 8,
+    gap: space.md,
   },
   sectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: fontSize.footnote,
+    fontWeight: fontWeight.semibold,
     textTransform: 'uppercase',
-    color: '#666666',
+    color: colors.textTertiary,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: space.ml,
   },
   idle: {
-    opacity: 0.5,
+    opacity: opacity.dimmed,
   },
   headsign: {
     flex: 1,
-    fontSize: 15,
-    color: '#111111',
+    fontSize: fontSize.body,
+    color: colors.text,
   },
   platform: {
-    fontSize: 13,
-    color: '#555555',
+    fontSize: fontSize.footnote,
+    color: colors.textSecondary,
   },
   times: {
     flexDirection: 'row',
-    gap: 10,
+    gap: space.ml,
   },
   time: {
-    fontSize: 14,
-    color: '#444444',
+    fontSize: fontSize.callout,
+    color: colors.textSecondary,
     fontVariant: ['tabular-nums'],
   },
   next: {
-    fontWeight: '700',
-    color: '#111111',
+    fontWeight: fontWeight.bold,
+    color: colors.text,
   },
   legend: {
-    fontSize: 12,
-    color: '#666666',
+    fontSize: fontSize.caption,
+    color: colors.textTertiary,
   },
-});
+}));

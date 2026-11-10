@@ -11,7 +11,7 @@ import { MIN_INTERVAL_MS } from '@/core/fetchPolicy';
 import { STALE_AFTER_MS } from '@/core/staleness';
 import { MINUTE, SECOND } from '@/core/time';
 import type { PoleFeature } from '@/layers/transit';
-import { LATE_RED, STALE_GREY } from '@/layers/transit/DepartureTime';
+import { themes } from '@/ui/tokens';
 import { PoleMarker, TRACK_CHANGES_MS } from '@/layers/transit/PoleMarker';
 import { StationSheet } from '@/layers/transit/StationSheet';
 import { type ClockStore, createClockStore } from '@/state/clock';
@@ -185,7 +185,9 @@ describe('stale data in the transit layer', () => {
     jest.useFakeTimers();
     const f = feature(t0);
     const view = await render(<PoleMarker feature={f} clock={clock} />);
-    expect(screen.getByLabelText('20 min, live, 2 min late')).toHaveStyle({ color: LATE_RED });
+    expect(screen.getByLabelText('20 min, live, 2 min late')).toHaveStyle({
+      color: themes.light.colors.late,
+    });
     await act(async () => jest.advanceTimersByTime(TRACK_CHANGES_MS));
     const tracks = () => screen.getByTestId('marker').props.tracksViewChanges as boolean;
     expect(tracks()).toBe(false);
@@ -193,9 +195,11 @@ describe('stale data in the transit layer', () => {
     await view.rerender(<PoleMarker feature={f} clock={clock} stale />);
     const late = screen.getByLabelText('20 min, outdated live time, 2 min late');
     expect(late).toHaveTextContent('20 min +2');
-    expect(late).toHaveStyle({ color: STALE_GREY });
+    expect(late).toHaveStyle({ color: themes.light.colors.stale });
     // Timetable times keep their colour: they are what still holds.
-    expect(screen.getByLabelText('40 min, timetable')).toHaveStyle({ color: '#111111' });
+    expect(screen.getByLabelText('40 min, timetable')).toHaveStyle({
+      color: themes.light.colors.text,
+    });
     expect(tracks()).toBe(true); // the native marker snapshot is redrawn
     expect(
       screen.getByLabelText(/M27 to S Jungfernheide: 20 min, outdated live time, 2 min late/),
@@ -210,7 +214,7 @@ describe('stale data in the transit layer', () => {
 
     await view.rerender(<StationSheet feature={feature(t0)} client={null} clock={clock} stale />);
     expect(screen.getByLabelText('20 min, outdated live time, 2 min late')).toHaveStyle({
-      color: STALE_GREY,
+      color: themes.light.colors.stale,
     });
     expect(screen.getByText(/^Grey: live times from more than 5 minutes ago/)).toBeOnTheScreen();
     expect(screen.queryByText(/^Green: live, on time/)).toBeNull();
@@ -261,7 +265,7 @@ describe('MapScreen without a connection (task 6.2)', () => {
     await renderMap();
     expect(await screen.findByText('S Jungfernheide')).toBeOnTheScreen();
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(screen.getByLabelText(LIVE)).toHaveStyle({ color: LATE_RED });
+    expect(screen.getByLabelText(LIVE)).toHaveStyle({ color: themes.light.colors.late });
 
     // The connection goes: the next request (data 30 s old) fails.
     online = false;
@@ -271,7 +275,9 @@ describe('MapScreen without a connection (task 6.2)', () => {
     // The data stays; no dialog over the map.
     expect(screen.getByText('S Jungfernheide')).toBeOnTheScreen();
     expect(screen.queryByText('Could not load departures')).toBeNull();
-    expect(screen.getByLabelText(/^1\d min, live, 2 min late$/)).toHaveStyle({ color: LATE_RED });
+    expect(screen.getByLabelText(/^1\d min, live, 2 min late$/)).toHaveStyle({
+      color: themes.light.colors.late,
+    });
 
     // Two minutes offline: the age counts from the last answer.
     await act(() => jest.advanceTimersByTimeAsync(2 * MINUTE));
@@ -283,9 +289,11 @@ describe('MapScreen without a connection (task 6.2)', () => {
       screen.getByText(/^updated \d min ago, live times may be out of date$/),
     ).toBeOnTheScreen();
     expect(screen.getByLabelText(/^1\d min, outdated live time, 2 min late$/)).toHaveStyle({
-      color: STALE_GREY,
+      color: themes.light.colors.stale,
     });
-    expect(screen.getByLabelText(/^3\d min, timetable$/)).toHaveStyle({ color: '#111111' });
+    expect(screen.getByLabelText(/^3\d min, timetable$/)).toHaveStyle({
+      color: themes.light.colors.text,
+    });
 
     // Back online: "Try again" requests (after the 10 s floor) and all is normal.
     online = true;
@@ -294,7 +302,7 @@ describe('MapScreen without a connection (task 6.2)', () => {
     await act(() => jest.advanceTimersByTimeAsync(MIN_INTERVAL_MS));
     expect(requests).toBeGreaterThan(before);
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(screen.getByLabelText(LIVE)).toHaveStyle({ color: LATE_RED });
+    expect(screen.getByLabelText(LIVE)).toHaveStyle({ color: themes.light.colors.late });
   });
 
   it('without any data shows the error with "Try again", as before', async () => {
