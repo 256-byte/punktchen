@@ -203,6 +203,52 @@ describe('PoleMarker', () => {
     await act(async () => jest.advanceTimersByTime(TRACK_CHANGES_MS));
     expect(tracks()).toBe(false);
   });
+
+  it('shows the station header and cluster count on a multi-pole station cluster (task 7.2)', async () => {
+    const clustered: PoleFeature = {
+      ...f,
+      station: { ...f.station, name: 'S+U Alexanderplatz' },
+      poleCount: 8,
+      stationCount: 3,
+      detail: 'stations',
+    };
+    await render(<PoleMarker feature={clustered} clock={clock} />);
+    expect(screen.getByText('S+U Alexanderplatz')).toBeOnTheScreen();
+    expect(screen.getByText('+2')).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText(
+        /^S\+U Alexanderplatz and 2 nearby stops\. M27 to S Jungfernheide: 3 min, timetable\./,
+      ),
+    ).toBeOnTheScreen();
+  });
+
+  it('switches to line badges without headsigns or countdowns at compact zoom (task 7.2)', async () => {
+    const compactFeature: PoleFeature = {
+      ...f,
+      station: { ...f.station, name: 'S+U Alexanderplatz' },
+      pole: {
+        ...f.pole,
+        directions: [...f.pole.directions, direction('U6', 'U Alt-Mariendorf', [dep('14:35')])],
+      },
+      poleCount: 6,
+      stationCount: 2,
+      detail: 'compact',
+    };
+    await render(<PoleMarker feature={compactFeature} clock={clock} />);
+    expect(screen.getByText('S+U Alexanderplatz')).toBeOnTheScreen();
+    expect(screen.getAllByText('+1')).toHaveLength(2);
+    expect(screen.getByText('M27')).toBeOnTheScreen();
+    expect(screen.getByText('247')).toBeOnTheScreen();
+    // 5 running lines (M27, 247, 120, 142, U6): 4 badges + "+1".
+    expect(
+      screen.getByLabelText(
+        'S+U Alexanderplatz and 1 nearby stops. Lines: M27, 247, 120, 142, and 1 more',
+      ),
+    ).toBeOnTheScreen();
+    // No headsigns or countdowns at compact zoom.
+    expect(screen.queryByText('S Jungfernheide')).toBeNull();
+    expect(screen.queryByText('3 min')).toBeNull();
+  });
 });
 
 describe('transit layer', () => {

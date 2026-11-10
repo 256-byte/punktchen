@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 7 — UI polish
-- **Next task:** 7.2 marker clustering / zoom-based detail level
+- **Next task:** 7.3 ring lines ⟳/⟲, terminal display
 - **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
@@ -59,7 +59,7 @@
 | 6 | 6.2 Staleness UI | done | `StatusBanner` at the top of the map ("Updated X ago", warning after 5 min, "No connection — showing last known data" + "Try again"); live times grey when stale; airplane mode test in the README, simulated in Jest; checked on the iPhone (user) |
 | 6 | 6.3 Drop past departures offline, countdown keeps running | done | Already true by design (labels come from the kept answer and the clock); proven by a 10 min offline test on the map screen; sheet says "No newer data" when stale data runs out |
 | 7 | 7.1 Design tokens, light/dark mode | done | `tokens.ts` + `theme.ts` (`useTheme`, `themedStyles`); WCAG AA contrast checked for all text tokens in both modes; map, markers, sheet, banner and location screens follow the system appearance; checked on the iPhone in light and dark mode (user, 2026-11-10) |
-| 7 | 7.2 Marker clustering / zoom-based detail level | todo | |
+| 7 | 7.2 Marker clustering / zoom-based detail level | done | `clustering.ts`: discrete zoom buckets (`poles`, `stations`, `compact`), mode-prioritised + line-interleaved direction merge, hub-first station clustering (120 m at default zoom), compact badge pills at low zoom |
 | 7 | 7.3 Ring lines ⟳/⟲, terminal display | todo | |
 | 7 | 7.4 3D pitch toggle, buildings | todo | |
 | 7 | 7.5 Empty/error states, haptics, accessibility labels | todo | |
@@ -112,6 +112,16 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-10 — task 7.2
+- Done: `src/core/clustering.ts` (`zoomSpec`, `sameZoomSpec`, `mergeDirections`, `clusterStations`, `compactLines`), `src/layers/registry.ts` (`select(response, latitudeDelta)`), `src/layers/transit/index.ts` (uses `clusterStations`), `src/layers/transit/PoleMarker.tsx` (station header + `+N` cluster count on merged `stations` markers; compact station + `LineBadge` pill without headsigns or countdowns at `compact` zoom), `src/ui/MapScreen.tsx` (passes `latitudeDelta` to layers, updates only when crossing a zoom bucket via `sameZoomSpec`).
+- Decisions:
+  - Pure TypeScript clustering in `src/core/clustering.ts` (no third-party map clustering library): transit data already has the `Station → poles` hierarchy, and discrete `latitudeDelta` buckets prevent re-clustering on pure pans.
+  - Three zoom detail levels: `poles` (`latitudeDelta ≤ 0.006`: street level, merging 10 m twin platforms at 15 m and mode groups at 28 m, individual poles at ≤ 0.0012), `stations` (`0.006 < latitudeDelta ≤ 0.018`: default 500 m open view, one marker per station and immediate neighbours within 120 m, ranked so rail hubs like S+U Alexanderplatz lead over adjacent bus stops), and `compact` (`latitudeDelta > 0.018`: overview pill with station name and up to 4 unique running line badges).
+  - When multiple poles merge (`mergeDirections`), directions are ordered by mode priority (`DATA_MODEL.md` §5.2) and interleaved by `(mode, line)` so rail and distinct lines appear in the top 4 rows instead of being pushed into "+N more" by a bus pole that comes first in the array. Single-pole stations keep their exact pole marker without an extra header row.
+- Tests: Vitest `clustering.test.ts` (11: zoom buckets, pan stability, single-pole preservation, rail-first line interleaving, departure deduplication, S+U Wedding street-level Bus/U-Bahn/S-Bahn split, Alexanderplatz hub + Memhardstr. + Gontardstr. merge vs. Rotes Rathaus separate, compact overview lines); core coverage > 99 %. Jest `transit-markers.test.tsx` (+2: station header + `+N` on clustered station marker, compact badge-only marker without headsigns/countdowns), `map-screen.test.tsx` (+1: Alexanderplatz poles clustered at default zoom → split on street zoom-in → compact badges on zoom-out).
+- New deps: none.
+- Next: 7.3 ring lines ⟳/⟲, terminal display.
 
 ### 2026-11-10 — task 7.1
 - Done: `src/core/color.ts` (`relativeLuminance`, `contrastRatio`; `textColorOn` in `directions.ts` now uses `relativeLuminance`), `src/ui/tokens.ts` (light and dark `Colors`, `fontSize`, `fontWeight`, `space`, `radius`, `opacity`, `themes`), `src/ui/theme.ts` (`useTheme`, `schemeOf`, `themedStyles` — builds both `StyleSheet` sets once at module load). Migrated all UI and layer components (`DepartureTime`, `LineBadge`, `PoleMarker`, `StationSheet`, `StatusBanner`, `Attribution`, `BackendStatus`, `DevPlacePicker`, `LocationGate`, `MapScreen`, `app/_layout.tsx`) to design tokens. `MapView` gets `userInterfaceStyle={scheme}`, `BottomSheet` gets themed `backgroundStyle` and `handleIndicatorStyle`, `PoleMarker` gets a hairline border on dark maps and refreshes `tracksViewChanges` when the scheme flips, and `StationSheet`'s legend says "White: timetable only" in dark mode.
