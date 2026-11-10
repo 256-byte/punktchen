@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 7 — UI polish
-- **Next task:** 7.3 ring lines ⟳/⟲, terminal display
+- **Next task:** 7.4 3D pitch toggle, buildings
 - **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
@@ -59,8 +59,8 @@
 | 6 | 6.2 Staleness UI | done | `StatusBanner` at the top of the map ("Updated X ago", warning after 5 min, "No connection — showing last known data" + "Try again"); live times grey when stale; airplane mode test in the README, simulated in Jest; checked on the iPhone (user) |
 | 6 | 6.3 Drop past departures offline, countdown keeps running | done | Already true by design (labels come from the kept answer and the clock); proven by a 10 min offline test on the map screen; sheet says "No newer data" when stale data runs out |
 | 7 | 7.1 Design tokens, light/dark mode | done | `tokens.ts` + `theme.ts` (`useTheme`, `themedStyles`); WCAG AA contrast checked for all text tokens in both modes; map, markers, sheet, banner and location screens follow the system appearance; checked on the iPhone in light and dark mode (user, 2026-11-10) |
-| 7 | 7.2 Marker clustering / zoom-based detail level | done | `clustering.ts`: discrete zoom buckets (`poles`, `stations`, `compact`), mode-prioritised + line-interleaved direction merge, hub-first station clustering (120 m at default zoom), compact badge pills at low zoom |
-| 7 | 7.3 Ring lines ⟳/⟲, terminal display | todo | |
+| 7 | 7.2 Marker clustering / zoom-based detail level | done | `clustering.ts`: discrete zoom buckets (`poles`, `stations`, `compact`), mode-prioritised + line-interleaved direction merge, hub-first station clustering (120 m at default zoom), compact badge pills at low zoom; checked on the iPhone (user, 2026-11-10) |
+| 7 | 7.3 Ring lines ⟳/⟲, terminal display | done | `ringSymbol` / `directionHeadsign` (`⟳` S41 clockwise, `⟲` S42 counter-clockwise), `isTerminalDirection` / `nonTerminalDirections` (drops `isTerminal`, `"Fahrt endet hier"`, and multi-pole station-name arrivals when a return direction exists while keeping loop lines like 114 at S Wannsee), and `sheetModel` omits directions from `idle` when already running on another platform |
 | 7 | 7.4 3D pitch toggle, buildings | todo | |
 | 7 | 7.5 Empty/error states, haptics, accessibility labels | todo | |
 | 7 | 7.6 README screenshots/GIF, architecture diagram | todo | |
@@ -112,6 +112,18 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-10 — task 7.3
+- Done:
+  - `src/core/directions.ts`: `ringSymbol` (`⟳` for clockwise S41, `⟲` for counter-clockwise S42, `null` for non-ring directions), `directionHeadsign` (prefixes `⟳` or `⟲` on `isRing: true` headsigns), `linesWithReturnDirection`, `isTerminalDirection` (flags `isTerminal: true`, `"Fahrt endet hier"`, and directions whose headsign matches `station.name` when the same `(mode, line)` also has a return direction leaving the station), and `nonTerminalDirections`. `nextCells` and `markerRows` also skip terminal directions.
+  - `src/core/clustering.ts`: strips terminal directions per station before clustering (`stationWithoutTerminals`), in `mergeDirections`, and in `compactLines`.
+  - `src/core/sheet.ts`: `sheetSignature` and `sheetModel` exclude terminal directions from both active platform sections and the bottom "No departures soon" section; `sheetModel` also excludes a direction from `idle` when its `directionKey` is already running on another platform of the same station (prevents `S41`, `S42`, and `S15` at S+U Wedding from appearing both as running on their main platform and under "No departures soon" from rare opposite-platform trips).
+  - `src/layers/transit/PoleMarker.tsx` and `src/layers/transit/StationSheet.tsx`: render `directionHeadsign` (and read it in `PoleMarker`'s accessibility label) and filter pole directions through `nonTerminalDirections`.
+- Findings:
+  - At multi-pole terminals such as `S Wannsee Bhf` (`de:11000:900053301`), arriving buses (`118`, `218`, `316`, `318`) stop at a drop-off pole (`::5` / `::3`) before pulling forward to the termination pole (`::1` / `::2`) within the same station, so GTFS marks the drop-off pole `is_terminal = false` with `headsign = "S Wannsee Bhf"`. Checking whether the same `(mode, line)` has a return direction (`headsign !== station.name`) hides those arriving directions while preserving genuine loop lines like Bus `114` (`headsign = "S Wannsee Bhf"` as its only destination, `DATA_MODEL.md` §7 #27).
+- Tests: Vitest `directions.test.ts` (+2: `ringSymbol`/`directionHeadsign`, terminal filtering + loop preservation), `clustering.test.ts` (+1: terminal filtering on pole merge), `sheet.test.ts` (+2: S+U Wedding cross-platform running/idle deduplication, S Wannsee terminal return-only + loop 114 preservation); Jest `transit-markers.test.tsx` (+1: `⟳`/`⟲` display + accessibility label + terminal hiding), `station-sheet.test.tsx` (+1: `⟳`/`⟲` headsigns + terminal arrival omission).
+- New deps: none.
+- Next: 7.4 3D pitch toggle, buildings.
 
 ### 2026-11-10 — task 7.2
 - Done: `src/core/clustering.ts` (`zoomSpec`, `sameZoomSpec`, `mergeDirections`, `clusterStations`, `compactLines`), `src/layers/registry.ts` (`select(response, latitudeDelta)`), `src/layers/transit/index.ts` (uses `clusterStations`), `src/layers/transit/PoleMarker.tsx` (station header + `+N` cluster count on merged `stations` markers; compact station + `LineBadge` pill without headsigns or countdowns at `compact` zoom), `src/ui/MapScreen.tsx` (passes `latitudeDelta` to layers, updates only when crossing a zoom bucket via `sameZoomSpec`).

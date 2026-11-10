@@ -249,6 +249,40 @@ describe('PoleMarker', () => {
     expect(screen.queryByText('S Jungfernheide')).toBeNull();
     expect(screen.queryByText('3 min')).toBeNull();
   });
+
+  it('shows ⟳/⟲ on Ringbahn lines and hides terminal arrival directions (task 7.3)', async () => {
+    const ringAndTerminal = feature([
+      {
+        ...direction('S41', 'Ringbahn S 41', [dep('14:32')]),
+        mode: 'sbahn',
+        isRing: true,
+      },
+      {
+        ...direction('S42', 'Ringbahn S 42', [dep('14:34')]),
+        mode: 'sbahn',
+        isRing: true,
+      },
+      {
+        ...direction('U6', 'S+U Wedding', [dep('14:31')]),
+        mode: 'ubahn',
+        isTerminal: true,
+      },
+      {
+        ...direction('U6', 'U Alt-Mariendorf', [dep('14:35')]),
+        mode: 'ubahn',
+      },
+    ]);
+    await render(<PoleMarker feature={ringAndTerminal} clock={clock} />);
+    expect(screen.getByText('⟳ Ringbahn S 41')).toBeOnTheScreen();
+    expect(screen.getByText('⟲ Ringbahn S 42')).toBeOnTheScreen();
+    expect(screen.getByText('U Alt-Mariendorf')).toBeOnTheScreen();
+    expect(screen.queryByText('S+U Wedding')).toBeNull();
+    expect(
+      screen.getByLabelText(
+        /^S\+U Wedding\. S41 to ⟳ Ringbahn S 41: 2 min, timetable\. S42 to ⟲ Ringbahn S 42: 4 min, timetable\. U6 to U Alt-Mariendorf: 5 min, timetable$/,
+      ),
+    ).toBeOnTheScreen();
+  });
 });
 
 describe('transit layer', () => {

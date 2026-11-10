@@ -4,11 +4,16 @@ import type { Departure } from './departures';
 import {
   badgeColor,
   type Direction,
+  directionHeadsign,
   directionKey,
+  isTerminalDirection,
+  linesWithReturnDirection,
   MARKER_ROWS,
   markerRows,
   MODE_COLORS,
   nextCells,
+  nonTerminalDirections,
+  ringSymbol,
   textColorOn,
 } from './directions';
 
@@ -70,6 +75,108 @@ describe('directionKey', () => {
     const plain = direction({ line: 'S41', mode: 'sbahn', headsign: 'Ringbahn S 41' });
     expect(directionKey(plain)).toBe('sbahn|S41|Ringbahn S 41|');
     expect(directionKey({ ...plain, isRing: true })).toBe('sbahn|S41|Ringbahn S 41|ring');
+  });
+});
+
+describe('ringSymbol and directionHeadsign (task 7.3)', () => {
+  it('prefixes ⟳ for clockwise S41 and ⟲ for counter-clockwise S42', () => {
+    const s41 = direction({ line: 'S41', mode: 'sbahn', headsign: 'Ringbahn S 41', isRing: true });
+    const s42 = direction({ line: 'S42', mode: 'sbahn', headsign: 'Ringbahn S 42', isRing: true });
+    const partialS41 = direction({
+      line: 'S41',
+      mode: 'sbahn',
+      headsign: 'S Ostkreuz Bhf',
+      isRing: true,
+    });
+    const partialS42 = direction({
+      line: 'S42',
+      mode: 'sbahn',
+      headsign: 'S Südkreuz Bhf',
+      isRing: true,
+    });
+    const plain = direction({ line: 'U6', mode: 'ubahn', headsign: 'U Alt-Mariendorf' });
+
+    expect(ringSymbol(s41)).toBe('⟳');
+    expect(ringSymbol(s42)).toBe('⟲');
+    expect(ringSymbol(plain)).toBeNull();
+
+    expect(directionHeadsign(s41)).toBe('⟳ Ringbahn S 41');
+    expect(directionHeadsign(s42)).toBe('⟲ Ringbahn S 42');
+    expect(directionHeadsign(partialS41)).toBe('⟳ S Ostkreuz Bhf');
+    expect(directionHeadsign(partialS42)).toBe('⟲ S Südkreuz Bhf');
+    expect(directionHeadsign({ ...s41, headsign: '⟳ Ringbahn S 41' })).toBe('⟳ Ringbahn S 41');
+    expect(directionHeadsign(plain)).toBe('U Alt-Mariendorf');
+  });
+});
+
+describe('terminal direction filtering (task 7.3)', () => {
+  it('drops isTerminal, "Fahrt endet hier", and station-name arrivals when a return direction exists, while keeping loop lines', () => {
+    const wannseeDirs = [
+      direction({
+        line: 'S1',
+        mode: 'sbahn',
+        headsign: 'S Wannsee Bhf',
+        isTerminal: true,
+        departures: [dep('14:31')],
+      }),
+      direction({
+        line: 'S1',
+        mode: 'sbahn',
+        headsign: 'S Oranienburg Bhf',
+        departures: [dep('14:35')],
+      }),
+      direction({
+        line: '118',
+        mode: 'bus',
+        headsign: 'S Wannsee Bhf',
+        departures: [dep('14:32')],
+      }),
+      direction({
+        line: '118',
+        mode: 'bus',
+        headsign: 'Rathaus Zehlendorf',
+        departures: [dep('14:38')],
+      }),
+      direction({
+        line: '114',
+        mode: 'bus',
+        headsign: 'S Wannsee Bhf', // loop line: no other headsign
+        departures: [dep('14:40')],
+      }),
+      direction({
+        line: '316',
+        mode: 'bus',
+        headsign: 'Fahrt endet hier',
+        departures: [dep('14:33')],
+      }),
+    ];
+
+    const returnLines = linesWithReturnDirection([{ directions: wannseeDirs }], 'S Wannsee Bhf');
+    expect(returnLines.has('sbahn|S1')).toBe(true);
+    expect(returnLines.has('bus|118')).toBe(true);
+    expect(returnLines.has('bus|114')).toBe(false);
+    expect(isTerminalDirection(wannseeDirs[2]!, 'S Wannsee Bhf', returnLines)).toBe(true);
+    expect(isTerminalDirection(wannseeDirs[4]!, 'S Wannsee Bhf', returnLines)).toBe(false);
+
+    const filtered = nonTerminalDirections(wannseeDirs, { name: 'S Wannsee Bhf' });
+    expect(filtered.map((d) => `${d.line} -> ${d.headsign}`)).toEqual([
+      'S1 -> S Oranienburg Bhf',
+      '118 -> Rathaus Zehlendorf',
+      '114 -> S Wannsee Bhf',
+    ]);
+
+    // Preserves array identity when nothing is filtered.
+    const clean = [direction({ line: 'U6', headsign: 'U Alt-Mariendorf' })];
+    expect(nonTerminalDirections(clean, { name: 'S+U Wedding' })).toBe(clean);
+
+    // nextCells and markerRows also skip isTerminal and "Fahrt endet hier".
+    const cells = nextCells([wannseeDirs[0]!, wannseeDirs[1]!, wannseeDirs[5]!], now);
+    expect(cells).toEqual([null, 's\t5 min', null]);
+    expect(
+      markerRows([wannseeDirs[0]!, wannseeDirs[1]!], ['s\t1 min', 's\t5 min']).rows.map(
+        (r) => r.direction.headsign,
+      ),
+    ).toEqual(['S Oranienburg Bhf']);
   });
 });
 

@@ -261,6 +261,34 @@ describe('mergeDirections', () => {
     expect(merged).toHaveLength(1);
     expect(merged[0]!.departures.map((d) => d.tripId)).toEqual(['t1', 't2', 't3']);
   });
+
+  it('drops terminal directions when merging poles (task 7.3)', () => {
+    const p1 = {
+      id: 'p1',
+      location: { lat: 52.5, lng: 13.4 },
+      platform: '1',
+      description: null,
+      directions: [
+        { ...dir('U6', 'S+U Wedding', 'ubahn'), isTerminal: true },
+        dir('U6', 'U Alt-Mariendorf', 'ubahn'),
+      ],
+    };
+    const p2 = {
+      id: 'p2',
+      location: { lat: 52.5, lng: 13.4 },
+      platform: '2',
+      description: null,
+      directions: [
+        dir('U6', 'Fahrt endet hier', 'ubahn'),
+        dir('U6', 'U Kurt-Schumacher-Platz', 'ubahn'),
+      ],
+    };
+    expect(mergeDirections([p1]).map((d) => d.headsign)).toEqual(['U Alt-Mariendorf']);
+    expect(mergeDirections([p1, p2]).map((d) => d.headsign)).toEqual([
+      'U Alt-Mariendorf',
+      'U Kurt-Schumacher-Platz',
+    ]);
+  });
 });
 
 describe('clusterStations across zoom levels', () => {

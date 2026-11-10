@@ -3,7 +3,13 @@
 // latitude span (`Region.latitudeDelta`) and returns the markers to draw.
 
 import type { components } from '../api/schema.gen';
-import { type Direction, directionKey, type Mode } from './directions';
+import {
+  type Direction,
+  directionKey,
+  isTerminalDirection,
+  type Mode,
+  nonTerminalDirections,
+} from './directions';
 import { distanceMeters, type LatLng } from './geo';
 
 export type Station = components['schemas']['Station'];
@@ -90,9 +96,21 @@ const MODE_RANK: Record<Mode, number> = {
   other: 6,
 };
 
-/** Whether a pole has any direction with departures in the loaded window. */
+/** Whether a pole has any non-terminal direction with departures in the loaded window. */
 function hasDepartures(pole: Pole): boolean {
-  return pole.directions.some((d) => d.departures.length > 0);
+  return pole.directions.some((d) => !isTerminalDirection(d) && d.departures.length > 0);
+}
+
+/** Strips terminating arrival directions from a station's poles (task 7.3). */
+function stationWithoutTerminals(station: Station): Station {
+  let changed = false;
+  const poles = station.poles.map((pole) => {
+    const directions = nonTerminalDirections(pole.directions, station);
+    if (directions === pole.directions) return pole;
+    changed = true;
+    return { ...pole, directions };
+  });
+  return changed ? { ...station, poles } : station;
 }
 
 /** Arithmetic mean of coordinates. */
@@ -114,11 +132,12 @@ function centroid(points: readonly LatLng[]): LatLng {
  */
 export function mergeDirections(poles: readonly Pole[]): Direction[] {
   if (poles.length === 0) return [];
-  if (poles.length === 1) return poles[0]!.directions;
+  if (poles.length === 1) return nonTerminalDirections(poles[0]!.directions);
 
   const byKey = new Map<string, Direction>();
   for (const pole of poles) {
     for (const d of pole.directions) {
+      if (isTerminalDirection(d)) continue;
       const key = directionKey(d);
       const existing = byKey.get(key);
       if (!existing) {
@@ -169,9 +188,10 @@ export function clusterStations(
   latitudeDelta?: number,
 ): ClusteredFeature[] {
   const spec = zoomSpec(latitudeDelta);
+  const cleaned = stations.map(stationWithoutTerminals);
 
   if (spec.detail === 'poles' && spec.radiusM === 0) {
-    return stations.flatMap((station) =>
+    return cleaned.flatMap((station) =>
       station.poles.map((pole) => ({
         station,
         pole,
@@ -183,10 +203,10 @@ export function clusterStations(
   }
 
   if (spec.detail === 'poles') {
-    return stations.flatMap((station) => clusterPolesInStation(station, spec.radiusM));
+    return cleaned.flatMap((station) => clusterPolesInStation(station, spec.radiusM));
   }
 
-  return clusterByStation(stations, spec.radiusM, spec.detail);
+  return clusterByStation(cleaned, spec.radiusM, spec.detail);
 }
 
 /** Street-level clustering: merges nearby active poles within the same station. */
@@ -317,7 +337,7 @@ export function compactLines(
   const unique: Direction[] = [];
   const seen = new Set<string>();
   directions.forEach((d, i) => {
-    if (cells[i] == null) return;
+    if (cells[i] == null || isTerminalDirection(d)) return;
     const id = `${d.mode}|${d.line}`;
     if (!seen.has(id)) {
       seen.add(id);

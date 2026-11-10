@@ -194,6 +194,40 @@ describe('StationSheet', () => {
     expect(await screen.findByText('No departures in the next 90 minutes.')).toBeOnTheScreen();
     expect(screen.getByText('Nauen')).toBeOnTheScreen();
   });
+
+  it('formats Ringbahn ⟳/⟲ headsigns and shows only return directions at terminal stops (task 7.3)', async () => {
+    const weddingAndTerminal: Station = {
+      ...full,
+      poles: [
+        pole('p1', '1', [{ ...S41, isRing: true }]),
+        pole('p2', '2', [
+          {
+            ...direction('S42', 'Ringbahn S 42', [dep('14:34')], 'sbahn'),
+            isRing: true,
+          },
+          {
+            ...direction('U6', 'S+U Wedding', [dep('14:31')], 'ubahn'),
+            isTerminal: true,
+          },
+          direction('U6', 'U Alt-Mariendorf', [dep('14:36')], 'ubahn'),
+        ]),
+        pole('p3', '3', [
+          {
+            ...direction('S41', 'S Südkreuz Bhf', [], 'sbahn'),
+            isRing: true,
+          },
+        ]),
+      ],
+    };
+    answer = () => json(stationResponse(weddingAndTerminal));
+    await renderSheet();
+    expect(await screen.findByText('⟳ Ringbahn S 41')).toBeOnTheScreen();
+    expect(screen.getByText('⟲ Ringbahn S 42')).toBeOnTheScreen();
+    expect(screen.getByText('U Alt-Mariendorf')).toBeOnTheScreen();
+    expect(screen.getByText('⟳ S Südkreuz Bhf')).toBeOnTheScreen();
+    // The terminating U6 arrival ("S+U Wedding") is not shown as a departure row.
+    expect(screen.getAllByText('S+U Wedding')).toHaveLength(1); // station header only
+  });
 });
 
 describe('fetchStation', () => {

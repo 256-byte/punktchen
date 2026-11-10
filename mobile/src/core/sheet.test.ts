@@ -112,6 +112,62 @@ describe('sheetModel', () => {
     expect(empty.poles).toEqual([]);
     expect(empty.idle).toHaveLength(5);
   });
+
+  it('omits directions from idle when the same direction runs on another platform (S+U Wedding S41/S42)', () => {
+    const weddingRings: Station = {
+      ...station,
+      poles: [
+        pole('gleis1', '1', [
+          { ...direction('S41', 'Ringbahn S 41', [dep('14:32')]), mode: 'sbahn', isRing: true },
+          { ...direction('S42', 'Ringbahn S 42', []), mode: 'sbahn', isRing: true },
+        ]),
+        pole('gleis2', '2', [
+          { ...direction('S42', 'Ringbahn S 42', [dep('14:34')]), mode: 'sbahn', isRing: true },
+          { ...direction('S41', 'Ringbahn S 41', []), mode: 'sbahn', isRing: true },
+        ]),
+      ],
+    };
+    const m = sheetModel(weddingRings, sheetSignature(weddingRings, now));
+    expect(m.poles.map((p) => p.rows.map((r) => r.direction.line))).toEqual([['S41'], ['S42']]);
+    expect(m.idle).toEqual([]);
+  });
+
+  it('shows only the return direction at terminal stops while keeping loop lines (task 7.3)', () => {
+    const wannsee: Station = {
+      id: 'de:11000:900053301',
+      kind: 'station',
+      name: 'S Wannsee Bhf',
+      location: { lat: 52.421, lng: 13.179 },
+      modes: ['sbahn', 'bus'],
+      poles: [
+        pole('p1', '1', [
+          {
+            ...direction('S1', 'S Wannsee Bhf', [dep('14:32')]),
+            mode: 'sbahn',
+            isTerminal: true,
+          },
+          { ...direction('S1', 'S Oranienburg Bhf', [dep('14:35')]), mode: 'sbahn' },
+        ]),
+        pole('p2', null, [
+          direction('118', 'S Wannsee Bhf', [dep('14:33')]), // multi-pole arrival before layover
+          direction('118', 'Rathaus Zehlendorf', [dep('14:38')]),
+          direction('114', 'S Wannsee Bhf', [dep('14:40')]), // loop line: only headsign at Wannsee
+        ]),
+        pole('p3', null, [
+          direction('316', 'S Wannsee Bhf', []),
+          direction('316', 'Fahrt endet hier', []),
+          direction('316', 'Potsdam, Glienicker Brücke', []),
+        ]),
+      ],
+    };
+    const m = sheetModel(wannsee, sheetSignature(wannsee, now));
+    expect(
+      m.poles.map((p) => p.rows.map((r) => `${r.direction.line} -> ${r.direction.headsign}`)),
+    ).toEqual([['S1 -> S Oranienburg Bhf'], ['118 -> Rathaus Zehlendorf', '114 -> S Wannsee Bhf']]);
+    expect(m.idle.map((r) => `${r.direction.line} -> ${r.direction.headsign}`)).toEqual([
+      '316 -> Potsdam, Glienicker Brücke',
+    ]);
+  });
 });
 
 describe('poleTitle', () => {

@@ -4,7 +4,12 @@
 
 import type { components } from '../api/schema.gen';
 import { upcomingDepartures } from './departures';
-import { type Direction, directionKey } from './directions';
+import {
+  type Direction,
+  directionKey,
+  isTerminalDirection,
+  linesWithReturnDirection,
+} from './directions';
 import { type DepartureCell, decodeCell, departureCell, encodeCell } from './realtime';
 
 export type Station = components['schemas']['Station'];
@@ -17,12 +22,17 @@ export const SHEET_DEPARTURES = 3;
  * One string per direction of the station (poles in order, then their
  * directions): its next departures as encoded cells (countdown, live or
  * timetable, delay, cancelled; task 4.5), joined by "|"; "" when no
- * running departure is left. Plain strings, so a clock
- * selector over it (useNow) changes only when a label changes.
+ * running departure is left or when the direction is a terminal arrival
+ * (task 7.3). Plain strings, so a clock selector over it (useNow) changes
+ * only when a label changes.
  */
 export function sheetSignature(station: Station, now: number, max = SHEET_DEPARTURES): string[] {
+  const returnLines = linesWithReturnDirection(station.poles, station.name);
   return station.poles.flatMap((pole) =>
     pole.directions.map((d) => {
+      if (isTerminalDirection(d, station.name, returnLines)) {
+        return '';
+      }
       const upcoming = upcomingDepartures(d.departures, now);
       if (!upcoming.some((e) => !e.cancelled)) {
         return '';
@@ -60,18 +70,29 @@ export interface SheetModel {
   idle: IdleRow[];
 }
 
-/** The sheet's content from the station and its sheetSignature(). */
+/**
+ * The sheet's content from the station and its sheetSignature().
+ * Terminating arrival directions (task 7.3) are omitted from both active
+ * sections and `idle`; directions that are running on another platform of
+ * the same station (e.g. S41/S42 at S+U Wedding) are not listed as idle.
+ */
 export function sheetModel(station: Station, signature: readonly string[]): SheetModel {
+  const returnLines = linesWithReturnDirection(station.poles, station.name);
   const poles: SheetPole[] = [];
   const idle: IdleRow[] = [];
   const seenIdle = new Set<string>();
+  const runningKeys = new Set<string>();
   let i = 0;
   for (const pole of station.poles) {
     const rows: SheetRow[] = [];
     for (const direction of pole.directions) {
       const sig = signature[i++] ?? '';
+      if (isTerminalDirection(direction, station.name, returnLines)) {
+        continue;
+      }
       const key = directionKey(direction);
       if (sig !== '') {
+        runningKeys.add(key);
         rows.push({ key, direction, departures: sig.split('|').map(decodeCell) });
       } else if (!seenIdle.has(key)) {
         seenIdle.add(key);
@@ -82,7 +103,7 @@ export function sheetModel(station: Station, signature: readonly string[]): Shee
       poles.push({ pole, rows });
     }
   }
-  return { poles, idle };
+  return { poles, idle: idle.filter((r) => !runningKeys.has(r.key)) };
 }
 
 /**

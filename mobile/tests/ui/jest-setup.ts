@@ -1,6 +1,9 @@
 // Runs before every Jest test file (package.json "jest.setupFiles").
 import { jest } from '@jest/globals';
 
+// First render in a worker loads React Native + navigation trees under parallel load.
+jest.setTimeout(15_000);
+
 // Safe area insets (attribution on the map): the library's own Jest mock.
 jest.mock(
   'react-native-safe-area-context',
