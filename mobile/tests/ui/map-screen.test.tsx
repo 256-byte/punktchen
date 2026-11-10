@@ -9,6 +9,7 @@ import { MIN_INTERVAL_MS } from '@/core/fetchPolicy';
 import type { LatLng } from '@/core/geo';
 import { MAX_3D_ALTITUDE_M, MIN_3D_ZOOM, PITCH_3D_DEG, regionAround } from '@/core/geo';
 import { type Station, transitLayer } from '@/layers/transit';
+import * as haptics from '@/lib/haptics';
 import { createLocationStore, type LocationStore } from '@/state/location';
 import { MapScreen, START_RADIUS_M } from '@/ui/MapScreen';
 
@@ -392,6 +393,52 @@ describe('MapScreen layers', () => {
     expect(screen.getByText('U2')).toBeOnTheScreen();
     expect(screen.getByText('100')).toBeOnTheScreen();
     expect(screen.queryByText('S+U Pankow')).toBeNull();
+  });
+
+  it('shows empty states when no stops or no departures are nearby (task 7.5)', async () => {
+    answer = () =>
+      new Response(JSON.stringify(nearby()), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    await renderMap(WEDDING);
+    expect(await screen.findByText('No stops nearby')).toBeOnTheScreen();
+    expect(
+      screen.getByText(
+        'No transit stops within 500 m. Move the map to look around Berlin and Brandenburg.',
+      ),
+    ).toBeOnTheScreen();
+
+    // Stops exist, but none has upcoming departures in the 90-minute window.
+    const quiet = station('de:11000:900009104', 'S+U Wedding');
+    quiet.poles[0]!.directions[0]!.departures = [];
+    answer = () =>
+      new Response(JSON.stringify(nearby(quiet)), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    await renderMap(north(300));
+    expect(await screen.findByText('No departures nearby')).toBeOnTheScreen();
+    expect(
+      screen.getByText('Stops in this area have no departures in the next 90 minutes.'),
+    ).toBeOnTheScreen();
+  });
+
+  it('triggers haptic feedback on marker selection, 3D toggle, and retry (task 7.5)', async () => {
+    const selectionSpy = jest.spyOn(haptics, 'hapticSelection');
+    const lightSpy = jest.spyOn(haptics, 'hapticLight');
+
+    await renderMap(WEDDING);
+    const marker = await screen.findByTestId('marker');
+
+    await fireEvent.press(marker);
+    expect(selectionSpy).toHaveBeenCalledTimes(1);
+
+    await fireEvent.press(screen.getByRole('button', { name: '3D' }));
+    expect(lightSpy).toHaveBeenCalledTimes(1);
+
+    selectionSpy.mockRestore();
+    lightSpy.mockRestore();
   });
 });
 

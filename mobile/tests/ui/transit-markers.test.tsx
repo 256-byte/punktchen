@@ -99,9 +99,13 @@ describe('PoleMarker', () => {
     expect(screen.queryByText('N20')).toBeNull(); // nothing soon (night line): sheet only
     expect(screen.queryByText('—')).toBeNull();
     expect(screen.queryByText(/more$/)).toBeNull();
-    expect(
-      screen.getByLabelText(/^S\+U Wedding\. M27 to S Jungfernheide: 3 min, timetable\. 247 to/),
-    ).toBeOnTheScreen();
+    const markerButton = screen.getByLabelText(
+      /^S\+U Wedding\. M27 to S Jungfernheide: 3 min, timetable\. 247 to/,
+    );
+    expect(markerButton).toBeOnTheScreen();
+    expect(markerButton.props.accessible).toBe(true);
+    expect(markerButton.props.accessibilityRole).toBe('button');
+    expect(markerButton.props.accessibilityHint).toBe('Opens station departures');
   });
 
   it('colours live countdowns and shows the delay of late ones (task 4.5)', async () => {
@@ -138,6 +142,7 @@ describe('PoleMarker', () => {
     await render(<PoleMarker feature={busy} clock={clock} />);
     expect(screen.getByText('+1 more')).toBeOnTheScreen();
     expect(screen.queryByText('N40')).toBeNull();
+    expect(screen.getByLabelText(/\. 1 more direction$/)).toBeOnTheScreen();
   });
 
   it('draws no marker for a pole with nothing coming', async () => {

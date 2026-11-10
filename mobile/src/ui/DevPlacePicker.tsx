@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import type { LatLng } from '@/core/geo';
+import { hapticSelection } from '@/lib/haptics';
 import type { LocationStore } from '@/state/location';
 
 import { themedStyles } from './theme';
@@ -27,6 +28,7 @@ export function DevPlacePicker({ store }: { store: LocationStore }) {
   const [open, setOpen] = useState(false);
   const styles = useStyles();
   const choose = (action: () => void) => {
+    hapticSelection();
     action();
     setOpen(false);
   };
@@ -35,6 +37,7 @@ export function DevPlacePicker({ store }: { store: LocationStore }) {
     <View style={styles.container}>
       <Pressable
         accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
         onPress={() => setOpen((o) => !o)}
         style={({ pressed }) => [styles.toggle, pressed && styles.pressed]}
       >

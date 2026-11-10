@@ -160,6 +160,13 @@ describe('StationSheet', () => {
     expect(screen.getByText('S Oranienburger Str.')).toBeOnTheScreen();
     expect(screen.getByText('Pl. 5')).toBeOnTheScreen();
     expect(screen.queryByText('Platform 5')).toBeNull(); // its pole has nothing running
+    // VoiceOver labels for running and idle direction rows (task 7.5).
+    expect(
+      screen.getByLabelText(
+        'S41 to Ringbahn S 41: 2 min, timetable; 10 min, live, 3 min late; 12 min, timetable',
+      ),
+    ).toBeOnTheScreen();
+    expect(screen.getByLabelText('RE2 to Nauen, platform 5: no departures soon')).toBeOnTheScreen();
     const texts = screen.getAllByText(/./).map((t) => String(t.props.children));
     expect(texts.indexOf('No departures soon')).toBeGreaterThan(texts.indexOf('S Jungfernheide'));
     expect(texts.indexOf('Nauen')).toBeGreaterThan(texts.indexOf('No departures soon'));

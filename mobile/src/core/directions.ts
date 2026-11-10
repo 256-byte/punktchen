@@ -174,3 +174,40 @@ export function nextCells(directions: readonly Direction[], now: number): (strin
     return next ? encodeCell(departureCell(next)) : null;
   });
 }
+
+export interface NearbyEmptyState {
+  title: string;
+  detail: string;
+}
+
+/**
+ * Empty state for the map when `/v1/nearby` succeeded with nothing to show on
+ * markers (task 7.5): either no stops within 500 m, or stops with no non-terminal
+ * departures in the 90-minute window. Returns `null` when at least one pole has
+ * a non-terminal direction with departures.
+ */
+export function nearbyEmptyState(
+  stations: readonly {
+    name: string;
+    poles: readonly { directions: readonly Direction[] }[];
+  }[],
+): NearbyEmptyState | null {
+  if (stations.length === 0) {
+    return {
+      title: 'No stops nearby',
+      detail: 'No transit stops within 500 m. Move the map to look around Berlin and Brandenburg.',
+    };
+  }
+  const hasDepartures = stations.some((station) =>
+    station.poles.some((pole) =>
+      nonTerminalDirections(pole.directions, station).some((d) => d.departures.length > 0),
+    ),
+  );
+  if (!hasDepartures) {
+    return {
+      title: 'No departures nearby',
+      detail: 'Stops in this area have no departures in the next 90 minutes.',
+    };
+  }
+  return null;
+}

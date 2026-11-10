@@ -9,12 +9,14 @@ import type { NearbyResponse } from '@/api/nearby';
 import { useNearby } from '@/api/useNearby';
 import type { ApiBaseUrl } from '@/core/apiBaseUrl';
 import { sameZoomSpec } from '@/core/clustering';
+import { nearbyEmptyState } from '@/core/directions';
 import { nextRequestCenter } from '@/core/fetchPolicy';
 import { type LatLng, pitchCamera, regionAround } from '@/core/geo';
 import type { LocationView } from '@/core/location';
 import { freshness } from '@/core/staleness';
 import { mapLayers } from '@/layers';
 import type { AnyMapLayer } from '@/layers/registry';
+import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { type ClockStore, clockStore, useClockTicker, useDeviceNow } from '@/state/clock';
 import { locationStore, type LocationStore } from '@/state/location';
 
@@ -103,12 +105,23 @@ export function MapScreen({
   }, [jump]);
 
   const togglePitch = () => {
+    hapticLight();
     const next = !pitched;
     pitchedRef.current = next;
     setPitched(next);
     map.current?.animateCamera(pitchCamera(next, deltaRef.current), {
       duration: FOLLOW_ANIMATION_MS,
     });
+  };
+
+  const selectFeature = (next: Selected) => {
+    hapticSelection();
+    setSelected(next);
+  };
+
+  const retryNearby = () => {
+    hapticLight();
+    nearby.refresh();
   };
 
   const center = useRequestCenter(position);
@@ -128,6 +141,9 @@ export function MapScreen({
     clock,
   );
   const failure = nearby.isError ? failureOf(nearby.error) : null;
+  const emptyState = nearby.data
+    ? nearbyEmptyState(nearby.data.response.layers.transit?.features ?? [])
+    : null;
   const styles = useStyles();
   const { scheme } = useTheme();
 
@@ -159,7 +175,7 @@ export function MapScreen({
             response={nearby.data.response}
             latitudeDelta={latitudeDelta}
             stale={stale}
-            onSelect={setSelected}
+            onSelect={selectFeature}
           />
         ) : null}
       </MapView>
@@ -172,20 +188,28 @@ export function MapScreen({
         </View>
       ) : checkedAt !== undefined ? (
         // With data on the map a failure is a line at the top, not a dialog.
-        <StatusBanner
-          checkedAt={checkedAt}
-          failure={failure}
-          onRetry={nearby.refresh}
-          retrying={nearby.isFetching}
-          clock={clock}
-        />
+        <>
+          <StatusBanner
+            checkedAt={checkedAt}
+            failure={failure}
+            onRetry={retryNearby}
+            retrying={nearby.isFetching}
+            clock={clock}
+          />
+          {emptyState ? (
+            <View style={styles.status} accessibilityRole="alert" accessibilityLiveRegion="polite">
+              <Text style={styles.emptyHeading}>{emptyState.title}</Text>
+              <Text style={styles.statusDetail}>{emptyState.detail}</Text>
+            </View>
+          ) : null}
+        </>
       ) : nearby.isError ? (
-        <View style={styles.status}>
+        <View style={styles.status} accessibilityRole="alert" accessibilityLiveRegion="polite">
           <Text style={styles.statusHeading}>Could not load departures</Text>
           <Text style={styles.statusDetail}>{nearby.error.message}</Text>
           <Pressable
             accessibilityRole="button"
-            onPress={nearby.refresh}
+            onPress={retryNearby}
             disabled={nearby.isFetching}
             style={({ pressed }) => [
               styles.retry,
@@ -285,6 +309,7 @@ function PitchToggle({ pitched, onToggle }: { pitched: boolean; onToggle: () => 
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="3D"
+      accessibilityHint="Tilts the map to show 3D buildings"
       accessibilityState={{ selected: pitched }}
       onPress={onToggle}
       style={({ pressed }) => [
@@ -356,6 +381,11 @@ const useStyles = themedStyles(
       fontSize: fontSize.bodyLarge,
       fontWeight: fontWeight.semibold,
       color: colors.danger,
+    },
+    emptyHeading: {
+      fontSize: fontSize.bodyLarge,
+      fontWeight: fontWeight.semibold,
+      color: colors.text,
     },
     statusDetail: {
       fontSize: fontSize.callout,
