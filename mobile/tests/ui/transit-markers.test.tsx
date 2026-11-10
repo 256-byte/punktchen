@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { act, render, renderHook, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, render, renderHook, screen, within } from '@testing-library/react-native';
 import { Profiler } from 'react';
 
 import type { NearbyResponse } from '@/api/nearby';
@@ -146,6 +146,33 @@ describe('PoleMarker', () => {
     expect(screen.getByText('+1 more')).toBeOnTheScreen();
     expect(screen.queryByText('N40')).toBeNull();
     expect(screen.getByLabelText(/\. 1 more direction$/)).toBeOnTheScreen();
+  });
+
+  it('draws at displayAt when moved aside and reports its size (task 7.9)', async () => {
+    const onSize = jest.fn();
+    await render(
+      <PoleMarker
+        feature={f}
+        clock={clock}
+        displayAt={{ lat: 52.55, lng: 13.37 }}
+        onSize={onSize}
+      />,
+    );
+    expect(screen.getByTestId('marker').props.coordinate).toEqual({
+      latitude: 52.55,
+      longitude: 13.37,
+    });
+    await act(async () =>
+      fireEvent(screen.getByLabelText(/^S\+U Wedding\. 120/, { exact: false }), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width: 180, height: 96 } },
+      }),
+    );
+    expect(onSize).toHaveBeenLastCalledWith({ width: 180, height: 96 });
+
+    // Nothing to draw: takes no room.
+    const night = feature([direction('N20', 'S Oranienburger Str.', [])]);
+    await render(<PoleMarker feature={night} clock={clock} onSize={onSize} />);
+    expect(onSize).toHaveBeenLastCalledWith({ width: 0, height: 0 });
   });
 
   it('draws no marker for a pole with nothing coming', async () => {

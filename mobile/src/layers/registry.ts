@@ -6,6 +6,8 @@ import type { ComponentType } from 'react';
 import type { ApiClient } from '@/api/client';
 import type { NearbyResponse } from '@/api/nearby';
 import type { components } from '@/api/schema.gen';
+import type { LatLng } from '@/core/geo';
+import type { Size } from '@/core/labelLayout';
 
 export type LayerId = components['schemas']['LayerId'];
 
@@ -28,15 +30,23 @@ export interface MapLayer<TFeature> {
   select(response: NearbyResponse, latitudeDelta?: number, options?: MapViewOptions): TFeature[];
   /** Stable React key of a feature. */
   key(feature: TFeature): string;
+  /** Where a feature is on the map (its marker's point; task 7.9). */
+  location(feature: TFeature): LatLng;
   /**
    * What the map draws for a feature (a react-native-maps Marker); onPress
    * opens its sheet. stale: the /v1/nearby data is older than 5 min, so
    * values that were live are shown as last known (ARCHITECTURE §4.3).
+   * displayAt: where to draw the marker instead of location(feature), when
+   * the map moved it aside so it does not cover another one (task 7.9).
+   * onSize: the marker reports its drawn size (0 × 0 when it draws nothing),
+   * which the map needs to keep markers apart.
    */
   Marker: ComponentType<{
     feature: TFeature;
     onPress: (feature: TFeature) => void;
     stale: boolean;
+    displayAt?: LatLng;
+    onSize?: (size: Size) => void;
   }>;
   /**
    * Content of the bottom sheet for a tapped feature (the map screen owns

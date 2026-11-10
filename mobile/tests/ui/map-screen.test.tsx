@@ -99,6 +99,7 @@ beforeEach(() => {
       headers: { 'Content-Type': 'application/json' },
     });
   map.props = null;
+  map.scale = 100_000;
   map.animateToRegion.mockClear();
   map.animateCamera.mockClear();
 });
@@ -488,6 +489,45 @@ describe('MapScreen layers', () => {
 
     await fireEvent.press(toggle);
     expect(screen.getAllByTestId('marker')).toHaveLength(1);
+  });
+
+  it('moves overlapping markers apart and back when zoomed in (task 7.9)', async () => {
+    const first = station('de:11000:1', 'First stop');
+    const second = {
+      ...station('de:11000:2', 'Second stop'),
+      location: { lat: 52.54285, lng: 13.366 }, // 17 m north of the first
+    };
+    second.poles[0]!.location = second.location;
+    answer = () =>
+      new Response(JSON.stringify(nearby(first, second)), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    await renderMap(WEDDING);
+    await screen.findByText('Second stop → Jungfernheide');
+    const streetZoom = {
+      latitude: 52.5427,
+      longitude: 13.366,
+      latitudeDelta: 0.001,
+      longitudeDelta: 0.001,
+    };
+    await act(async () => map.props?.onRegionChangeComplete?.(streetZoom, {}));
+
+    // 17 m ≈ 15 points apart: the bubbles (170 × 90 until measured) overlap.
+    // The first (nearest) stays on its stop; the second moves aside.
+    const secondStop = { latitude: 52.54285, longitude: 13.366 };
+    const markerAt = (i: number) => screen.getAllByTestId('marker')[i]!.props.coordinate;
+    await waitFor(() => expect(markerAt(1)).not.toEqual(secondStop));
+    expect(markerAt(0)).toEqual({ latitude: 52.5427, longitude: 13.366 });
+    // Only the two markers: no line or dot back to the stop (user decision).
+    expect(screen.getAllByTestId('marker')).toHaveLength(2);
+
+    // Zoomed in far enough (100× the points per degree): both back on their stops.
+    map.scale = 10_000_000;
+    await act(async () =>
+      map.props?.onRegionChangeComplete?.({ ...streetZoom, latitudeDelta: 0.0002 }, {}),
+    );
+    await waitFor(() => expect(markerAt(1)).toEqual(secondStop));
   });
 
   it('triggers haptic feedback on marker selection, 3D toggle, and retry (task 7.5)', async () => {

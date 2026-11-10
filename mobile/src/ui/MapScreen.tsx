@@ -1,21 +1,21 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import BottomSheet from '@gorhom/bottom-sheet';
 import MapView from 'react-native-maps';
 import { useStore } from 'zustand';
 
 import { type ApiClient, failureOf } from '@/api/client';
-import type { NearbyResponse } from '@/api/nearby';
 import { useNearby } from '@/api/useNearby';
 import type { ApiBaseUrl } from '@/core/apiBaseUrl';
 import { COMBINE_STOPS_DEFAULT, sameZoomSpec } from '@/core/clustering';
 import { nearbyEmptyState } from '@/core/directions';
 import { nextRequestCenter } from '@/core/fetchPolicy';
 import { type LatLng, pitchCamera, regionAround } from '@/core/geo';
+import type { Size } from '@/core/labelLayout';
 import type { LocationView } from '@/core/location';
 import { freshness } from '@/core/staleness';
 import { mapLayers } from '@/layers';
-import type { AnyMapLayer, MapViewOptions } from '@/layers/registry';
+import type { AnyMapLayer } from '@/layers/registry';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { type ClockStore, clockStore, useClockTicker, useDeviceNow } from '@/state/clock';
 import { locationStore, type LocationStore } from '@/state/location';
@@ -25,6 +25,7 @@ import { BackendStatus } from './BackendStatus';
 import { DevPlacePicker } from './DevPlacePicker';
 import { StatusBanner } from './StatusBanner';
 import { themedStyles, useTheme } from './theme';
+import { type Displaced, useMarkerLayout } from './useMarkerLayout';
 
 /** The map opens showing this radius around the user (the /v1/nearby default). */
 export const START_RADIUS_M = 500;
@@ -153,6 +154,24 @@ export function MapScreen({
   const styles = useStyles();
   const { scheme } = useTheme();
 
+  // What the layers draw, in priority order for keeping markers apart (7.9).
+  const response = nearby.data?.response;
+  const drawn = useMemo(
+    () =>
+      response
+        ? layers.flatMap((layer) =>
+            layer.select(response, latitudeDelta, { combineStops }).map((feature) => ({
+              layer,
+              feature,
+              key: `${layer.id}:${layer.key(feature)}`,
+              location: layer.location(feature),
+            })),
+          )
+        : [],
+    [layers, response, latitudeDelta, combineStops],
+  );
+  const { displaced, relayout, reportSize } = useMarkerLayout(map, drawn);
+
   return (
     <View style={styles.container}>
       <MapView
@@ -173,18 +192,16 @@ export function MapScreen({
           setLatitudeDelta((prev) =>
             sameZoomSpec(prev, r.latitudeDelta) ? prev : r.latitudeDelta,
           );
+          relayout();
         }}
       >
-        {nearby.data ? (
-          <LayerMarkers
-            layers={layers}
-            response={nearby.data.response}
-            latitudeDelta={latitudeDelta}
-            combineStops={combineStops}
-            stale={stale}
-            onSelect={selectFeature}
-          />
-        ) : null}
+        <LayerMarkers
+          drawn={drawn}
+          displaced={displaced}
+          stale={stale}
+          onSelect={selectFeature}
+          onSize={reportSize}
+        />
       </MapView>
       <MapAttribution lines={nearby.data?.response.meta.attribution ?? []} />
       <PitchToggle pitched={pitched} onToggle={togglePitch} />
@@ -240,34 +257,41 @@ export function MapScreen({
   );
 }
 
+interface Drawn {
+  layer: AnyMapLayer;
+  feature: unknown;
+  key: string;
+  location: LatLng;
+}
+
+/**
+ * The layers' markers; one moved aside so it does not cover another (7.9)
+ * is drawn at its new place. No line back to its stop: zooming in puts it
+ * back there (user decision 2026-11-10).
+ */
 function LayerMarkers({
-  layers,
-  response,
-  latitudeDelta,
-  combineStops,
+  drawn,
+  displaced,
   stale,
   onSelect,
+  onSize,
 }: {
-  layers: readonly AnyMapLayer[];
-  response: NearbyResponse;
-  latitudeDelta: number;
-  combineStops: boolean;
+  drawn: readonly Drawn[];
+  displaced: ReadonlyMap<string, Displaced>;
   stale: boolean;
   onSelect: (selected: Selected) => void;
+  onSize: (key: string, size: Size) => void;
 }) {
-  const options: MapViewOptions = { combineStops };
-  return layers.map((layer) =>
-    layer
-      .select(response, latitudeDelta, options)
-      .map((feature) => (
-        <layer.Marker
-          key={`${layer.id}:${layer.key(feature)}`}
-          feature={feature}
-          stale={stale}
-          onPress={(f) => onSelect({ layer, feature: f })}
-        />
-      )),
-  );
+  return drawn.map(({ layer, feature, key }) => (
+    <layer.Marker
+      key={key}
+      feature={feature}
+      stale={stale}
+      displayAt={displaced.get(key)?.displayAt}
+      onSize={(size) => onSize(key, size)}
+      onPress={(f) => onSelect({ layer, feature: f })}
+    />
+  ));
 }
 
 /** A tapped feature, shown in the bottom sheet. */
