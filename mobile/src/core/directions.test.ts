@@ -11,6 +11,7 @@ import {
   MARKER_ROWS,
   markerRows,
   MODE_COLORS,
+  nearbyEmptyState,
   nextCells,
   nonTerminalDirections,
   ringSymbol,
@@ -277,5 +278,55 @@ describe('ten minutes without new data (task 6.3)', () => {
 
   it('shows nothing once every known departure has left', () => {
     expect(labels(at('14:54'))).toEqual([]);
+  });
+});
+
+describe('nearbyEmptyState (task 7.5)', () => {
+  it('explains when no stops are within 500 m', () => {
+    expect(nearbyEmptyState([])).toEqual({
+      title: 'No stops nearby',
+      detail: 'No transit stops within 500 m. Move the map to look around Berlin and Brandenburg.',
+    });
+  });
+
+  it('explains when stops nearby have no departures or only terminal arrivals', () => {
+    const stations = [
+      {
+        name: 'S+U Wedding',
+        poles: [
+          {
+            directions: [
+              direction({ line: 'N20', headsign: 'S Oranienburger Str.', departures: [] }),
+              direction({
+                line: 'U6',
+                headsign: 'S+U Wedding',
+                isTerminal: true,
+                departures: [dep('14:32')],
+              }),
+            ],
+          },
+        ],
+      },
+    ];
+    expect(nearbyEmptyState(stations)).toEqual({
+      title: 'No departures nearby',
+      detail: 'Stops in this area have no departures in the next 90 minutes.',
+    });
+  });
+
+  it('returns null when at least one non-terminal direction has departures', () => {
+    const stations = [
+      {
+        name: 'S+U Wedding',
+        poles: [
+          {
+            directions: [
+              direction({ line: 'U6', headsign: 'U Alt-Mariendorf', departures: [dep('14:32')] }),
+            ],
+          },
+        ],
+      },
+    ];
+    expect(nearbyEmptyState(stations)).toBeNull();
   });
 });

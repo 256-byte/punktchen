@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 7 — UI polish
-- **Next task:** 7.5 empty/error states, haptics, accessibility labels
+- **Next task:** 7.6 README screenshots/GIF, architecture diagram
 - **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
@@ -61,8 +61,8 @@
 | 7 | 7.1 Design tokens, light/dark mode | done | `tokens.ts` + `theme.ts` (`useTheme`, `themedStyles`); WCAG AA contrast checked for all text tokens in both modes; map, markers, sheet, banner and location screens follow the system appearance; checked on the iPhone in light and dark mode (user, 2026-11-10) |
 | 7 | 7.2 Marker clustering / zoom-based detail level | done | `clustering.ts`: discrete zoom buckets (`poles`, `stations`, `compact`), mode-prioritised + line-interleaved direction merge, hub-first station clustering (120 m at default zoom), compact badge pills at low zoom; checked on the iPhone (user, 2026-11-10) |
 | 7 | 7.3 Ring lines ⟳/⟲, terminal display | done | `ringSymbol` / `directionHeadsign` (`⟳` S41 clockwise, `⟲` S42 counter-clockwise), `isTerminalDirection` / `nonTerminalDirections` (drops `isTerminal`, `"Fahrt endet hier"`, and multi-pole station-name arrivals when a return direction exists while keeping loop lines like 114 at S Wannsee), and `sheetModel` omits directions from `idle` when already running on another platform; checked on the iPhone (user, 2026-11-10) |
-| 7 | 7.4 3D pitch toggle, buildings | done | `showsBuildings` + `pitchEnabled` on `MapView`; `"3D"` toggle (`PitchToggle` in `MapScreen.tsx` + `pitchCamera` in `src/core/geo.ts`, tilting to 50° with `altitude ≤ 750 m` on iOS and `zoom ≥ 16.5` on Android so 3D buildings render immediately, and keeping 3D across camera jumps) |
-| 7 | 7.5 Empty/error states, haptics, accessibility labels | todo | |
+| 7 | 7.4 3D pitch toggle, buildings | done | `showsBuildings` + `pitchEnabled` on `MapView`; `"3D"` toggle (`PitchToggle` in `MapScreen.tsx` + `pitchCamera` in `src/core/geo.ts`, tilting to 50° with `altitude ≤ 750 m` on iOS and `zoom ≥ 16.5` on Android so 3D buildings render immediately, and keeping 3D across camera jumps); checked on the iPhone (user, 2026-11-10) |
+| 7 | 7.5 Empty/error states, haptics, accessibility labels | done | `nearbyEmptyState` in `src/core/directions.ts` ("No stops nearby" / "No departures nearby"); `src/lib/haptics.ts` (`hapticSelection` on marker tap / dev picker, `hapticLight` on 3D toggle / retry); VoiceOver `accessible`, `accessibilityRole="button"`, `accessibilityHint`, and full `accessibilityLabel` on `PoleMarker` (`<Marker>` + bubble) and `StationSheet` rows; checked on the iPhone (user, 2026-11-10) |
 | 7 | 7.6 README screenshots/GIF, architecture diagram | todo | |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
@@ -112,6 +112,15 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-10 — task 7.5
+- Done:
+  - `src/core/directions.ts`: `nearbyEmptyState(stations)` returning `"No stops nearby"` when `/v1/nearby` has 0 stations within 500 m and `"No departures nearby"` when stations exist in range but none has any non-terminal direction with departures in the 90-minute window (`null` otherwise).
+  - `src/lib/haptics.ts`: `hapticSelection()` and `hapticLight()` backed by `requireOptionalNativeModule('ExpoHaptics')` from `expo-modules-core` (works out of the box in Expo Go on iOS/Android without extra dependencies and no-ops in Jest). Wired to marker taps, 3D pitch toggle, "Try again", and the developer place picker.
+  - `src/layers/transit/PoleMarker.tsx`, `src/layers/transit/StationSheet.tsx`, `src/ui/MapScreen.tsx`, `src/ui/DevPlacePicker.tsx`: added `accessible`, `accessibilityRole="button"`, `accessibilityHint="Opens station departures"`, and `accessibilityLabel` (including the `+N more` overflow count) on both `<Marker>` and the marker bubble `<View>` so iOS VoiceOver (`MKAnnotationView`) and Android TalkBack read the full marker content as one button; added full row `accessibilityLabel`s on active and idle `StationSheet` rows and `accessibilityRole="alert"` on empty and error states.
+- Tests: Vitest `directions.test.ts` (+3: `nearbyEmptyState` with no stops, stops without departures, stops with departures); Jest `transit-markers.test.tsx` (VoiceOver `accessible`, `accessibilityRole`, `accessibilityHint`, overflow count in `accessibilityLabel`), `station-sheet.test.tsx` (VoiceOver labels on active and idle rows), `map-screen.test.tsx` (+2: empty states and haptic feedback spies).
+- New deps: none (`expo-modules-core` is already bundled with `expo`).
+- Next: 7.6 README screenshots/GIF, architecture diagram.
 
 ### 2026-11-10 — task 7.4
 - Done:

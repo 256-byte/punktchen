@@ -25,6 +25,8 @@ import { LineBadge } from './LineBadge';
 /** How long a marker redraws its native snapshot after its content changed. */
 export const TRACK_CHANGES_MS = 500;
 
+const MARKER_A11Y_HINT = 'Opens station departures';
+
 /**
  * A pole or station cluster marker:
  * - At `poles` and `stations` zoom: one row per direction with an upcoming
@@ -72,16 +74,22 @@ export function PoleMarker({
     if (!compact || compact.lines.length === 0) {
       return null;
     }
+    const label = compactAccessibilityText(feature, compact.lines, compact.more);
     return (
       <Marker
         coordinate={{ latitude: feature.pole.location.lat, longitude: feature.pole.location.lng }}
         anchor={{ x: 0.5, y: 1 }}
         tracksViewChanges={tracks}
+        accessibilityLabel={label}
+        accessibilityHint={MARKER_A11Y_HINT}
         onPress={onPress ? () => onPress(feature) : undefined}
       >
         <View
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel={label}
+          accessibilityHint={MARKER_A11Y_HINT}
           style={styles.compactBubble}
-          accessibilityLabel={compactAccessibilityText(feature, compact.lines, compact.more)}
         >
           <View style={styles.header}>
             <Text style={styles.stationName} numberOfLines={1}>
@@ -106,14 +114,23 @@ export function PoleMarker({
     return null;
   }
   const showStationHeader = detail === 'stations' && (poleCount > 1 || stationCount > 1);
+  const label = accessibilityText(feature, rows, more, stale);
   return (
     <Marker
       coordinate={{ latitude: feature.pole.location.lat, longitude: feature.pole.location.lng }}
       anchor={{ x: 0.5, y: 1 }}
       tracksViewChanges={tracks}
+      accessibilityLabel={label}
+      accessibilityHint={MARKER_A11Y_HINT}
       onPress={onPress ? () => onPress(feature) : undefined}
     >
-      <View style={styles.bubble} accessibilityLabel={accessibilityText(feature, rows, stale)}>
+      <View
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityHint={MARKER_A11Y_HINT}
+        style={styles.bubble}
+      >
         {showStationHeader ? (
           <View style={styles.header}>
             <Text style={styles.stationName} numberOfLines={1}>
@@ -154,7 +171,7 @@ function Row({ row: { direction, next }, stale }: { row: MarkerRow; stale: boole
   );
 }
 
-function accessibilityText(feature: PoleFeature, rows: MarkerRow[], stale: boolean) {
+function accessibilityText(feature: PoleFeature, rows: MarkerRow[], more: number, stale: boolean) {
   const stationCount = feature.stationCount ?? 1;
   const header =
     stationCount > 1
@@ -164,6 +181,9 @@ function accessibilityText(feature: PoleFeature, rows: MarkerRow[], stale: boole
     (r) =>
       `${r.direction.line} to ${directionHeadsign(r.direction)}: ${cellDescription(r.next, stale)}`,
   );
+  if (more > 0) {
+    parts.push(`${more} more ${more === 1 ? 'direction' : 'directions'}`);
+  }
   return [header, ...parts].join('. ');
 }
 

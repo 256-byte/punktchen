@@ -4,7 +4,8 @@ import { Text, View } from 'react-native';
 
 import type { ApiClient } from '@/api/client';
 import { useStation } from '@/api/station';
-import { type Direction, ringSymbol } from '@/core/directions';
+import { type Direction, directionHeadsign, ringSymbol } from '@/core/directions';
+import { cellDescription } from '@/core/realtime';
 import { poleTitle, type SheetPole, type SheetRow, sheetModel, sheetSignature } from '@/core/sheet';
 import { freshness } from '@/core/staleness';
 import { type ClockStore, clockStore, useDeviceNow, useNow } from '@/state/clock';
@@ -56,7 +57,7 @@ export function StationSheet({
       </Text>
       {loading ? <Text style={styles.note}>Loading all platforms…</Text> : null}
       {query.isError ? (
-        <Text style={[styles.note, styles.error]}>
+        <Text style={[styles.note, styles.error]} accessibilityRole="alert">
           Could not load the whole station: {query.error.message}
         </Text>
       ) : null}
@@ -75,7 +76,11 @@ export function StationSheet({
           {/* Stale data ran out: nothing is known about later departures (task 6.3). */}
           <Text style={styles.sectionTitle}>{stale ? 'No newer data' : 'No departures soon'}</Text>
           {model.idle.map((r) => (
-            <View key={r.key} style={[styles.row, styles.idle]}>
+            <View
+              key={r.key}
+              style={[styles.row, styles.idle]}
+              accessibilityLabel={`${r.direction.line} to ${directionHeadsign(r.direction)}${r.platform ? `, platform ${r.platform}` : ''}: ${stale ? 'no newer data' : 'no departures soon'}`}
+            >
               <LineBadge direction={r.direction} size="large" />
               <HeadsignText direction={r.direction} />
               {r.platform ? <Text style={styles.platform}>Pl. {r.platform}</Text> : null}
@@ -112,8 +117,9 @@ function PoleSection({ pole, index, stale }: { pole: SheetPole; index: number; s
 
 function DirectionRow({ row, stale }: { row: SheetRow; stale: boolean }) {
   const styles = useStyles();
+  const label = `${row.direction.line} to ${directionHeadsign(row.direction)}: ${row.departures.map((d) => cellDescription(d, stale)).join('; ')}`;
   return (
-    <View style={styles.row}>
+    <View style={styles.row} accessibilityLabel={label}>
       <LineBadge direction={row.direction} size="large" />
       <HeadsignText direction={row.direction} />
       <View style={styles.times}>
