@@ -10,7 +10,7 @@ import { useNearby } from '@/api/useNearby';
 import type { ApiBaseUrl } from '@/core/apiBaseUrl';
 import { sameZoomSpec } from '@/core/clustering';
 import { nextRequestCenter } from '@/core/fetchPolicy';
-import { type LatLng, regionAround } from '@/core/geo';
+import { type LatLng, pitchCamera, regionAround } from '@/core/geo';
 import type { LocationView } from '@/core/location';
 import { freshness } from '@/core/staleness';
 import { mapLayers } from '@/layers';
@@ -62,6 +62,9 @@ export function MapScreen({
   const map = useRef<MapView>(null);
   const [initialRegion] = useState(() => regionAround(position, START_RADIUS_M));
   const [latitudeDelta, setLatitudeDelta] = useState(initialRegion.latitudeDelta);
+  const [pitched, setPitched] = useState(false);
+  const pitchedRef = useRef(false);
+  const deltaRef = useRef(initialRegion.latitudeDelta);
   const following = useRef(true);
   const followsDevice = source !== 'mapCenter';
 
@@ -72,7 +75,13 @@ export function MapScreen({
 
   useEffect(() => {
     if (followsDevice && following.current) {
-      map.current?.animateToRegion(regionAround(position, START_RADIUS_M), FOLLOW_ANIMATION_MS);
+      if (pitchedRef.current) {
+        map.current?.animateCamera(pitchCamera(true, deltaRef.current, position), {
+          duration: FOLLOW_ANIMATION_MS,
+        });
+      } else {
+        map.current?.animateToRegion(regionAround(position, START_RADIUS_M), FOLLOW_ANIMATION_MS);
+      }
     }
   }, [followsDevice, position]);
 
@@ -80,9 +89,27 @@ export function MapScreen({
   const jump = useStore(store, (s) => s.jump);
   useEffect(() => {
     if (jump) {
-      map.current?.animateToRegion(regionAround(jump.center, START_RADIUS_M), FOLLOW_ANIMATION_MS);
+      if (pitchedRef.current) {
+        map.current?.animateCamera(pitchCamera(true, deltaRef.current, jump.center), {
+          duration: FOLLOW_ANIMATION_MS,
+        });
+      } else {
+        map.current?.animateToRegion(
+          regionAround(jump.center, START_RADIUS_M),
+          FOLLOW_ANIMATION_MS,
+        );
+      }
     }
   }, [jump]);
+
+  const togglePitch = () => {
+    const next = !pitched;
+    pitchedRef.current = next;
+    setPitched(next);
+    map.current?.animateCamera(pitchCamera(next, deltaRef.current), {
+      duration: FOLLOW_ANIMATION_MS,
+    });
+  };
 
   const center = useRequestCenter(position);
   const nearby = useNearby(client, { lat: center.lat, lng: center.lng });
@@ -113,10 +140,13 @@ export function MapScreen({
         // Light or dark map with the system (task 7.1): Apple Maps and Google Maps.
         userInterfaceStyle={scheme}
         showsUserLocation={followsDevice}
+        showsBuildings
+        pitchEnabled
         onPanDrag={() => {
           following.current = false;
         }}
         onRegionChangeComplete={(r) => {
+          deltaRef.current = r.latitudeDelta;
           store.getState().setMapCenter({ lat: r.latitude, lng: r.longitude });
           setLatitudeDelta((prev) =>
             sameZoomSpec(prev, r.latitudeDelta) ? prev : r.latitudeDelta,
@@ -134,6 +164,7 @@ export function MapScreen({
         ) : null}
       </MapView>
       <MapAttribution lines={nearby.data?.response.meta.attribution ?? []} />
+      <PitchToggle pitched={pitched} onToggle={togglePitch} />
       {devTools ? <DevPlacePicker store={store} /> : null}
       {client === null ? (
         <View style={styles.status}>
@@ -248,6 +279,25 @@ function FeatureSheet({
   );
 }
 
+function PitchToggle({ pitched, onToggle }: { pitched: boolean; onToggle: () => void }) {
+  const styles = useStyles();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="3D"
+      accessibilityState={{ selected: pitched }}
+      onPress={onToggle}
+      style={({ pressed }) => [
+        styles.pitchButton,
+        pitched && styles.pitchButtonActive,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Text style={[styles.pitchLabel, pitched && styles.pitchLabelActive]}>3D</Text>
+    </Pressable>
+  );
+}
+
 /** Request centre that moves only after > 150 m (nextRequestCenter). */
 function useRequestCenter(position: LatLng): LatLng {
   const [center, setCenter] = useState(position);
@@ -258,49 +308,79 @@ function useRequestCenter(position: LatLng): LatLng {
   return next;
 }
 
-const useStyles = themedStyles(({ colors, fontSize, fontWeight, opacity, radius, space }) => ({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  status: {
-    position: 'absolute',
-    left: space.xl,
-    right: space.xl,
-    bottom: space.xxxl,
-    padding: space.xl,
-    borderRadius: radius.xl,
-    backgroundColor: colors.overlay,
-    gap: space.sm,
-  },
-  statusHeading: {
-    fontSize: fontSize.bodyLarge,
-    fontWeight: fontWeight.semibold,
-    color: colors.danger,
-  },
-  statusDetail: {
-    fontSize: fontSize.callout,
-    color: colors.textSecondary,
-  },
-  retry: {
-    alignSelf: 'flex-start',
-    marginTop: space.xs,
-    paddingVertical: space.md,
-    paddingHorizontal: space.lg,
-    borderRadius: radius.md,
-    backgroundColor: colors.accent,
-  },
-  retryLabel: {
-    color: colors.onAccent,
-    fontWeight: fontWeight.semibold,
-  },
-  pressed: {
-    opacity: opacity.pressed,
-  },
-  sheetBackground: {
-    backgroundColor: colors.surface,
-  },
-  sheetHandle: {
-    backgroundColor: colors.handle,
-  },
-}));
+const useStyles = themedStyles(
+  ({ scheme, colors, fontSize, fontWeight, opacity, radius, space }) => ({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    pitchButton: {
+      position: 'absolute',
+      top: 124, // aligned with DevPlacePicker below the status banner
+      left: space.lg,
+      paddingVertical: space.sm,
+      paddingHorizontal: space.ml,
+      borderRadius: radius.md,
+      backgroundColor: colors.surface,
+      borderWidth: scheme === 'dark' ? StyleSheet.hairlineWidth : 0,
+      borderColor: colors.border,
+      shadowColor: colors.shadow,
+      shadowOpacity: 0.2,
+      shadowRadius: 3,
+      shadowOffset: { width: 0, height: 1 },
+      elevation: 3,
+    },
+    pitchButtonActive: {
+      backgroundColor: colors.accent,
+      borderColor: colors.accent,
+    },
+    pitchLabel: {
+      fontSize: fontSize.footnote,
+      fontWeight: fontWeight.bold,
+      color: colors.text,
+    },
+    pitchLabelActive: {
+      color: colors.onAccent,
+    },
+    status: {
+      position: 'absolute',
+      left: space.xl,
+      right: space.xl,
+      bottom: space.xxxl,
+      padding: space.xl,
+      borderRadius: radius.xl,
+      backgroundColor: colors.overlay,
+      gap: space.sm,
+    },
+    statusHeading: {
+      fontSize: fontSize.bodyLarge,
+      fontWeight: fontWeight.semibold,
+      color: colors.danger,
+    },
+    statusDetail: {
+      fontSize: fontSize.callout,
+      color: colors.textSecondary,
+    },
+    retry: {
+      alignSelf: 'flex-start',
+      marginTop: space.xs,
+      paddingVertical: space.md,
+      paddingHorizontal: space.lg,
+      borderRadius: radius.md,
+      backgroundColor: colors.accent,
+    },
+    retryLabel: {
+      color: colors.onAccent,
+      fontWeight: fontWeight.semibold,
+    },
+    pressed: {
+      opacity: opacity.pressed,
+    },
+    sheetBackground: {
+      backgroundColor: colors.surface,
+    },
+    sheetHandle: {
+      backgroundColor: colors.handle,
+    },
+  }),
+);

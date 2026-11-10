@@ -3,13 +3,14 @@
 import { jest } from '@jest/globals';
 import { forwardRef, type ReactNode, useImperativeHandle } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import type { MapViewProps, Region } from 'react-native-maps';
+import type { Camera, MapViewProps, Region } from 'react-native-maps';
 
 type Props = MapViewProps & { children?: ReactNode };
 
 export const map = {
   props: null as Props | null,
   animateToRegion: jest.fn<(region: Region, duration?: number) => void>(),
+  animateCamera: jest.fn<(camera: Partial<Camera>, opts?: { duration?: number }) => void>(),
 };
 
 // Outside the component: the React Compiler lint forbids writing module
@@ -20,7 +21,10 @@ function record(props: Props) {
 
 const MapView = forwardRef<unknown, Props>(function MapView(props, ref) {
   record(props);
-  useImperativeHandle(ref, () => ({ animateToRegion: map.animateToRegion }));
+  useImperativeHandle(ref, () => ({
+    animateToRegion: map.animateToRegion,
+    animateCamera: map.animateCamera,
+  }));
   return <View testID="map">{props.children}</View>;
 });
 
