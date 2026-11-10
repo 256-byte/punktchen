@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { distanceMeters, regionAround } from './geo';
+import {
+  distanceMeters,
+  MAX_3D_ALTITUDE_M,
+  MIN_3D_ZOOM,
+  PITCH_3D_DEG,
+  pitchCamera,
+  regionAround,
+} from './geo';
 
 const wedding = { lat: 52.5427, lng: 13.366 };
 const alexanderplatz = { lat: 52.521512, lng: 13.411267 };
@@ -50,5 +57,33 @@ describe('regionAround', () => {
     expect(distanceMeters(wedding, north)).toBeCloseTo(600, 0);
     expect(distanceMeters(wedding, east)).toBeCloseTo(600, 0);
     expect(r.longitudeDelta).toBeGreaterThan(r.latitudeDelta);
+  });
+});
+
+describe('pitchCamera (task 7.4)', () => {
+  it('tilts to 3D with building-range altitude and zoom on iOS and Android', () => {
+    // At default 500 m radius (latitudeDelta ≈ 0.0108), clamps altitude/zoom into 3D building range.
+    expect(pitchCamera(true, 0.0108)).toEqual({
+      pitch: PITCH_3D_DEG,
+      heading: 0,
+      altitude: MAX_3D_ALTITUDE_M,
+      zoom: MIN_3D_ZOOM,
+    });
+
+    // When already zoomed in to street level (0.002° ≈ 222 m), preserves closer altitude/zoom.
+    const street = pitchCamera(true, 0.002, wedding);
+    expect(street.center).toEqual({ latitude: wedding.lat, longitude: wedding.lng });
+    expect(street.pitch).toBe(PITCH_3D_DEG);
+    expect(street.altitude).toBeLessThan(MAX_3D_ALTITUDE_M);
+    expect(street.zoom).toBeGreaterThan(MIN_3D_ZOOM);
+  });
+
+  it('resets pitch and heading to 0 without forcing zoom when returning to 2D', () => {
+    expect(pitchCamera(false, 0.0108)).toEqual({ pitch: 0, heading: 0 });
+    expect(pitchCamera(false, 0.0108, wedding)).toEqual({
+      center: { latitude: wedding.lat, longitude: wedding.lng },
+      pitch: 0,
+      heading: 0,
+    });
   });
 });

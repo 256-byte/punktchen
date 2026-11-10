@@ -7,7 +7,7 @@ import { createApiClient, type ApiClientOptions } from '@/api/client';
 import type { NearbyResponse } from '@/api/nearby';
 import { MIN_INTERVAL_MS } from '@/core/fetchPolicy';
 import type { LatLng } from '@/core/geo';
-import { regionAround } from '@/core/geo';
+import { MAX_3D_ALTITUDE_M, MIN_3D_ZOOM, PITCH_3D_DEG, regionAround } from '@/core/geo';
 import { type Station, transitLayer } from '@/layers/transit';
 import { createLocationStore, type LocationStore } from '@/state/location';
 import { MapScreen, START_RADIUS_M } from '@/ui/MapScreen';
@@ -99,6 +99,7 @@ beforeEach(() => {
     });
   map.props = null;
   map.animateToRegion.mockClear();
+  map.animateCamera.mockClear();
 });
 
 afterEach(() => {
@@ -165,6 +166,55 @@ describe('MapScreen camera', () => {
       ),
     );
     expect(store.getState().mapCenter).toEqual({ lat: 52.52, lng: 13.41 });
+  });
+
+  it('enables 3D buildings and toggles 3D camera pitch on iOS and Android (task 7.4)', async () => {
+    const { move } = await renderMap(WEDDING, 'lastKnown');
+    expect(map.props?.showsBuildings).toBe(true);
+    expect(map.props?.pitchEnabled).toBe(true);
+
+    const toggle = screen.getByRole('button', { name: '3D' });
+    expect(toggle.props.accessibilityState).toEqual({ selected: false });
+
+    // Enable 3D: tilts to 50° and brings altitude (iOS) and zoom (Android) into 3D building range.
+    await fireEvent.press(toggle);
+    expect(toggle.props.accessibilityState).toEqual({ selected: true });
+    expect(map.animateCamera).toHaveBeenLastCalledWith(
+      {
+        pitch: PITCH_3D_DEG,
+        heading: 0,
+        altitude: MAX_3D_ALTITUDE_M,
+        zoom: MIN_3D_ZOOM,
+      },
+      { duration: 400 },
+    );
+
+    // Moving or jumping while in 3D keeps the 3D camera instead of flattening with animateToRegion.
+    map.animateToRegion.mockClear();
+    map.animateCamera.mockClear();
+    await move(north(40), 'live');
+    expect(map.animateToRegion).not.toHaveBeenCalled();
+    expect(map.animateCamera).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        center: { latitude: north(40).lat, longitude: north(40).lng },
+        pitch: PITCH_3D_DEG,
+      }),
+      { duration: 400 },
+    );
+
+    await act(async () => store.getState().lookAt({ lat: 52.5215, lng: 13.4113 }));
+    expect(map.animateCamera).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        center: { latitude: 52.5215, longitude: 13.4113 },
+        pitch: PITCH_3D_DEG,
+      }),
+      { duration: 400 },
+    );
+
+    // Disable 3D: resets pitch and heading to 0 without forcing zoom.
+    await fireEvent.press(toggle);
+    expect(toggle.props.accessibilityState).toEqual({ selected: false });
+    expect(map.animateCamera).toHaveBeenLastCalledWith({ pitch: 0, heading: 0 }, { duration: 400 });
   });
 });
 

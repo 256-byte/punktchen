@@ -249,6 +249,7 @@ Realtime display (task 4.5, `src/core/realtime.ts`, `DepartureTime`): marker row
 
 Map screen (`src/ui/MapScreen.tsx`, task 3.4):
 - Opens centred on the position (`initialRegion`, 500 m around it) and follows the device position until the user drags the map (`onPanDrag`; `isGesture` of `onRegionChangeComplete` is Google Maps only). In "map center" mode the camera never moves by itself.
+- Enables 3D extruded buildings (`showsBuildings`) and tilt gestures (`pitchEnabled`), plus a `"3D"` toggle button (`PitchToggle`, task 7.4) that tilts the camera to 50° (`pitchCamera` in `src/core/geo.ts`, setting `altitude ≤ 750 m` for iOS MapKit and `zoom ≥ 16.5` for Android Google Maps so 3D buildings render immediately) or resets pitch/heading to 0°. While in 3D, camera jumps (`lookAt` or device follow) use `animateCamera` rather than `animateToRegion` so the 3D tilt is preserved.
 - Reports its centre to the location store on every `onRegionChangeComplete`, so "map center" mode looks where the map is.
 - Requests `/v1/nearby` for a request centre that moves only after > 150 m (`nextRequestCenter`), so small moves and pans reuse one query (and its ETag).
 - Without a configured backend it shows `BackendStatus`. A failed request without any data shows the message with "Try again"; with data on the map it is a line in the `StatusBanner` at the top (§4.3, task 6.2).
