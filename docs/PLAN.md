@@ -66,7 +66,7 @@ Goal: see live-counting pins around you on the iPhone.
 
 | ID | Task | Acceptance criteria |
 |---|---|---|
-| 4.0 | **Realtime coverage check.** Weekday daytime samples (morning, noon, evening) with `gtfsexplore rt`: share of trips per mode that have real `delay` values (DATA_MODEL §7 #18, #19). Decide whether an additional realtime source is needed for BVG U-Bahn/tram (if yes: ADR first, user approval) | Numbers in DATA_MODEL §7; decision in PROGRESS |
+| 4.0 | **Realtime coverage check.** Weekday daytime samples (morning, noon, evening) with `gtfsexplore coverage`: share of trips per mode that have real `delay` values (DATA_MODEL §7 #18, #19). Decide whether an additional realtime source is needed for BVG U-Bahn/tram (if yes: ADR first, user approval) | Numbers in DATA_MODEL §7; decision in PROGRESS |
 | 4.1 | GTFS-RT poller: interval, `If-None-Match`, gzip, timeout, backoff, metrics; never > 7 req/min (provider limit since 2026-11-02); User-Agent with project name + repository URL | Unit test with fake server: 304 path, error/backoff path |
 | 4.2 | Parser → trip-instance state (latest wins), using recorded testdata; an empty feed with a stale header is "no data" and keeps the last state | Golden tests on recorded feeds incl. `vbb-empty-stale.pb` |
 | 4.3 | Merge rules (ARCHITECTURE §3.4): stop match (`stop_id`, else `stop_sequence` for bare station numbers), delay propagation, cancellations, skipped stops, `source` flag (`realtime` only for events with `delay`) | Table-driven tests for each rule |
