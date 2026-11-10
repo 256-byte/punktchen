@@ -44,6 +44,34 @@ export function textColorOn(background: string): '#000000' | '#FFFFFF' {
   return 1.05 / (luminance + 0.05) >= 3 ? '#FFFFFF' : '#000000';
 }
 
+/** Modes with an icon (task 7.10), in the order of DATA_MODEL §5.2; `other` has none. */
+export const ICON_MODES: readonly Mode[] = ['regional', 'sbahn', 'ubahn', 'tram', 'bus', 'ferry'];
+
+/**
+ * The modes a marker stands for, for its header icons (task 7.10): every mode
+ * of its directions, terminal arrivals left out, in ICON_MODES order. At
+ * street zoom a bus stop gives [bus], at a merged station or cluster e.g.
+ * [sbahn, ubahn, bus].
+ */
+export function markerModes(directions: readonly Direction[]): Mode[] {
+  const present = new Set<Mode>();
+  for (const d of directions) {
+    if (!isTerminalDirection(d)) present.add(d.mode);
+  }
+  return ICON_MODES.filter((m) => present.has(m));
+}
+
+/** Spoken name of a mode, for screen readers. */
+export const MODE_NAMES: Record<Mode, string> = {
+  regional: 'Regional train',
+  sbahn: 'S-Bahn',
+  ubahn: 'U-Bahn',
+  tram: 'Tram',
+  bus: 'Bus',
+  ferry: 'Ferry',
+  other: 'Other',
+};
+
 /** Unique within a pole (the API merges directions by this label, DATA_MODEL §3.2). */
 export function directionKey(d: Direction): string {
   return `${d.mode}|${d.line}|${d.headsign}|${d.isRing ? 'ring' : ''}`;

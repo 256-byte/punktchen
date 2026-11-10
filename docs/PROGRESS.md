@@ -4,8 +4,8 @@
 
 ## Current status
 
-- **Active phase:** Phase 7 — UI polish (reopened 2026-11-10 for 7.7–7.10, user request; MVP Phases 0–6 done)
-- **Next task:** 7.10 mode icons in marker header
+- **Active phase:** Phase 7 — UI polish (complete again: 7.7–7.10 done; MVP Phases 0–7 done)
+- **Next task:** none scheduled (later phases require user approval + ADR; see `docs/PLAN.md`)
 - **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
@@ -67,7 +67,7 @@
 | 7 | 7.7 Marker rows ordered by next departure | done | Shown rows sorted soonest first, selection unchanged (user decision); station sheet sorted per platform, platform order kept; sort minute carried in `nextCells` / `sheetSignature`, no extra renders; markers checked on the iPhone (user), sheet to check |
 | 7 | 7.8 Combined stop popup | done | `stopGroups`: same station + main mode; rail ≤ 60 m, tram ≤ 50 m with a shared running line; bus stops never (user decision after the iPhone check); "Combine" switch on the map (default on); sections with a divider, up to 6 rows dealt per section; checked on 6 real areas (DATA_MODEL §7 #32); to check on the iPhone |
 | 7 | 7.9 Marker overlap avoidance | done | `layoutLabels` (greedy, nearest free spot, sideways first) on the map's own projection after each camera move; back in place when zoomed in; checked on the iPhone (user); no line/dot to the stop (user decision) |
-| 7 | 7.10 Mode icons in marker header | todo | Own drawings with `react-native-svg` (user decision) |
+| 7 | 7.10 Mode icons in marker header | done | Header with mode icons + station name in every marker, all zoom levels; S/U drawn by us, tram/bus/RE/ferry Material Icons (Apache-2.0); new dep `react-native-svg`; to check on the iPhone |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
 
@@ -118,6 +118,15 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-10 — task 7.10
+- Done:
+  - `src/core/directions.ts`: `markerModes(directions)` (modes of a marker's non-terminal directions in the order regional, sbahn, ubahn, tram, bus, ferry; `other` has no icon) and `MODE_NAMES` for screen readers.
+  - `src/layers/transit/ModeIcon.tsx`: 14 pt icons — white "S" on a green circle, white "U" on a blue square (our own), white tram / bus / train / boat pictograms (Material Icons, Apache-2.0) on a rounded square in the mode's colour (`MODE_COLORS`).
+  - `PoleMarker`: every marker now starts with a header (icons, station name, "+N" merged stops) at every zoom level; before, only station clusters and compact pills had a name. Accessibility label: "<station>, <modes>. <rows>".
+- Tests: Vitest `directions.test.ts` (+1 `markerModes`); Jest `transit-markers.test.tsx` (+4: bus icon at street zoom; S-Bahn, U-Bahn, bus icons in order at poles / stations / compact zoom; labels with mode names).
+- New deps: `react-native-svg` 15.16.0 (`npx expo install`, included in Expo Go): draws the tram, bus, train and ferry pictograms; approved by the user (decision table, 2026-11-10).
+- Next: check on the iPhone. Phase 7 is complete again; nothing scheduled.
 
 ### 2026-11-10 — task 7.9
 - Done:

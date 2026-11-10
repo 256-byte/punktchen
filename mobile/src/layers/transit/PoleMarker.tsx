@@ -10,7 +10,10 @@ import {
   directionHeadsign,
   directionKey,
   type MarkerRow,
+  markerModes,
   markerRows,
+  type Mode,
+  MODE_NAMES,
   nextCells,
   nonTerminalDirections,
   ringSymbol,
@@ -24,6 +27,7 @@ import type { ColorScheme } from '@/ui/tokens';
 import { DepartureTime } from './DepartureTime';
 import type { PoleFeature } from './index';
 import { LineBadge } from './LineBadge';
+import { ModeIcon } from './ModeIcon';
 
 /** How long a marker redraws its native snapshot after its content changed. */
 export const TRACK_CHANGES_MS = 500;
@@ -31,11 +35,11 @@ export const TRACK_CHANGES_MS = 500;
 const MARKER_A11Y_HINT = 'Opens station departures';
 
 /**
- * A pole or station cluster marker:
+ * A pole or station cluster marker. At every zoom its top line shows the
+ * icons of its modes and the station's name (task 7.10).
  * - At `poles` and `stations` zoom: one row per direction with an upcoming
  *   departure — line badge, headsign, countdown (task 3.5) coloured live or
- *   timetable, with its delay (4.5). Multi-pole station clusters show the
- *   station name at the top (7.2).
+ *   timetable, with its delay (4.5).
  * - At `compact` (overview) zoom: station name + line badges without
  *   headsigns or countdowns (7.2, ARCHITECTURE §4.5).
  * Directions with nothing coming are left out (station sheet, 3.6); a marker
@@ -69,7 +73,7 @@ export function PoleMarker({
     return poles.map((p) => nonTerminalDirections(p.directions, feature.station));
   }, [detail, feature.sections, feature.pole, feature.station]);
   const directions = useMemo(() => sectionDirections.flat(), [sectionDirections]);
-  const poleCount = feature.poleCount ?? 1;
+  const modes = useMemo(() => markerModes(directions), [directions]);
   const stationCount = feature.stationCount ?? 1;
   const styles = useStyles();
   const { scheme } = useTheme();
@@ -103,7 +107,7 @@ export function PoleMarker({
     if (!compact || compact.lines.length === 0) {
       return null;
     }
-    const label = compactAccessibilityText(feature, compact.lines, compact.more);
+    const label = compactAccessibilityText(feature, modes, compact.lines, compact.more);
     return (
       <Marker
         coordinate={coordinate}
@@ -121,14 +125,7 @@ export function PoleMarker({
           style={styles.compactBubble}
           onLayout={reportLayout}
         >
-          <View style={styles.header}>
-            <Text style={styles.stationName} numberOfLines={1}>
-              {feature.station.name}
-            </Text>
-            {stationCount > 1 ? (
-              <Text style={styles.clusterCount}>{`+${stationCount - 1}`}</Text>
-            ) : null}
-          </View>
+          <Header name={feature.station.name} modes={modes} stationCount={stationCount} />
           <View style={styles.badges}>
             {compact.lines.map((d) => (
               <LineBadge key={`${d.mode}|${d.line}`} direction={d} />
@@ -143,8 +140,7 @@ export function PoleMarker({
   if (rows.length === 0) {
     return null;
   }
-  const showStationHeader = detail === 'stations' && (poleCount > 1 || stationCount > 1);
-  const label = accessibilityText(feature, rows, more, stale);
+  const label = accessibilityText(feature, modes, rows, more, stale);
   return (
     <Marker
       coordinate={coordinate}
@@ -162,16 +158,7 @@ export function PoleMarker({
         style={styles.bubble}
         onLayout={reportLayout}
       >
-        {showStationHeader ? (
-          <View style={styles.header}>
-            <Text style={styles.stationName} numberOfLines={1}>
-              {feature.station.name}
-            </Text>
-            {stationCount > 1 ? (
-              <Text style={styles.clusterCount}>{`+${stationCount - 1}`}</Text>
-            ) : null}
-          </View>
-        ) : null}
+        <Header name={feature.station.name} modes={modes} stationCount={stationCount} />
         {sections.map((section, s) => (
           <View
             key={s}
@@ -186,6 +173,37 @@ export function PoleMarker({
         {more > 0 ? <Text style={styles.more}>+{more} more</Text> : null}
       </View>
     </Marker>
+  );
+}
+
+/**
+ * Top line of every marker (task 7.10): the icons of the modes it stands for,
+ * the station's name, and "+N" when nearby stops are merged in.
+ */
+function Header({
+  name,
+  modes,
+  stationCount,
+}: {
+  name: string;
+  modes: readonly Mode[];
+  stationCount: number;
+}) {
+  const styles = useStyles();
+  return (
+    <View style={styles.header} testID="marker-header">
+      {modes.length > 0 ? (
+        <View style={styles.icons}>
+          {modes.map((m) => (
+            <ModeIcon key={m} mode={m} />
+          ))}
+        </View>
+      ) : null}
+      <Text style={styles.stationName} numberOfLines={1}>
+        {name}
+      </Text>
+      {stationCount > 1 ? <Text style={styles.clusterCount}>{`+${stationCount - 1}`}</Text> : null}
+    </View>
   );
 }
 
@@ -210,12 +228,24 @@ function Row({ row: { direction, next }, stale }: { row: MarkerRow; stale: boole
   );
 }
 
-function accessibilityText(feature: PoleFeature, rows: MarkerRow[], more: number, stale: boolean) {
+/** "S+U Wedding, S-Bahn, U-Bahn" or "S+U Alexanderplatz and 2 nearby stops, …". */
+function headerText(feature: PoleFeature, modes: readonly Mode[]) {
   const stationCount = feature.stationCount ?? 1;
-  const header =
+  const name =
     stationCount > 1
       ? `${feature.station.name} and ${stationCount - 1} nearby stops`
       : feature.station.name;
+  return [name, ...modes.map((m) => MODE_NAMES[m])].join(', ');
+}
+
+function accessibilityText(
+  feature: PoleFeature,
+  modes: readonly Mode[],
+  rows: MarkerRow[],
+  more: number,
+  stale: boolean,
+) {
+  const header = headerText(feature, modes);
   const parts = rows.map(
     (r) =>
       `${r.direction.line} to ${directionHeadsign(r.direction)}: ${cellDescription(r.next, stale)}`,
@@ -226,12 +256,13 @@ function accessibilityText(feature: PoleFeature, rows: MarkerRow[], more: number
   return [header, ...parts].join('. ');
 }
 
-function compactAccessibilityText(feature: PoleFeature, lines: readonly Direction[], more: number) {
-  const stationCount = feature.stationCount ?? 1;
-  const header =
-    stationCount > 1
-      ? `${feature.station.name} and ${stationCount - 1} nearby stops`
-      : feature.station.name;
+function compactAccessibilityText(
+  feature: PoleFeature,
+  modes: readonly Mode[],
+  lines: readonly Direction[],
+  more: number,
+) {
+  const header = headerText(feature, modes);
   const names = lines.map((d) => d.line).join(', ');
   const tail = more > 0 ? `, and ${more} more` : '';
   return `${header}. Lines: ${names}${tail}`;
@@ -306,6 +337,10 @@ const useStyles = themedStyles(({ scheme, colors, fontSize, fontWeight, radius, 
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.xs,
+  },
+  icons: {
+    flexDirection: 'row',
+    gap: 2,
   },
   stationName: {
     flexShrink: 1,
