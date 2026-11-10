@@ -1,0 +1,225 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 560" width="920" height="560" role="img" aria-label="LiveStop map view in light mode and dark 3D mode">
+  <defs>
+    <style>
+      .font { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+      .tabular { font-variant-numeric: tabular-nums; }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.72; }
+      }
+      .live-pulse { animation: pulse 2.4s ease-in-out infinite; }
+    </style>
+    <filter id="shadow-light" x="-12%" y="-12%" width="124%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000000" flood-opacity="0.18"/>
+    </filter>
+    <filter id="shadow-phone" x="-8%" y="-6%" width="116%" height="116%">
+      <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#000000" flood-opacity="0.22"/>
+    </filter>
+    <clipPath id="screen-left">
+      <rect x="60" y="42" width="360" height="476" rx="34"/>
+    </clipPath>
+    <clipPath id="screen-right">
+      <rect x="500" y="42" width="360" height="476" rx="34"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background canvas -->
+  <rect width="920" height="560" rx="18" fill="#F3F4F6"/>
+
+  <!-- ==================== LEFT PHONE: LIGHT MODE (S+U WEDDING) ==================== -->
+  <g filter="url(#shadow-phone)">
+    <rect x="52" y="34" width="376" height="492" rx="42" fill="#1F2937"/>
+    <rect x="55" y="37" width="370" height="486" rx="39" fill="#374151"/>
+  </g>
+
+  <g clip-path="url(#screen-left)" class="font">
+    <!-- Light Map Base -->
+    <rect x="60" y="42" width="360" height="476" fill="#EBE9E2"/>
+    <!-- Parks & water -->
+    <polygon points="60,42 175,42 145,155 60,135" fill="#D9EAD3"/>
+    <polygon points="315,340 420,310 420,518 290,518" fill="#D9EAD3"/>
+    <path d="M 60 410 Q 190 385 420 445" stroke="#B7D7E8" stroke-width="14" fill="none"/>
+
+    <!-- Street Grid (Wedding: Müllerstraße / Ringbahn / Fennstraße) -->
+    <path d="M 110 42 L 285 518" stroke="#FFFFFF" stroke-width="14" fill="none"/>
+    <path d="M 60 220 L 420 175" stroke="#FFFFFF" stroke-width="11" fill="none"/>
+    <path d="M 60 320 L 420 265" stroke="#F9FAFB" stroke-width="7" fill="none"/>
+    <path d="M 185 42 L 155 518" stroke="#F9FAFB" stroke-width="7" fill="none"/>
+    <path d="M 335 42 L 300 518" stroke="#F9FAFB" stroke-width="7" fill="none"/>
+    <!-- S-Bahn Ringbahn tracks -->
+    <path d="M 60 190 Q 230 220 420 150" stroke="#9CA3AF" stroke-width="3" stroke-dasharray="6,4" fill="none"/>
+
+    <!-- 3D Building footprints (subtle in 2D) -->
+    <rect x="82" y="236" width="54" height="36" rx="3" fill="#E0DDD5" stroke="#D3CFC6" stroke-width="1"/>
+    <rect x="242" y="88" width="68" height="42" rx="3" fill="#E0DDD5" stroke="#D3CFC6" stroke-width="1"/>
+    <rect x="295" y="285" width="64" height="44" rx="3" fill="#E0DDD5" stroke="#D3CFC6" stroke-width="1"/>
+
+    <!-- User location blue dot -->
+    <circle cx="222" cy="245" r="22" fill="#2563EB" fill-opacity="0.14"/>
+    <circle cx="222" cy="245" r="7" fill="#FFFFFF"/>
+    <circle cx="222" cy="245" r="5" fill="#2563EB"/>
+
+    <!-- Top Status Bar + Dynamic Island -->
+    <rect x="195" y="50" width="90" height="22" rx="11" fill="#111827"/>
+    <text x="84" y="65" font-size="11" font-weight="700" fill="#111827">09:41</text>
+
+    <!-- 3D Pitch Toggle Button (2D state) -->
+    <g filter="url(#shadow-light)">
+      <rect x="74" y="88" width="40" height="28" rx="8" fill="#FFFFFF"/>
+      <text x="94" y="106" text-anchor="middle" font-size="12" font-weight="700" fill="#111827">3D</text>
+    </g>
+
+    <!-- MARKER 1: S+U Wedding (Main Hub Cluster) -->
+    <g filter="url(#shadow-light)">
+      <rect x="108" y="110" width="220" height="110" rx="8" fill="#FFFFFF"/>
+      <polygon points="212,220 224,220 218,228" fill="#FFFFFF"/>
+      <!-- Header -->
+      <text x="116" y="125" font-size="11" font-weight="700" fill="#111827">S+U Wedding</text>
+      <!-- Row 1: S41 Ringbahn -->
+      <rect x="116" y="132" width="30" height="16" rx="4" fill="#AD5937"/>
+      <text x="131" y="144" text-anchor="middle" font-size="10" font-weight="700" fill="#FFFFFF">S41</text>
+      <text x="152" y="144" font-size="12" fill="#111827"><tspan font-size="15" font-weight="700">⟳</tspan> Ringbahn S 41</text>
+      <text x="320" y="144" text-anchor="end" font-size="12" font-weight="600" fill="#15803D" class="tabular live-pulse">2 min</text>
+      <!-- Row 2: S42 Ringbahn -->
+      <rect x="116" y="153" width="30" height="16" rx="4" fill="#CB6418"/>
+      <text x="131" y="165" text-anchor="middle" font-size="10" font-weight="700" fill="#FFFFFF">S42</text>
+      <text x="152" y="165" font-size="12" fill="#111827"><tspan font-size="15" font-weight="700">⟲</tspan> Ringbahn S 42</text>
+      <text x="320" y="165" text-anchor="end" font-size="12" font-weight="600" fill="#B91C1C" class="tabular">4 min +2</text>
+      <!-- Row 3: U6 -->
+      <rect x="116" y="174" width="30" height="16" rx="4" fill="#8C6DAB"/>
+      <text x="131" y="186" text-anchor="middle" font-size="10" font-weight="700" fill="#FFFFFF">U6</text>
+      <text x="152" y="186" font-size="12" fill="#111827">U Alt-Mariendorf</text>
+      <text x="320" y="186" text-anchor="end" font-size="12" font-weight="600" fill="#15803D" class="tabular live-pulse">now</text>
+      <!-- Row 4: M27 -->
+      <rect x="116" y="195" width="30" height="16" rx="4" fill="#A5027D"/>
+      <text x="131" y="207" text-anchor="middle" font-size="10" font-weight="700" fill="#FFFFFF">M27</text>
+      <text x="152" y="207" font-size="12" fill="#111827">S Jungfernheide</text>
+      <text x="320" y="207" text-anchor="end" font-size="12" font-weight="600" fill="#111827" class="tabular">6 min</text>
+    </g>
+
+    <!-- MARKER 2: Reinickendorfer Str. (Bus Pole) -->
+    <g filter="url(#shadow-light)">
+      <rect x="74" y="286" width="194" height="68" rx="8" fill="#FFFFFF"/>
+      <polygon points="165,354 177,354 171,362" fill="#FFFFFF"/>
+      <text x="82" y="301" font-size="11" font-weight="700" fill="#111827">U Reinickendorfer Str.</text>
+      <!-- Row 1: 120 -->
+      <rect x="82" y="308" width="30" height="16" rx="4" fill="#A5027D"/>
+      <text x="97" y="320" text-anchor="middle" font-size="10" font-weight="700" fill="#FFFFFF">120</text>
+      <text x="118" y="320" font-size="12" fill="#111827">Hauptbahnhof</text>
+      <text x="260" y="320" text-anchor="end" font-size="12" font-weight="600" fill="#15803D" class="tabular live-pulse">3 min</text>
+      <!-- Row 2: 147 -->
+      <rect x="82" y="329" width="30" height="16" rx="4" fill="#A5027D"/>
+      <text x="97" y="341" text-anchor="middle" font-size="10" font-weight="700" fill="#FFFFFF">147</text>
+      <text x="118" y="341" font-size="12" fill="#111827">S Ostbahnhof</text>
+      <text x="260" y="341" text-anchor="end" font-size="12" font-weight="600" fill="#111827" class="tabular">9 min</text>
+    </g>
+
+    <!-- MARKER 3: Nettelbeckplatz -->
+    <g filter="url(#shadow-light)">
+      <rect x="208" y="378" width="196" height="62" rx="8" fill="#FFFFFF"/>
+      <polygon points="300,440 312,440 306,448" fill="#FFFFFF"/>
+      <text x="216" y="393" font-size="11" font-weight="700" fill="#111827">Nettelbeckplatz</text>
+      <rect x="216" y="400" width="30" height="16" rx="4" fill="#A5027D"/>
+      <text x="231" y="412" text-anchor="middle" font-size="10" font-weight="700" fill="#FFFFFF">M27</text>
+      <text x="252" y="412" font-size="12" fill="#111827">S+U Pankow</text>
+      <text x="396" y="412" text-anchor="end" font-size="12" font-weight="600" fill="#15803D" class="tabular">5 min</text>
+      <text x="216" y="431" font-size="10" fill="#4B5563">+2 more</text>
+    </g>
+
+    <!-- Bottom Right Attribution -->
+    <rect x="292" y="492" width="120" height="18" rx="4" fill="#FFFFFF" fill-opacity="0.82"/>
+    <text x="352" y="504" text-anchor="middle" font-size="10" fill="#4B5563">Data: VBB (CC BY 4.0)</text>
+  </g>
+  <text x="240" y="546" text-anchor="middle" class="font" font-size="13" font-weight="600" fill="#374151">Light Mode · Live &amp; Ringbahn (⟳/⟲) Markers</text>
+
+  <!-- ==================== RIGHT PHONE: DARK MODE + 3D BUILDINGS ==================== -->
+  <g filter="url(#shadow-phone)">
+    <rect x="492" y="34" width="376" height="492" rx="42" fill="#111827"/>
+    <rect x="495" y="37" width="370" height="486" rx="39" fill="#1F2937"/>
+  </g>
+
+  <g clip-path="url(#screen-right)" class="font">
+    <!-- Dark Map Base -->
+    <rect x="500" y="42" width="360" height="476" fill="#0F172A"/>
+    <!-- Perspective Street Grid (50° Pitch) -->
+    <path d="M 650 42 L 520 518" stroke="#1E293B" stroke-width="18" fill="none"/>
+    <path d="M 720 42 L 820 518" stroke="#1E293B" stroke-width="16" fill="none"/>
+    <path d="M 500 185 L 860 215" stroke="#1E293B" stroke-width="12" fill="none"/>
+    <path d="M 500 315 L 860 355" stroke="#1E293B" stroke-width="14" fill="none"/>
+    <path d="M 500 140 Q 680 165 860 125" stroke="#475569" stroke-width="3" stroke-dasharray="6,4" fill="none"/>
+
+    <!-- Extruded 3D Buildings (50° camera tilt) -->
+    <!-- Building 1 -->
+    <polygon points="525,220 595,225 595,260 525,255" fill="#1E293B" stroke="#334155" stroke-width="1"/>
+    <polygon points="525,190 595,195 595,225 525,220" fill="#263449" stroke="#334155" stroke-width="1"/>
+    <polygon points="595,195 612,182 612,247 595,260" fill="#172033" stroke="#334155" stroke-width="1"/>
+    <!-- Building 2 (Alexanderplatz high-rise style) -->
+    <polygon points="735,235 815,242 815,295 735,288" fill="#1E293B" stroke="#334155" stroke-width="1"/>
+    <polygon points="735,175 815,182 815,242 735,235" fill="#29384E" stroke="#3B4F6B" stroke-width="1"/>
+    <polygon points="815,182 835,168 835,280 815,295" fill="#172033" stroke="#334155" stroke-width="1"/>
+    <!-- Building 3 -->
+    <polygon points="545,365 625,372 625,420 545,413" fill="#263449" stroke="#334155" stroke-width="1"/>
+    <polygon points="545,340 625,347 625,372 545,365" fill="#334155" stroke="#475569" stroke-width="1"/>
+
+    <!-- Top Status Bar + Dynamic Island -->
+    <rect x="635" y="50" width="90" height="22" rx="11" fill="#000000"/>
+    <text x="524" y="65" font-size="11" font-weight="700" fill="#F3F4F6">09:41</text>
+
+    <!-- Status Banner (Updated 2 min ago) -->
+    <rect x="595" y="80" width="170" height="26" rx="10" fill="#16181D" fill-opacity="0.92" stroke="#2A2E37" stroke-width="1"/>
+    <text x="680" y="97" text-anchor="middle" font-size="11" font-weight="600" fill="#F3F4F6">Updated 2 min ago</text>
+
+    <!-- 3D Pitch Toggle Button (Active state, highlighted blue) -->
+    <rect x="514" y="116" width="40" height="28" rx="8" fill="#2563EB"/>
+    <text x="534" y="134" text-anchor="middle" font-size="12" font-weight="700" fill="#FFFFFF">3D</text>
+
+    <!-- DARK MARKER 1: S+U Alexanderplatz (+2 nearby stops) -->
+    <g filter="url(#shadow-light)">
+      <rect x="556" y="132" width="226" height="122" rx="8" fill="#1C1F26" stroke="#2A2E37" stroke-width="1"/>
+      <polygon points="663,254 675,254 669,262" fill="#1C1F26"/>
+      <text x="564" y="147" font-size="11" font-weight="700" fill="#F3F4F6">S+U Alexanderplatz</text>
+      <text x="774" y="147" text-anchor="end" font-size="11" font-weight="600" fill="#9CA3AF">+2</text>
+      <!-- Row 1: RE1 -->
+      <rect x="564" y="154" width="32" height="16" rx="4" fill="#E30613"/>
+      <text x="580" y="166" text-anchor="middle" font-size="10" font-weight="700" fill="#FFFFFF">RE1</text>
+      <text x="602" y="166" font-size="12" fill="#F3F4F6">Frankfurt (Oder)</text>
+      <text x="774" y="166" text-anchor="end" font-size="12" font-weight="600" fill="#4ADE80" class="tabular live-pulse">1 min</text>
+      <!-- Row 2: S5 -->
+      <rect x="564" y="175" width="32" height="16" rx="4" fill="#EB7405"/>
+      <text x="580" y="187" text-anchor="middle" font-size="10" font-weight="700" fill="#FFFFFF">S5</text>
+      <text x="602" y="187" font-size="12" fill="#F3F4F6">S Westkreuz</text>
+      <text x="774" y="187" text-anchor="end" font-size="12" font-weight="600" fill="#4ADE80" class="tabular live-pulse">3 min</text>
+      <!-- Row 3: U2 -->
+      <rect x="564" y="196" width="32" height="16" rx="4" fill="#DA421E"/>
+      <text x="580" y="208" text-anchor="middle" font-size="10" font-weight="700" fill="#FFFFFF">U2</text>
+      <text x="602" y="208" font-size="12" fill="#F3F4F6">S+U Pankow</text>
+      <text x="774" y="208" text-anchor="end" font-size="12" font-weight="600" fill="#F87171" class="tabular">5 min +1</text>
+      <!-- Row 4: M4 -->
+      <rect x="564" y="217" width="32" height="16" rx="4" fill="#CE1B22"/>
+      <text x="580" y="229" text-anchor="middle" font-size="10" font-weight="700" fill="#FFFFFF">M4</text>
+      <text x="602" y="229" font-size="12" fill="#F3F4F6">Falkenberg</text>
+      <text x="774" y="229" text-anchor="end" font-size="12" font-weight="600" fill="#4ADE80" class="tabular">2 min</text>
+      <text x="564" y="246" font-size="10" fill="#9CA3AF">+14 more</text>
+    </g>
+
+    <!-- DARK MARKER 2: Compact Badge Pill (Overview / Neighbour Cluster) -->
+    <g filter="url(#shadow-light)">
+      <rect x="615" y="346" width="184" height="48" rx="8" fill="#1C1F26" stroke="#2A2E37" stroke-width="1"/>
+      <polygon points="701,394 713,394 707,402" fill="#1C1F26"/>
+      <text x="623" y="361" font-size="11" font-weight="700" fill="#F3F4F6">U Weinmeisterstr.</text>
+      <rect x="623" y="368" width="28" height="16" rx="4" fill="#224F86"/>
+      <text x="637" y="380" text-anchor="middle" font-size="10" font-weight="700" fill="#FFFFFF">U8</text>
+      <rect x="655" y="368" width="28" height="16" rx="4" fill="#F3791D"/>
+      <text x="669" y="380" text-anchor="middle" font-size="10" font-weight="700" fill="#000000">M1</text>
+      <rect x="687" y="368" width="28" height="16" rx="4" fill="#659530"/>
+      <text x="701" y="380" text-anchor="middle" font-size="10" font-weight="700" fill="#FFFFFF">M8</text>
+      <rect x="719" y="368" width="32" height="16" rx="4" fill="#A5027D"/>
+      <text x="735" y="380" text-anchor="middle" font-size="10" font-weight="700" fill="#FFFFFF">N40</text>
+    </g>
+
+    <!-- Bottom Right Attribution -->
+    <rect x="732" y="492" width="120" height="18" rx="4" fill="#16181D" fill-opacity="0.82"/>
+    <text x="792" y="504" text-anchor="middle" font-size="10" fill="#9CA3AF">Data: VBB (CC BY 4.0)</text>
+  </g>
+  <text x="680" y="546" text-anchor="middle" class="font" font-size="13" font-weight="600" fill="#374151">Dark Mode · 3D Pitch &amp; Hub Clustering</text>
+</svg>
