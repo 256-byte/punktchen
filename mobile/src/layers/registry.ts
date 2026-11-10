@@ -9,14 +9,23 @@ import type { components } from '@/api/schema.gen';
 
 export type LayerId = components['schemas']['LayerId'];
 
+/**
+ * How the user wants the map drawn, from switches on the map screen. Layers
+ * read what applies to them and ignore the rest.
+ */
+export interface MapViewOptions {
+  /** Both platforms / sides of one stop in one marker (transit, task 7.8). */
+  combineStops?: boolean;
+}
+
 export interface MapLayer<TFeature> {
   id: LayerId;
   /**
    * This layer's features in a /v1/nearby response (none if the layer is
    * down), clustered or filtered for the map's visible vertical span
-   * (`latitudeDelta` in degrees; task 7.2).
+   * (`latitudeDelta` in degrees; task 7.2) and the view options.
    */
-  select(response: NearbyResponse, latitudeDelta?: number): TFeature[];
+  select(response: NearbyResponse, latitudeDelta?: number, options?: MapViewOptions): TFeature[];
   /** Stable React key of a feature. */
   key(feature: TFeature): string;
   /**

@@ -158,7 +158,67 @@ export function markerRows(
   cells: readonly (string | null)[],
   max = MARKER_ROWS,
 ): { rows: MarkerRow[]; more: number } {
-  const running: { row: MarkerRow; minute: number }[] = [];
+  const running = runningRows(directions, cells);
+  return { rows: soonestFirst(running.slice(0, max)), more: Math.max(0, running.length - max) };
+}
+
+/**
+ * Rows of a combined stop marker (task 7.8). More than MARKER_ROWS: it stands
+ * for two to four poles that each had their own marker before.
+ */
+export const SECTION_MARKER_ROWS = 6;
+
+/**
+ * The rows of a combined stop marker (task 7.8), one list per section (pole),
+ * empty sections left out. Up to `max` rows are dealt out in turns — each
+ * section's first running direction, then each one's second, … — so every
+ * platform or street side gets a row before any gets a second. Inside a
+ * section the shown rows are ordered soonest first, like markerRows (7.7).
+ *
+ * sections: each section's directions; cells: nextCells() of all of them, in
+ * the same order, concatenated.
+ */
+export function sectionRows(
+  sections: readonly (readonly Direction[])[],
+  cells: readonly (string | null)[],
+  max = SECTION_MARKER_ROWS,
+): { sections: MarkerRow[][]; more: number } {
+  let offset = 0;
+  const running = sections
+    .map((directions) => {
+      const rows = runningRows(directions, cells.slice(offset, offset + directions.length));
+      offset += directions.length;
+      return rows;
+    })
+    .filter((rows) => rows.length > 0);
+  const total = running.reduce((n, rows) => n + rows.length, 0);
+  const taken = running.map(() => 0);
+  let shown = 0;
+  for (let turn = 0; shown < max && shown < total; turn++) {
+    running.forEach((rows, s) => {
+      if (shown < max && turn < rows.length) {
+        taken[s]!++;
+        shown++;
+      }
+    });
+  }
+  return {
+    sections: running.map((rows, s) => soonestFirst(rows.slice(0, taken[s]))),
+    more: total - shown,
+  };
+}
+
+interface RunningRow {
+  row: MarkerRow;
+  minute: number;
+}
+
+/** Non-terminal directions with an upcoming departure, in the given order. */
+function runningRows(
+  directions: readonly Direction[],
+  cells: readonly (string | null)[],
+): RunningRow[] {
+  const running: RunningRow[] = [];
   directions.forEach((direction, i) => {
     if (isTerminalDirection(direction)) return;
     const cell = cells[i];
@@ -166,8 +226,12 @@ export function markerRows(
     const { minute, encoded } = splitNextCell(cell);
     running.push({ row: { direction, next: decodeCell(encoded) }, minute });
   });
-  const shown = running.slice(0, max).sort((a, b) => a.minute - b.minute); // stable
-  return { rows: shown.map((r) => r.row), more: Math.max(0, running.length - max) };
+  return running;
+}
+
+/** Soonest next departure first; equal minutes keep their order (stable sort). */
+function soonestFirst(rows: RunningRow[]): MarkerRow[] {
+  return [...rows].sort((a, b) => a.minute - b.minute).map((r) => r.row);
 }
 
 /**

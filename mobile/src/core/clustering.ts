@@ -84,7 +84,35 @@ export interface ClusteredFeature {
   stationCount: number;
   /** Zoom detail level for rendering. */
   detail: DetailLevel;
+  /**
+   * Combined stop (task 7.8, `poles` zoom only): the poles shown as separate
+   * sections of one marker, divided by a line (e.g. both platforms of S+U
+   * Wedding's S-Bahn, or both sides of a street). Absent for a single pole.
+   */
+  sections?: Pole[];
 }
+
+/**
+ * Combined stop rule (task 7.8, user-approved 2026-11-10). Two active poles
+ * of the same station are one stop when their main mode is the same and:
+ * - rail (regional, S-Bahn, U-Bahn): they are at most `STOP_RAIL_M` apart —
+ *   all platforms of a station's line(s) of that mode, e.g. U6 + U9 at
+ *   U Leopoldplatz (4–16 m apart, DATA_MODEL §7);
+ * - tram, ferry, other: at most `STOP_STREET_M` apart and they share a line
+ *   that has departures — the two sides of a street (Seestr./Amrumer Str.
+ *   M13/50, 6 m), not two lines that only meet at a corner (Gerichtstr.
+ *   247 / M27, 36 m; U Leopoldplatz Nazarethkirchstr. 247 / Müllerstr. 120,
+ *   28 m, which share only idle variants).
+ * Bus stops are never joined (user decision 2026-11-10, after seeing it on
+ * the iPhone): the two sides of a street are often 30–50 m apart, and one
+ * marker between them hides where each stop is.
+ * Different modes are never one stop: S and U Wedding stay apart (~180 m)
+ * as do U platforms and bus stops next to them.
+ */
+export const STOP_RAIL_M = 60;
+export const STOP_STREET_M = 50;
+
+const RAIL_MODES: ReadonlySet<Mode> = new Set<Mode>(['regional', 'sbahn', 'ubahn']);
 
 const MODE_RANK: Record<Mode, number> = {
   regional: 0,
@@ -180,81 +208,191 @@ function stationRank(station: Station, activePoles: readonly Pole[]): number {
   return (10 - bestMode) * 1000 + activePoles.length;
 }
 
+export interface ClusterOptions {
+  /**
+   * Combined stops at street zoom (task 7.8): both platforms / sides of one
+   * stop in one marker with sections. Off: every pole its own marker at the
+   * closest zoom and flat merged rows at the wider street zooms, as in 7.2.
+   * A switch on the map (user request 2026-11-10); default COMBINE_STOPS_DEFAULT.
+   */
+  combineStops?: boolean;
+}
+
+/** Combined stops are on unless switched off on the map (task 7.8). */
+export const COMBINE_STOPS_DEFAULT = true;
+
 /**
  * Builds the map markers for `stations` at the zoom given by `latitudeDelta`.
  */
 export function clusterStations(
   stations: readonly Station[],
   latitudeDelta?: number,
+  options: ClusterOptions = {},
 ): ClusteredFeature[] {
   const spec = zoomSpec(latitudeDelta);
   const cleaned = stations.map(stationWithoutTerminals);
-
-  if (spec.detail === 'poles' && spec.radiusM === 0) {
-    return cleaned.flatMap((station) =>
-      station.poles.map((pole) => ({
-        station,
-        pole,
-        poleCount: 1,
-        stationCount: 1,
-        detail: 'poles' as const,
-      })),
-    );
-  }
+  const combineStops = options.combineStops ?? COMBINE_STOPS_DEFAULT;
 
   if (spec.detail === 'poles') {
-    return cleaned.flatMap((station) => clusterPolesInStation(station, spec.radiusM));
+    return cleaned.flatMap((station) => clusterPolesInStation(station, spec.radiusM, combineStops));
   }
 
   return clusterByStation(cleaned, spec.radiusM, spec.detail);
 }
 
-/** Street-level clustering: merges nearby active poles within the same station. */
-function clusterPolesInStation(station: Station, radiusM: number): ClusteredFeature[] {
+/** Most important mode of a pole's directions (its "kind" of stop). */
+function poleMode(pole: Pole): Mode {
+  let best: Mode = 'other';
+  for (const d of pole.directions) {
+    if (MODE_RANK[d.mode] < MODE_RANK[best]) best = d.mode;
+  }
+  return best;
+}
+
+/** Whether two poles of one station are one stop (task 7.8, see STOP_RAIL_M). */
+export function isSameStop(a: Pole, b: Pole): boolean {
+  const mode = poleMode(a);
+  if (mode !== poleMode(b)) return false;
+  const distance = distanceMeters(a.location, b.location);
+  if (RAIL_MODES.has(mode)) return distance <= STOP_RAIL_M;
+  if (mode === 'bus' || distance > STOP_STREET_M) return false;
+  // Only lines that run now: an idle variant (e.g. 120 ending at U Leopoldplatz)
+  // would join a corner stop to a stop of another line.
+  const lines = new Set(runningLines(a));
+  return runningLines(b).some((line) => lines.has(line));
+}
+
+function runningLines(pole: Pole): string[] {
+  return pole.directions.filter((d) => d.departures.length > 0).map((d) => `${d.mode}|${d.line}`);
+}
+
+const natural = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true });
+
+/** First running line of a pole in natural order ("M4" < "M10"); "" if none. */
+function firstLine(pole: Pole): string {
+  return (
+    pole.directions
+      .filter((d) => d.departures.length > 0)
+      .map((d) => d.line)
+      .sort(natural)[0] ?? ''
+  );
+}
+
+/**
+ * Order of sections in a combined marker, independent of the API's
+ * nearest-first order (which changes as the user walks): mode, first line,
+ * platform ("1" < "2" < "10"), id. So a line's two directions sit next to
+ * each other: U6 Gleis 1, U6 Gleis 2, U9 Gleis 1, U9 Gleis 2 at U Leopoldplatz.
+ */
+function compareSections(a: Pole, b: Pole): number {
+  return (
+    MODE_RANK[poleMode(a)] - MODE_RANK[poleMode(b)] ||
+    natural(firstLine(a), firstLine(b)) ||
+    natural(a.platform ?? '', b.platform ?? '') ||
+    a.id.localeCompare(b.id)
+  );
+}
+
+/**
+ * The combined stops of a station (task 7.8): its active poles joined by
+ * isSameStop, transitively (single linkage, so U6 and U9 platforms that are
+ * each within reach join one stop). Groups in order of their first pole.
+ */
+export function stopGroups(poles: readonly Pole[]): Pole[][] {
+  const parent = poles.map((_, i) => i);
+  const find = (i: number): number => {
+    while (parent[i] !== i) {
+      parent[i] = parent[parent[i]!]!;
+      i = parent[i]!;
+    }
+    return i;
+  };
+  for (let i = 0; i < poles.length; i++) {
+    for (let j = i + 1; j < poles.length; j++) {
+      if (isSameStop(poles[i]!, poles[j]!)) parent[find(j)] = find(i);
+    }
+  }
+  const groups = new Map<number, Pole[]>();
+  poles.forEach((pole, i) => {
+    const root = find(i);
+    const group = groups.get(root);
+    if (group) group.push(pole);
+    else groups.set(root, [pole]);
+  });
+  return [...groups.values()];
+}
+
+/**
+ * Street-level clustering: the station's active poles form combined stops
+ * (task 7.8); at the wider street zooms (`radiusM` > 0) stops whose centres
+ * are within `radiusM` of a seed stop join it too (task 7.2). A marker with
+ * several poles shows each pole as a section.
+ */
+function clusterPolesInStation(
+  station: Station,
+  radiusM: number,
+  combineStops: boolean,
+): ClusteredFeature[] {
   const active = station.poles.filter(hasDepartures);
   if (active.length === 0) return [];
 
-  const used = new Array<boolean>(active.length).fill(false);
+  const stops = combineStops ? stopGroups(active) : active.map((pole) => [pole]);
+  const groups = stops.map((poles) => ({
+    poles,
+    center: centroid(poles.map((p) => p.location)),
+  }));
+  const used = new Array<boolean>(groups.length).fill(false);
   const out: ClusteredFeature[] = [];
 
-  for (let i = 0; i < active.length; i++) {
+  for (let i = 0; i < groups.length; i++) {
     if (used[i]) continue;
     used[i] = true;
-    const seed = active[i]!;
-    const group: Pole[] = [seed];
-
-    for (let j = i + 1; j < active.length; j++) {
+    const seed = groups[i]!;
+    const poles = [...seed.poles];
+    for (let j = i + 1; j < groups.length; j++) {
       if (used[j]) continue;
-      const candidate = active[j]!;
-      if (distanceMeters(seed.location, candidate.location) <= radiusM) {
+      if (radiusM > 0 && distanceMeters(seed.center, groups[j]!.center) <= radiusM) {
         used[j] = true;
-        group.push(candidate);
+        poles.push(...groups[j]!.poles);
       }
     }
 
-    if (group.length === 1) {
-      out.push({
-        station,
-        pole: seed,
-        poleCount: 1,
-        stationCount: 1,
-        detail: 'poles',
-      });
-    } else {
+    if (poles.length === 1) {
+      out.push({ station, pole: poles[0]!, poleCount: 1, stationCount: 1, detail: 'poles' });
+      continue;
+    }
+    if (!combineStops) {
+      // As in 7.2: one flat list, seed pole first.
       out.push({
         station,
         pole: {
-          id: group.map((p) => p.id).join('+'),
-          location: centroid(group.map((p) => p.location)),
-          platform: seed.platform,
-          description: seed.description,
-          directions: mergeDirections(group),
+          id: poles.map((p) => p.id).join('+'),
+          location: centroid(poles.map((p) => p.location)),
+          platform: seed.poles[0]!.platform,
+          description: seed.poles[0]!.description,
+          directions: mergeDirections(poles),
         },
-        poleCount: group.length,
+        poleCount: poles.length,
         stationCount: 1,
         detail: 'poles',
       });
+      continue;
     }
+    const sections = poles.sort(compareSections);
+    out.push({
+      station,
+      pole: {
+        id: sections.map((p) => p.id).join('+'),
+        location: centroid(sections.map((p) => p.location)),
+        platform: sections[0]!.platform,
+        description: sections[0]!.description,
+        directions: mergeDirections(sections),
+      },
+      poleCount: sections.length,
+      stationCount: 1,
+      detail: 'poles',
+      sections,
+    });
   }
   return out;
 }

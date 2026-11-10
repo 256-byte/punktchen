@@ -292,32 +292,66 @@ describe('mergeDirections', () => {
 });
 
 describe('clusterStations across zoom levels', () => {
-  it('without latitudeDelta returns every pole unclustered', () => {
-    const features = clusterStations([weddingStation]);
-    expect(features).toHaveLength(7);
-    expect(features.every((f) => f.detail === 'poles' && f.poleCount === 1)).toBe(true);
-  });
+  const uStop = 'de:11000:900009104::1+de:11000:900009104::2'; // U6 Gleis 1 + 2
+  const sStop = 'de:11000:900009104:1:51+de:11000:900009104:1:50'; // S-Bahn Gleis 1 + 2
 
-  it('at street zoom (0.004) splits S+U Wedding into Bus, U-Bahn and S-Bahn groups and drops idle poles', () => {
+  it.each([undefined, 0.001, 0.002])(
+    'at street zoom (%s) shows S+U Wedding’s U- and S-Bahn as combined stops, each bus stop alone (task 7.8)',
+    (latitudeDelta) => {
+      const features = clusterStations([weddingStation], latitudeDelta);
+      expect(features.map((f) => f.pole.id)).toEqual([
+        'de:11000:900009104::3', // both sides of Müllerstr., 27 m apart: bus stops are never one stop
+        'de:11000:900009104::4',
+        uStop,
+        sStop,
+      ]); // idle pole: no marker
+      expect(features.map((f) => f.sections?.length ?? 1)).toEqual([1, 1, 2, 2]);
+      expect(features[3]!.sections!.map((p) => p.directions[0]!.line)).toEqual(['S41', 'S42']);
+      // The merged list (screen reader, sheet) still has both U6 directions.
+      expect(features[2]!.pole.directions.map((d) => d.headsign)).toEqual([
+        'Alt-Mariendorf',
+        'Kurt-Schumacher-Platz',
+      ]);
+    },
+  );
+
+  it('at the widest street zoom (0.004) still merges poles within 28 m, bus stops too (task 7.2)', () => {
     const features = clusterStations([weddingStation], 0.004);
-    expect(features).toHaveLength(3);
     expect(features.map((f) => f.pole.id)).toEqual([
       'de:11000:900009104::3+de:11000:900009104::4',
+      uStop,
+      sStop,
+    ]);
+    expect(features.every((f) => f.sections?.length === 2)).toBe(true);
+  });
+
+  it('with combined stops switched off, draws street zoom as before 7.8', () => {
+    const off = (delta: number) =>
+      clusterStations([weddingStation], delta, { combineStops: false });
+    // Closest zoom: every pole with something coming is its own marker.
+    expect(off(0.001).map((f) => f.pole.id)).toEqual([
+      'de:11000:900009104::3',
+      'de:11000:900009104::4',
+      'de:11000:900009104::2',
+      'de:11000:900009104::1',
+      'de:11000:900009104:1:51',
+      'de:11000:900009104:1:50',
+    ]);
+    // 15 m: only the 9–10 m twin platforms merge, flat, seed first.
+    expect(off(0.002).map((f) => f.pole.id)).toEqual([
+      'de:11000:900009104::3',
+      'de:11000:900009104::4',
       'de:11000:900009104::2+de:11000:900009104::1',
       'de:11000:900009104:1:51+de:11000:900009104:1:50',
     ]);
-    // U-Bahn twin platforms now show both directions on one marker instead of overlapping.
-    expect(features[1]!.pole.directions.map((d) => d.headsign)).toEqual([
+    // 28 m: bus pair too; no sections anywhere.
+    const wide = off(0.004);
+    expect(wide.map((f) => f.pole.id)[0]).toBe('de:11000:900009104::3+de:11000:900009104::4');
+    expect([...off(0.001), ...off(0.002), ...wide].some((f) => f.sections)).toBe(false);
+    expect(wide[1]!.pole.directions.map((d) => d.headsign)).toEqual([
       'Kurt-Schumacher-Platz',
       'Alt-Mariendorf',
     ]);
-  });
-
-  it('at closer street zoom (0.002) separates the two bus poles while keeping 10 m twin platforms together', () => {
-    const features = clusterStations([weddingStation], 0.002);
-    expect(features).toHaveLength(4);
-    expect(features[0]!.pole.id).toBe('de:11000:900009104::3');
-    expect(features[1]!.pole.id).toBe('de:11000:900009104::4');
   });
 
   it('at default zoom (0.0108, Alexanderplatz density) merges the hub and its immediate stops while keeping Rotes Rathaus separate', () => {
@@ -344,6 +378,92 @@ describe('clusterStations across zoom levels', () => {
     expect(features[0]!.detail).toBe('compact');
     expect(features[0]!.station.name).toBe('S+U Alexanderplatz');
     expect(features[0]!.stationCount).toBe(3);
+  });
+});
+
+describe('combined stops (task 7.8)', () => {
+  const pole = (
+    id: string,
+    lat: number,
+    lng: number,
+    directions: Direction[],
+    platform: string | null = null,
+  ) => ({ id, location: { lat, lng }, platform, description: null, directions });
+  const station = (name: string, poles: Station['poles']): Station => ({
+    id: `de:11000:${name}`,
+    kind: 'station',
+    name,
+    location: poles[0]!.location,
+    modes: [],
+    poles,
+  });
+  const ids = (s: Station) =>
+    clusterStations([s], 0.001).map((f) => f.sections?.map((p) => p.id) ?? [f.pole.id]);
+
+  // Real coordinates (VBB, 2026-11-10).
+  const leopoldplatz = station('U Leopoldplatz', [
+    pole('u9-2', 52.546349, 13.35923, [dir('U9', 'U Osloer Str.', 'ubahn')], '2 (U9)'),
+    pole('u6-2', 52.546419, 13.359163, [dir('U6', 'U Kurt-Schumacher-Platz', 'ubahn')], '2 (U6)'),
+    pole('u9-1', 52.546448, 13.359059, [dir('U9', 'S+U Rathaus Steglitz', 'ubahn')], '1 (U9)'),
+    pole('u6-1', 52.546389, 13.359121, [dir('U6', 'U Alt-Mariendorf', 'ubahn')], '1 (U6)'),
+    // Bus stop 39 m from the U platforms: another mode, its own marker.
+    pole('bus-8', 52.546044, 13.359507, [dir('120', 'S+U Berlin Hauptbahnhof')]),
+    // Nazarethkirchstr. (247) and Müllerstr. ht. Schulstr. (120), 28 m apart: they
+    // share line 120 only through an idle variant, so they stay apart.
+    pole('bus-6', 52.547174, 13.358551, [
+      dir('247', 'S Nordbahnhof'),
+      dir('120', 'U Leopoldplatz', 'bus', []),
+    ]),
+    pole('bus-9', 52.546924, 13.358479, [
+      dir('120', 'S+U Wittenau'),
+      dir('247', 'S Nordbahnhof', 'bus', []),
+    ]),
+  ]);
+
+  it('joins all U-Bahn platforms of a station, a line’s two directions next to each other', () => {
+    expect(ids(leopoldplatz)).toEqual([
+      ['u6-1', 'u6-2', 'u9-1', 'u9-2'],
+      ['bus-8'],
+      ['bus-6'],
+      ['bus-9'],
+    ]);
+  });
+
+  // Real coordinates of S Wedding/Martha-Ndumbe-Platz (bus M27 and 247).
+  const corner = (mode: Direction['mode']) =>
+    station('S Wedding/Martha-Ndumbe-Platz', [
+      pole('m27-a', 52.544164, 13.369588, [dir('M27', 'S+U Jungfernheide', mode)]),
+      pole('m27-b', 52.54438, 13.370193, [dir('M27', 'S+U Pankow', mode)]), // 48 m from m27-a
+      pole('247-a', 52.544476, 13.370697, [dir('247', 'S Nordbahnhof', mode)]), // 36 m from m27-b
+      pole('247-b', 52.544421, 13.371413, [dir('247', 'U Leopoldplatz', mode)]), // 49 m from 247-a
+    ]);
+
+  it('never joins bus stops, not even both sides of a street (user decision 2026-11-10)', () => {
+    expect(ids(corner('bus'))).toEqual([['m27-a'], ['m27-b'], ['247-a'], ['247-b']]);
+  });
+
+  it('joins tram stops on both sides of a street only when they share a running line', () => {
+    expect(ids(corner('tram'))).toEqual([
+      ['m27-a', 'm27-b'],
+      ['247-a', '247-b'],
+    ]);
+  });
+
+  it('keeps sides of a street apart beyond 50 m, platforms beyond 60 m', () => {
+    // 0.0006° latitude ≈ 67 m.
+    const far = station('Far', [
+      pole('a', 52.5, 13.4, [dir('M4', 'A', 'tram')]),
+      pole('b', 52.5006, 13.4, [dir('M4', 'B', 'tram')]),
+      pole('u1', 52.5, 13.41, [dir('U8', 'A', 'ubahn')], '1'),
+      pole('u2', 52.5006, 13.41, [dir('U8', 'B', 'ubahn')], '2'),
+    ]);
+    expect(ids(far)).toEqual([['a'], ['b'], ['u1'], ['u2']]);
+  });
+
+  it('never joins two stations, even close ones', () => {
+    const a = station('A', [pole('a', 52.5, 13.4, [dir('U6', 'X', 'ubahn')], '1')]);
+    const b = station('B', [pole('b', 52.50005, 13.4, [dir('U6', 'Y', 'ubahn')], '2')]);
+    expect(clusterStations([a, b], 0.001).map((f) => f.pole.id)).toEqual(['a', 'b']);
   });
 });
 

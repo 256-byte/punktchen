@@ -8,14 +8,14 @@ import { type ApiClient, failureOf } from '@/api/client';
 import type { NearbyResponse } from '@/api/nearby';
 import { useNearby } from '@/api/useNearby';
 import type { ApiBaseUrl } from '@/core/apiBaseUrl';
-import { sameZoomSpec } from '@/core/clustering';
+import { COMBINE_STOPS_DEFAULT, sameZoomSpec } from '@/core/clustering';
 import { nearbyEmptyState } from '@/core/directions';
 import { nextRequestCenter } from '@/core/fetchPolicy';
 import { type LatLng, pitchCamera, regionAround } from '@/core/geo';
 import type { LocationView } from '@/core/location';
 import { freshness } from '@/core/staleness';
 import { mapLayers } from '@/layers';
-import type { AnyMapLayer } from '@/layers/registry';
+import type { AnyMapLayer, MapViewOptions } from '@/layers/registry';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { type ClockStore, clockStore, useClockTicker, useDeviceNow } from '@/state/clock';
 import { locationStore, type LocationStore } from '@/state/location';
@@ -65,6 +65,7 @@ export function MapScreen({
   const [initialRegion] = useState(() => regionAround(position, START_RADIUS_M));
   const [latitudeDelta, setLatitudeDelta] = useState(initialRegion.latitudeDelta);
   const [pitched, setPitched] = useState(false);
+  const [combineStops, setCombineStops] = useState(COMBINE_STOPS_DEFAULT);
   const pitchedRef = useRef(false);
   const deltaRef = useRef(initialRegion.latitudeDelta);
   const following = useRef(true);
@@ -112,6 +113,11 @@ export function MapScreen({
     map.current?.animateCamera(pitchCamera(next, deltaRef.current), {
       duration: FOLLOW_ANIMATION_MS,
     });
+  };
+
+  const toggleCombineStops = () => {
+    hapticLight();
+    setCombineStops((on) => !on);
   };
 
   const selectFeature = (next: Selected) => {
@@ -174,6 +180,7 @@ export function MapScreen({
             layers={layers}
             response={nearby.data.response}
             latitudeDelta={latitudeDelta}
+            combineStops={combineStops}
             stale={stale}
             onSelect={selectFeature}
           />
@@ -181,6 +188,7 @@ export function MapScreen({
       </MapView>
       <MapAttribution lines={nearby.data?.response.meta.attribution ?? []} />
       <PitchToggle pitched={pitched} onToggle={togglePitch} />
+      <CombineStopsToggle on={combineStops} onToggle={toggleCombineStops} />
       {devTools ? <DevPlacePicker store={store} /> : null}
       {client === null ? (
         <View style={styles.status}>
@@ -236,18 +244,21 @@ function LayerMarkers({
   layers,
   response,
   latitudeDelta,
+  combineStops,
   stale,
   onSelect,
 }: {
   layers: readonly AnyMapLayer[];
   response: NearbyResponse;
   latitudeDelta: number;
+  combineStops: boolean;
   stale: boolean;
   onSelect: (selected: Selected) => void;
 }) {
+  const options: MapViewOptions = { combineStops };
   return layers.map((layer) =>
     layer
-      .select(response, latitudeDelta)
+      .select(response, latitudeDelta, options)
       .map((feature) => (
         <layer.Marker
           key={`${layer.id}:${layer.key(feature)}`}
@@ -323,6 +334,32 @@ function PitchToggle({ pitched, onToggle }: { pitched: boolean; onToggle: () => 
   );
 }
 
+/**
+ * Switch for combined stops (task 7.8, user request 2026-11-10): on, both
+ * platforms / sides of one stop share a marker at street zoom; off, every
+ * pole has its own, as before. Not saved: the app starts with the default.
+ */
+function CombineStopsToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  const styles = useStyles();
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityLabel="Combine stops"
+      accessibilityHint="Shows both platforms or directions of a stop in one marker"
+      accessibilityState={{ checked: on }}
+      onPress={onToggle}
+      style={({ pressed }) => [
+        styles.pitchButton,
+        styles.combineButton,
+        on && styles.pitchButtonActive,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Text style={[styles.pitchLabel, on && styles.pitchLabelActive]}>Combine</Text>
+    </Pressable>
+  );
+}
+
 /** Request centre that moves only after > 150 m (nextRequestCenter). */
 function useRequestCenter(position: LatLng): LatLng {
   const [center, setCenter] = useState(position);
@@ -354,6 +391,9 @@ const useStyles = themedStyles(
       shadowRadius: 3,
       shadowOffset: { width: 0, height: 1 },
       elevation: 3,
+    },
+    combineButton: {
+      top: 172, // below the 3D toggle
     },
     pitchButtonActive: {
       backgroundColor: colors.accent,

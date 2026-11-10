@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { act, render, renderHook, screen } from '@testing-library/react-native';
+import { act, render, renderHook, screen, within } from '@testing-library/react-native';
 import { Profiler } from 'react';
 
 import type { NearbyResponse } from '@/api/nearby';
@@ -174,6 +174,51 @@ describe('PoleMarker', () => {
     expect(lines()).toEqual(['142', 'M27', '247']); // 14:40, 14:43, 15:45
   });
 
+  it('draws a combined stop as sections divided by a line (task 7.8)', async () => {
+    const sbahn = (line: string, time: string): Direction => ({
+      ...direction(line, line === 'S15' ? 'S+U Hauptbahnhof' : `Ringbahn ${line}`, [dep(time)]),
+      mode: 'sbahn',
+      isRing: line !== 'S15',
+    });
+    const gleis1 = {
+      ...f.pole,
+      id: 'g1',
+      platform: '1',
+      directions: [sbahn('S41', '14:36'), sbahn('S15', '14:31')],
+    };
+    const gleis2 = {
+      ...f.pole,
+      id: 'g2',
+      platform: '2',
+      directions: [sbahn('S42', '14:33'), sbahn('S15', '14:40')],
+    };
+    const combined: PoleFeature = {
+      ...f,
+      pole: { ...f.pole, id: 'g1+g2', directions: [...gleis1.directions, ...gleis2.directions] },
+      poleCount: 2,
+      sections: [gleis1, gleis2],
+    };
+    await render(<PoleMarker feature={combined} clock={clock} />);
+    const lineIn = (id: string) =>
+      within(screen.getByTestId(id))
+        .getAllByText(/^S\d+$/)
+        .map((n) => n.props.children as string);
+    expect(lineIn('section-0')).toEqual(['S15', 'S41']); // soonest first
+    expect(lineIn('section-1')).toEqual(['S42', 'S15']);
+    // Same row spacing in every section (the first one too); a line above all but the first.
+    expect(screen.getByTestId('section-0')).toHaveStyle({ gap: 3 });
+    expect(screen.getByTestId('section-0')).not.toHaveStyle({
+      borderTopColor: themes.light.colors.border,
+    });
+    expect(screen.getByTestId('section-1')).toHaveStyle({
+      gap: 3,
+      borderTopColor: themes.light.colors.border,
+    });
+    expect(
+      screen.getByLabelText(/^S\+U Wedding\. S15 to S\+U Hauptbahnhof: 1 min/),
+    ).toBeOnTheScreen();
+  });
+
   it('counts down with the clock and moves on to the next departure', async () => {
     await render(<PoleMarker feature={f} clock={clock} />);
     await at(t0 + 60_000);
@@ -302,8 +347,9 @@ describe('PoleMarker', () => {
 });
 
 describe('transit layer', () => {
-  it('draws one marker per pole', () => {
+  it('draws one marker per pole with something coming (no shared line: not one stop)', () => {
     const station = feature([]).station;
+    const m27 = feature([direction('M27', 'S Jungfernheide', [dep('14:33')])]).pole;
     const response = {
       meta: { generatedAt: '2026-11-05T14:30:12+01:00', attribution: [], layers: {} },
       layers: {
@@ -312,7 +358,15 @@ describe('transit layer', () => {
           features: [
             {
               ...station,
-              poles: [feature([]).pole, { ...feature([]).pole, id: 'de:11000:900009104::4' }],
+              poles: [
+                m27,
+                {
+                  ...m27,
+                  id: 'de:11000:900009104::4',
+                  directions: [direction('247', 'S Nordbahnhof', [dep('14:35')])],
+                },
+                { ...m27, id: 'de:11000:900009104::9', directions: [] }, // nothing: no marker
+              ],
             },
           ],
         },

@@ -15,6 +15,8 @@ import {
   nextCells,
   nonTerminalDirections,
   ringSymbol,
+  SECTION_MARKER_ROWS,
+  sectionRows,
   textColorOn,
 } from './directions';
 
@@ -249,6 +251,50 @@ describe('markerRows order (task 7.7)', () => {
 
   it('puts cells without a sort minute last', () => {
     expect(shown(['s\t2 min', at('14:35', '5 min')])).toEqual(['M2 5 min', 'M1 2 min']);
+  });
+});
+
+describe('sectionRows (task 7.8)', () => {
+  const at = (hhmm: string, label: string) => `${minuteOf(hhmm)}|s\t${label}`;
+  const lines = (r: ReturnType<typeof sectionRows>) =>
+    r.sections.map((rows) => rows.map((x) => `${x.direction.line} ${x.next.label}`));
+
+  it('keeps each section apart, soonest first inside it', () => {
+    // S+U Wedding S-Bahn: Gleis 1 (S41, S15) and Gleis 2 (S42, S15).
+    const g1 = [direction({ line: 'S41' }), direction({ line: 'S15' })];
+    const g2 = [direction({ line: 'S42' }), direction({ line: 'S15' })];
+    const r = sectionRows(
+      [g1, g2],
+      [at('14:36', '6 min'), at('14:31', '1 min'), at('14:33', '3 min'), at('14:40', '10 min')],
+    );
+    expect(lines(r)).toEqual([
+      ['S15 1 min', 'S41 6 min'],
+      ['S42 3 min', 'S15 10 min'],
+    ]);
+    expect(r.more).toBe(0);
+  });
+
+  it(`gives every section a row before any gets a second, up to ${SECTION_MARKER_ROWS}`, () => {
+    const many = (prefix: string) => [1, 2, 3].map((n) => direction({ line: `${prefix}${n}` }));
+    const sections = [many('A'), many('B'), many('C'), many('D')];
+    const cells = sections.flat().map((_, i) => at(`14:${String(31 + i).padStart(2, '0')}`, 'x'));
+    const r = sectionRows(sections, cells);
+    expect(r.sections.map((rows) => rows.map((x) => x.direction.line))).toEqual([
+      ['A1', 'A2'],
+      ['B1', 'B2'],
+      ['C1'],
+      ['D1'],
+    ]);
+    expect(r.more).toBe(6);
+  });
+
+  it('leaves out sections with nothing coming', () => {
+    const r = sectionRows(
+      [[direction({ line: 'N6' })], [direction({ line: 'U6' })]],
+      [null, at('14:32', '2 min')],
+    );
+    expect(lines(r)).toEqual([['U6 2 min']]);
+    expect(sectionRows([[direction({})]], [null])).toEqual({ sections: [], more: 0 });
   });
 });
 
