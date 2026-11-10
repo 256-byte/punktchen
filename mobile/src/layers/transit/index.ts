@@ -33,6 +33,7 @@ export const transitLayer = defineLayer<PoleFeature>({
       combineStops: options?.combineStops,
     }),
   key: (f) => f.pole.id,
+  location: (f) => f.pole.location,
   Marker: PoleMarker,
   Sheet: StationSheet,
 });

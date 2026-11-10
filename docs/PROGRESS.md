@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 7 — UI polish (reopened 2026-11-10 for 7.7–7.10, user request; MVP Phases 0–6 done)
-- **Next task:** 7.9 marker overlap avoidance
+- **Next task:** 7.10 mode icons in marker header
 - **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
@@ -66,7 +66,7 @@
 | 7 | 7.6 README screenshots/GIF, architecture diagram | done | Portfolio-ready `README.md` with animated/vector previews (`docs/assets/map-light-dark.svg`, `docs/assets/station-sheet-offline.svg`), Mermaid + ASCII architecture diagrams, and ADR summary table |
 | 7 | 7.7 Marker rows ordered by next departure | done | Shown rows sorted soonest first, selection unchanged (user decision); station sheet sorted per platform, platform order kept; sort minute carried in `nextCells` / `sheetSignature`, no extra renders; markers checked on the iPhone (user), sheet to check |
 | 7 | 7.8 Combined stop popup | done | `stopGroups`: same station + main mode; rail ≤ 60 m, tram ≤ 50 m with a shared running line; bus stops never (user decision after the iPhone check); "Combine" switch on the map (default on); sections with a divider, up to 6 rows dealt per section; checked on 6 real areas (DATA_MODEL §7 #32); to check on the iPhone |
-| 7 | 7.9 Marker overlap avoidance | todo | |
+| 7 | 7.9 Marker overlap avoidance | done | `layoutLabels` (greedy, nearest free spot, sideways first) on the map's own projection after each camera move; back in place when zoomed in; checked on the iPhone (user); no line/dot to the stop (user decision) |
 | 7 | 7.10 Mode icons in marker header | todo | Own drawings with `react-native-svg` (user decision) |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
@@ -118,6 +118,18 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-10 — task 7.9
+- Done:
+  - `src/core/labelLayout.ts`: `layoutLabels` — places bubbles in priority order, each overlapping one moves to the nearest free position (12-point steps up to 260, sideways first at equal distance); `sameLayout`, `isInPlace`.
+  - `src/ui/useMarkerLayout.ts`: projects marker points with the map (`pointForCoordinate` / `coordinateForPoint`), runs the layout 40 ms after a camera move, data change or size report, drops outdated runs, keeps the old result when nothing moved (pan). `MARKER_ANCHOR` per platform (Apple Maps centres markers: it ignores `anchor`).
+  - Layer interface: `location(feature)`, Marker props `displayAt` and `onSize`. `MapScreen` builds the drawn list once (`drawn`) and draws moved markers at their new place.
+  - `PoleMarker`: draws at `displayAt` when given, reports its bubble size from `onLayout`, 0 × 0 when it draws nothing.
+- Tests: Vitest `labelLayout.test.ts` (in place when free, shortest way out, sideways on ties, 12-stop crowd without overlap for both anchors, maxShift, pan gives the same layout, back in place when zoomed in); Jest `map-screen.test.tsx` (+1: two stops 17 m apart → second moved aside, back on its stop when zoomed in; mock map now projects points), `transit-markers.test.tsx` (+1: `displayAt`, size reports).
+- New deps: none.
+- iPhone check (user): popups no longer overlap and return to their stops when zoomed in. The line and dot from a moved popup to its stop were not needed → removed.
+- Not verified yet: that `onLayout` reports marker sizes on the iPhone (Apple Maps snapshots marker views); without it the 170 × 90 default is used.
+- Next: 7.10 mode icons.
 
 ### 2026-11-10 — task 7.8
 - Done:

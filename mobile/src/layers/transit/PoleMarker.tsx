@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { type LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 import { Marker } from 'react-native-maps';
 
 import { compactLines, type DetailLevel } from '@/core/clustering';
+import type { LatLng } from '@/core/geo';
+import type { Size } from '@/core/labelLayout';
 import {
   type Direction,
   directionHeadsign,
@@ -46,12 +48,18 @@ export function PoleMarker({
   onPress,
   stale = false,
   clock = clockStore,
+  displayAt,
+  onSize,
 }: {
   feature: PoleFeature;
   /** The data is older than 5 min (ARCHITECTURE §4.3). */
   stale?: boolean;
   /** Tap: open the station sheet (task 3.6). */
   onPress?: (feature: PoleFeature) => void;
+  /** Draw here instead of at the pole: moved aside by the map (task 7.9). */
+  displayAt?: LatLng;
+  /** Reports the bubble's size, 0 × 0 when nothing is drawn (task 7.9). */
+  onSize?: (size: Size) => void;
   clock?: ClockStore;
 }) {
   const detail = feature.detail ?? 'poles';
@@ -78,6 +86,19 @@ export function PoleMarker({
   );
   const tracks = useTracksViewChanges(directions, cells, stale, scheme, detail, stationCount);
 
+  const at = displayAt ?? feature.pole.location;
+  const coordinate = useMemo(() => ({ latitude: at.lat, longitude: at.lng }), [at.lat, at.lng]);
+  const drawsNothing =
+    detail === 'compact' ? !compact || compact.lines.length === 0 : rows.length === 0;
+  // Nothing drawn: take no room on the map (task 7.9).
+  useEffect(() => {
+    if (drawsNothing) onSize?.({ width: 0, height: 0 });
+  }, [drawsNothing, onSize]);
+  const reportLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    onSize?.({ width, height });
+  };
+
   if (detail === 'compact') {
     if (!compact || compact.lines.length === 0) {
       return null;
@@ -85,7 +106,7 @@ export function PoleMarker({
     const label = compactAccessibilityText(feature, compact.lines, compact.more);
     return (
       <Marker
-        coordinate={{ latitude: feature.pole.location.lat, longitude: feature.pole.location.lng }}
+        coordinate={coordinate}
         anchor={{ x: 0.5, y: 1 }}
         tracksViewChanges={tracks}
         accessibilityLabel={label}
@@ -98,6 +119,7 @@ export function PoleMarker({
           accessibilityLabel={label}
           accessibilityHint={MARKER_A11Y_HINT}
           style={styles.compactBubble}
+          onLayout={reportLayout}
         >
           <View style={styles.header}>
             <Text style={styles.stationName} numberOfLines={1}>
@@ -125,7 +147,7 @@ export function PoleMarker({
   const label = accessibilityText(feature, rows, more, stale);
   return (
     <Marker
-      coordinate={{ latitude: feature.pole.location.lat, longitude: feature.pole.location.lng }}
+      coordinate={coordinate}
       anchor={{ x: 0.5, y: 1 }}
       tracksViewChanges={tracks}
       accessibilityLabel={label}
@@ -138,6 +160,7 @@ export function PoleMarker({
         accessibilityLabel={label}
         accessibilityHint={MARKER_A11Y_HINT}
         style={styles.bubble}
+        onLayout={reportLayout}
       >
         {showStationHeader ? (
           <View style={styles.header}>
