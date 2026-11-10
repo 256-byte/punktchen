@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Marker } from 'react-native-maps';
 
+import { compactLines, type DetailLevel } from '@/core/clustering';
 import {
   type Direction,
   directionKey,
@@ -22,13 +23,17 @@ import { LineBadge } from './LineBadge';
 export const TRACK_CHANGES_MS = 500;
 
 /**
- * A pole: one row per direction with an upcoming departure — line badge,
- * headsign, countdown (task 3.5) coloured live or timetable, with its
- * delay (4.5). Directions with nothing coming are left out (station sheet,
- * 3.6); a pole with none draws no marker. Re-renders when a cell changes
- * (about once a minute), not on every tick (ARCHITECTURE §4.5). With stale
- * data live countdowns are greyed out (6.2). Colours follow light/dark
- * mode (7.1).
+ * A pole or station cluster marker:
+ * - At `poles` and `stations` zoom: one row per direction with an upcoming
+ *   departure — line badge, headsign, countdown (task 3.5) coloured live or
+ *   timetable, with its delay (4.5). Multi-pole station clusters show the
+ *   station name at the top (7.2).
+ * - At `compact` (overview) zoom: station name + line badges without
+ *   headsigns or countdowns (7.2, ARCHITECTURE §4.5).
+ * Directions with nothing coming are left out (station sheet, 3.6); a marker
+ * with none draws nothing. Re-renders when a cell changes (about once a
+ * minute), not on every tick. With stale data live countdowns are greyed out
+ * (6.2). Colours follow light/dark mode (7.1).
  */
 export function PoleMarker({
   feature,
@@ -44,15 +49,57 @@ export function PoleMarker({
   clock?: ClockStore;
 }) {
   const directions = feature.pole.directions;
+  const detail = feature.detail ?? 'poles';
+  const poleCount = feature.poleCount ?? 1;
+  const stationCount = feature.stationCount ?? 1;
   const styles = useStyles();
   const { scheme } = useTheme();
   const cells = useNow((now) => nextCells(directions, now), clock);
   const { rows, more } = useMemo(() => markerRows(directions, cells), [directions, cells]);
-  const tracks = useTracksViewChanges(directions, cells, stale, scheme);
+  const compact = useMemo(
+    () => (detail === 'compact' ? compactLines(directions, cells) : null),
+    [detail, directions, cells],
+  );
+  const tracks = useTracksViewChanges(directions, cells, stale, scheme, detail, stationCount);
+
+  if (detail === 'compact') {
+    if (!compact || compact.lines.length === 0) {
+      return null;
+    }
+    return (
+      <Marker
+        coordinate={{ latitude: feature.pole.location.lat, longitude: feature.pole.location.lng }}
+        anchor={{ x: 0.5, y: 1 }}
+        tracksViewChanges={tracks}
+        onPress={onPress ? () => onPress(feature) : undefined}
+      >
+        <View
+          style={styles.compactBubble}
+          accessibilityLabel={compactAccessibilityText(feature, compact.lines, compact.more)}
+        >
+          <View style={styles.header}>
+            <Text style={styles.stationName} numberOfLines={1}>
+              {feature.station.name}
+            </Text>
+            {stationCount > 1 ? (
+              <Text style={styles.clusterCount}>{`+${stationCount - 1}`}</Text>
+            ) : null}
+          </View>
+          <View style={styles.badges}>
+            {compact.lines.map((d) => (
+              <LineBadge key={`${d.mode}|${d.line}`} direction={d} />
+            ))}
+            {compact.more > 0 ? <Text style={styles.more}>{`+${compact.more}`}</Text> : null}
+          </View>
+        </View>
+      </Marker>
+    );
+  }
 
   if (rows.length === 0) {
     return null;
   }
+  const showStationHeader = detail === 'stations' && (poleCount > 1 || stationCount > 1);
   return (
     <Marker
       coordinate={{ latitude: feature.pole.location.lat, longitude: feature.pole.location.lng }}
@@ -61,6 +108,16 @@ export function PoleMarker({
       onPress={onPress ? () => onPress(feature) : undefined}
     >
       <View style={styles.bubble} accessibilityLabel={accessibilityText(feature, rows, stale)}>
+        {showStationHeader ? (
+          <View style={styles.header}>
+            <Text style={styles.stationName} numberOfLines={1}>
+              {feature.station.name}
+            </Text>
+            {stationCount > 1 ? (
+              <Text style={styles.clusterCount}>{`+${stationCount - 1}`}</Text>
+            ) : null}
+          </View>
+        ) : null}
         {rows.map((r) => (
           <Row key={directionKey(r.direction)} row={r} stale={stale} />
         ))}
@@ -84,27 +141,45 @@ function Row({ row: { direction, next }, stale }: { row: MarkerRow; stale: boole
 }
 
 function accessibilityText(feature: PoleFeature, rows: MarkerRow[], stale: boolean) {
+  const stationCount = feature.stationCount ?? 1;
+  const header =
+    stationCount > 1
+      ? `${feature.station.name} and ${stationCount - 1} nearby stops`
+      : feature.station.name;
   const parts = rows.map(
     (r) => `${r.direction.line} to ${r.direction.headsign}: ${cellDescription(r.next, stale)}`,
   );
-  return [feature.station.name, ...parts].join('. ');
+  return [header, ...parts].join('. ');
+}
+
+function compactAccessibilityText(feature: PoleFeature, lines: readonly Direction[], more: number) {
+  const stationCount = feature.stationCount ?? 1;
+  const header =
+    stationCount > 1
+      ? `${feature.station.name} and ${stationCount - 1} nearby stops`
+      : feature.station.name;
+  const names = lines.map((d) => d.line).join(', ');
+  const tail = more > 0 ? `, and ${more} more` : '';
+  return `${header}. Lines: ${names}${tail}`;
 }
 
 /**
  * tracksViewChanges for a custom marker (Google Maps; Apple Maps ignores
  * it): on after the content changed, off again shortly after, so the map
  * does not redraw the marker every frame (ARCHITECTURE §4.5). A switch
- * between light and dark mode is a content change too (task 7.1).
+ * between light and dark mode or zoom detail is a content change too.
  */
 function useTracksViewChanges(
   directions: Direction[],
   cells: (string | null)[],
   stale: boolean,
   scheme: ColorScheme,
+  detail: DetailLevel,
+  stationCount: number,
 ): boolean {
   const content = useMemo(
-    () => ({ directions, cells, stale, scheme }),
-    [directions, cells, stale, scheme],
+    () => ({ directions, cells, stale, scheme, detail, stationCount }),
+    [directions, cells, stale, scheme, detail, stationCount],
   );
   const [tracking, setTracking] = useState(true);
   const [seen, setSeen] = useState(content);
@@ -137,6 +212,43 @@ const useStyles = themedStyles(({ scheme, colors, fontSize, fontWeight, radius, 
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 1 },
     elevation: 3,
+  },
+  compactBubble: {
+    maxWidth: 180,
+    paddingVertical: space.xs,
+    paddingHorizontal: space.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    gap: space.xxs,
+    borderWidth: scheme === 'dark' ? StyleSheet.hairlineWidth : 0,
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 3,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+  },
+  stationName: {
+    flexShrink: 1,
+    fontSize: fontSize.micro,
+    fontWeight: fontWeight.bold,
+    color: colors.text,
+  },
+  clusterCount: {
+    fontSize: fontSize.micro,
+    fontWeight: fontWeight.semibold,
+    color: colors.textSecondary,
+  },
+  badges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: space.xs,
   },
   row: {
     flexDirection: 'row',

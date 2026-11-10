@@ -11,8 +11,12 @@ export type LayerId = components['schemas']['LayerId'];
 
 export interface MapLayer<TFeature> {
   id: LayerId;
-  /** This layer's features in a /v1/nearby response (none if the layer is down). */
-  select(response: NearbyResponse): TFeature[];
+  /**
+   * This layer's features in a /v1/nearby response (none if the layer is
+   * down), clustered or filtered for the map's visible vertical span
+   * (`latitudeDelta` in degrees; task 7.2).
+   */
+  select(response: NearbyResponse, latitudeDelta?: number): TFeature[];
   /** Stable React key of a feature. */
   key(feature: TFeature): string;
   /**

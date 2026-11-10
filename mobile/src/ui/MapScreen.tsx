@@ -8,6 +8,7 @@ import { type ApiClient, failureOf } from '@/api/client';
 import type { NearbyResponse } from '@/api/nearby';
 import { useNearby } from '@/api/useNearby';
 import type { ApiBaseUrl } from '@/core/apiBaseUrl';
+import { sameZoomSpec } from '@/core/clustering';
 import { nextRequestCenter } from '@/core/fetchPolicy';
 import { type LatLng, regionAround } from '@/core/geo';
 import type { LocationView } from '@/core/location';
@@ -60,6 +61,7 @@ export function MapScreen({
 }: Props) {
   const map = useRef<MapView>(null);
   const [initialRegion] = useState(() => regionAround(position, START_RADIUS_M));
+  const [latitudeDelta, setLatitudeDelta] = useState(initialRegion.latitudeDelta);
   const following = useRef(true);
   const followsDevice = source !== 'mapCenter';
 
@@ -114,14 +116,18 @@ export function MapScreen({
         onPanDrag={() => {
           following.current = false;
         }}
-        onRegionChangeComplete={(r) =>
-          store.getState().setMapCenter({ lat: r.latitude, lng: r.longitude })
-        }
+        onRegionChangeComplete={(r) => {
+          store.getState().setMapCenter({ lat: r.latitude, lng: r.longitude });
+          setLatitudeDelta((prev) =>
+            sameZoomSpec(prev, r.latitudeDelta) ? prev : r.latitudeDelta,
+          );
+        }}
       >
         {nearby.data ? (
           <LayerMarkers
             layers={layers}
             response={nearby.data.response}
+            latitudeDelta={latitudeDelta}
             stale={stale}
             onSelect={setSelected}
           />
@@ -174,17 +180,19 @@ export function MapScreen({
 function LayerMarkers({
   layers,
   response,
+  latitudeDelta,
   stale,
   onSelect,
 }: {
   layers: readonly AnyMapLayer[];
   response: NearbyResponse;
+  latitudeDelta: number;
   stale: boolean;
   onSelect: (selected: Selected) => void;
 }) {
   return layers.map((layer) =>
     layer
-      .select(response)
+      .select(response, latitudeDelta)
       .map((feature) => (
         <layer.Marker
           key={`${layer.id}:${layer.key(feature)}`}

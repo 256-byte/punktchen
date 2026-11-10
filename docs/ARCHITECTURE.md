@@ -226,9 +226,9 @@ Wired in task 5.4 (`src/core/fetchLoop.ts`, `useNearby`):
 
 ```ts
 interface MapLayer<TFeature> {
-  id: LayerId;                                  // "transit"
-  select(response: NearbyResponse): TFeature[]; // pick this layer's features
-  key(feature: TFeature): string;               // stable React key
+  id: LayerId;                                                     // "transit"
+  select(response: NearbyResponse, latitudeDelta?: number): TFeature[]; // pick this layer's features for the zoom
+  key(feature: TFeature): string;                                  // stable React key
   Marker: React.ComponentType<{ feature: TFeature; onPress: (f: TFeature) => void; stale: boolean }>;
   Sheet: React.ComponentType<{ feature: TFeature; client: ApiClient | null; stale: boolean }>; // sheet content; stale: data older than 5 min (§4.3)
   refresh: { minIntervalMs: number };
@@ -266,6 +266,8 @@ Design tokens and light/dark mode (task 7.1, `src/ui/tokens.ts`, `src/ui/theme.t
 - Re-render markers only when the **displayed minute** changes, not every second. (`PoleMarker` selects its labels from the clock store; tested with a React Profiler: no render for 59 ticks, one when a label changes.)
 - `react-native-maps` custom markers: keep `tracksViewChanges` false except right after content changes (`PoleMarker`: on for 500 ms after its rows or labels change; only Google Maps uses it, Apple Maps ignores it).
 - Cluster / hide poles at low zoom; show at most next departure per direction on the marker; the rest in the sheet.
+  - Done in task 7.2 (`src/core/clustering.ts`, `PoleMarker`, `MapScreen`): `zoomSpec(latitudeDelta)` maps the visible vertical span into discrete zoom buckets (`poles` ≤ 0.006° with 0 / 15 / 28 m pole merge radii, `stations` ≤ 0.018° with 120 m neighbour merge radius, `compact` > 0.018° with 250 / 450 m merge radii). Panning without crossing a bucket does not update zoom state or re-render markers (`sameZoomSpec`).
+  - At `stations` zoom (the 500 m open view), a station's active poles and immediate neighbour stops within 120 m (e.g. S+U Alexanderplatz + Memhardstr. + Gontardstr., ranked so the main rail hub leads) merge into one marker showing the station header and up to 4 directions interleaved by mode and distinct line (`mergeDirections`). At `poles` zoom (street level), poles split into mode/platform groups and then individual poles. At `compact` zoom (overview), headsigns and countdowns hide, leaving the station name and up to 4 unique running `LineBadge`s (`compactLines`).
 
 ### 4.6 Tooling and tests
 

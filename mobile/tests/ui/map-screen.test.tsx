@@ -8,7 +8,7 @@ import type { NearbyResponse } from '@/api/nearby';
 import { MIN_INTERVAL_MS } from '@/core/fetchPolicy';
 import type { LatLng } from '@/core/geo';
 import { regionAround } from '@/core/geo';
-import { transitLayer } from '@/layers/transit';
+import { type Station, transitLayer } from '@/layers/transit';
 import { createLocationStore, type LocationStore } from '@/state/location';
 import { MapScreen, START_RADIUS_M } from '@/ui/MapScreen';
 
@@ -69,7 +69,7 @@ function station(id: string, name: string) {
   };
 }
 
-function nearby(...stations: ReturnType<typeof station>[]): NearbyResponse {
+function nearby(...stations: Station[]): NearbyResponse {
   return {
     meta: {
       generatedAt: '2026-11-05T14:30:12+01:00',
@@ -243,6 +243,105 @@ describe('MapScreen layers', () => {
     expect(await screen.findByText('S+U Wedding → Jungfernheide')).toBeOnTheScreen();
     expect(requests).toHaveLength(2);
     expect(screen.queryByText('Could not load departures')).toBeNull();
+  });
+
+  it('clusters poles at default zoom and expands them on zoom-in (task 7.2)', async () => {
+    const soon = new Date(Date.now() + 5 * 60_000).toISOString();
+    const dep = {
+      tripId: '1',
+      serviceDate: '2026-11-05',
+      scheduled: soon,
+      predicted: null,
+      delaySeconds: null,
+      source: 'scheduled' as const,
+      cancelled: false,
+    };
+    const alex = {
+      id: 'de:11000:900100003',
+      kind: 'station' as const,
+      name: 'S+U Alexanderplatz',
+      location: { lat: 52.52151, lng: 13.41127 },
+      modes: ['ubahn' as const, 'bus' as const],
+      poles: [
+        {
+          id: 'alex::bus',
+          location: { lat: 52.5219, lng: 13.411 },
+          platform: null,
+          description: null,
+          directions: [
+            {
+              line: '100',
+              mode: 'bus' as const,
+              color: null,
+              headsign: 'S+U Zoologischer Garten',
+              isTerminal: false,
+              isRing: false,
+              departures: [dep],
+            },
+          ],
+        },
+        {
+          id: 'alex::u2',
+          location: { lat: 52.5213, lng: 13.4114 }, // ~72 m from alex::bus
+          platform: '1',
+          description: null,
+          directions: [
+            {
+              line: 'U2',
+              mode: 'ubahn' as const,
+              color: '#DA421E',
+              headsign: 'S+U Pankow',
+              isTerminal: false,
+              isRing: false,
+              departures: [dep],
+            },
+          ],
+        },
+      ],
+    };
+    answer = () =>
+      new Response(JSON.stringify(nearby(alex)), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+    await renderMap(alex.location);
+    // Default zoom (latitudeDelta ≈ 0.0108 → stations): one clustered station marker.
+    expect(await screen.findByText('S+U Alexanderplatz')).toBeOnTheScreen();
+    expect(screen.getAllByTestId('marker')).toHaveLength(1);
+    expect(screen.getByText('S+U Pankow')).toBeOnTheScreen();
+    expect(screen.getByText('S+U Zoologischer Garten')).toBeOnTheScreen();
+
+    // Zoom in to street level (latitudeDelta = 0.002 → poles): the two poles split.
+    await act(async () =>
+      map.props?.onRegionChangeComplete?.(
+        {
+          latitude: alex.location.lat,
+          longitude: alex.location.lng,
+          latitudeDelta: 0.002,
+          longitudeDelta: 0.002,
+        },
+        {},
+      ),
+    );
+    expect(screen.getAllByTestId('marker')).toHaveLength(2);
+
+    // Zoom out to overview (latitudeDelta = 0.03 → compact): badges only, no headsigns.
+    await act(async () =>
+      map.props?.onRegionChangeComplete?.(
+        {
+          latitude: alex.location.lat,
+          longitude: alex.location.lng,
+          latitudeDelta: 0.03,
+          longitudeDelta: 0.03,
+        },
+        {},
+      ),
+    );
+    expect(screen.getAllByTestId('marker')).toHaveLength(1);
+    expect(screen.getByText('U2')).toBeOnTheScreen();
+    expect(screen.getByText('100')).toBeOnTheScreen();
+    expect(screen.queryByText('S+U Pankow')).toBeNull();
   });
 });
 
