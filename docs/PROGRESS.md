@@ -4,8 +4,8 @@
 
 ## Current status
 
-- **Active phase:** Phase 7 — UI polish (complete; MVP Phases 0–7 done)
-- **Next task:** none scheduled (later phases require user approval + ADR; see `docs/PLAN.md`)
+- **Active phase:** Phase 7 — UI polish (reopened 2026-11-10 for 7.7–7.10, user request; MVP Phases 0–6 done)
+- **Next task:** 7.8 combined stop popup
 - **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
@@ -64,6 +64,10 @@
 | 7 | 7.4 3D pitch toggle, buildings | done | `showsBuildings` + `pitchEnabled` on `MapView`; `"3D"` toggle (`PitchToggle` in `MapScreen.tsx` + `pitchCamera` in `src/core/geo.ts`, tilting to 50° with `altitude ≤ 750 m` on iOS and `zoom ≥ 16.5` on Android so 3D buildings render immediately, and keeping 3D across camera jumps); checked on the iPhone (user, 2026-11-10) |
 | 7 | 7.5 Empty/error states, haptics, accessibility labels | done | `nearbyEmptyState` in `src/core/directions.ts` ("No stops nearby" / "No departures nearby"); `src/lib/haptics.ts` (`hapticSelection` on marker tap / dev picker, `hapticLight` on 3D toggle / retry); VoiceOver `accessible`, `accessibilityRole="button"`, `accessibilityHint`, and full `accessibilityLabel` on `PoleMarker` (`<Marker>` + bubble) and `StationSheet` rows; checked on the iPhone (user, 2026-11-10) |
 | 7 | 7.6 README screenshots/GIF, architecture diagram | done | Portfolio-ready `README.md` with animated/vector previews (`docs/assets/map-light-dark.svg`, `docs/assets/station-sheet-offline.svg`), Mermaid + ASCII architecture diagrams, and ADR summary table |
+| 7 | 7.7 Marker rows ordered by next departure | done | Shown rows sorted soonest first, selection unchanged (user decision); station sheet sorted per platform, platform order kept; sort minute carried in `nextCells` / `sheetSignature`, no extra renders; markers checked on the iPhone (user), sheet to check |
+| 7 | 7.8 Combined stop popup | todo | Rule (user-approved): street zoom, same station; rail same mode ≤ ~60 m; bus/tram ≤ ~50 m and a shared line |
+| 7 | 7.9 Marker overlap avoidance | todo | |
+| 7 | 7.10 Mode icons in marker header | todo | Own drawings with `react-native-svg` (user decision) |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
 
@@ -91,6 +95,7 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 | 2026-11-09 | Map markers show only directions with an upcoming departure; a pole with none has no marker. Directions without one (night lines by day, rail replacement, suspended lines) are listed last in the station sheet (3.6) — user decision after seeing 72 of 151 directions empty around Alexanderplatz | — (ARCHITECTURE §4.4, DATA_MODEL §3.2) |
 | 2026-11-09 | Exception to "one task at a time": 4.1 starts while 4.0 waits for the Tuesday morning/noon samples (4.1 is needed whatever 4.0 decides). 4.0's tool and first numbers go in their own PR; the final numbers and decision follow in a small PR — user decision | — |
 | 2026-11-09 | Exception to "stay in the current phase": Phase 5 starts with 5.1 while 4.0's final step (daytime samples on 2026-11-10) is still open; 4.0 closes in its own small PR in between — user decision | — |
+| 2026-11-10 | Phase 7 reopened with 7.7–7.10 (marker order, combined stop popup, overlap avoidance, mode icons) instead of a new phase — user decision. 7.7: keep which directions are shown, sort only those by next departure. 7.8 merge rule as in the task table. 7.10: own icons drawn with `react-native-svg`, no downloaded logos | — (PLAN Phase 7) |
 | 2026-11-10 | **No additional realtime source for BVG U-Bahn/tram** (task 4.0). VBB's feed has a real delay for ~85 % of the trips running at any measured time: U-Bahn 100 % in the daytime (80 % at midnight), tram 87–92 %, bus 85–89 %. The earlier "U-Bahn 1.7 %" was the mix of TripUpdates, not coverage. The rest stays on the schedule (`source=scheduled`), which the app already shows differently | DATA_MODEL §7 #19, ARCHITECTURE §3.3 |
 
 ## Open questions
@@ -112,6 +117,15 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-10 — task 7.7
+- Done:
+  - PLAN: Phase 7 reopened with 7.7–7.10 (user request, decisions in the table above).
+  - `src/core/directions.ts`: `nextCells` strings now start with the epoch minute of the next departure (`<minute>|<cell>`); `markerRows` picks the rows as before and sorts the shown ones by that minute, soonest first (stable). Cells without a minute sort last.
+  - `src/core/sheet.ts` (after the user saw the marker order on the iPhone): the station sheet sorts the directions inside each platform the same way; the platform order stays. `sheetSignature` strings start with the minute of the next running departure (a cancelled first one does not count).
+- Tests: Vitest `directions.test.ts` (+4: user's example 21:44 / 10 min / now, selection kept with "+1", stable ties, missing key; updated cell strings and the 6.3 offline order), `sheet.test.ts` (+1: order per platform, platforms unchanged, follows the clock); Jest `transit-markers.test.tsx` (+1: order follows the clock; accessibility labels read in the new order). Marker order checked on the iPhone (user, 2026-11-10).
+- New deps: none.
+- Next: check on the iPhone, then 7.8 combined stop popup.
 
 ### 2026-11-10 — task 7.6
 - Done:

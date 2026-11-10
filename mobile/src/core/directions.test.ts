@@ -19,6 +19,8 @@ import {
 } from './directions';
 
 const now = Date.parse('2026-11-05T14:30:00+01:00');
+/** Epoch minute of a time on the test day: the sort key in nextCells (task 7.7). */
+const minuteOf = (hhmm: string) => Date.parse(`2026-11-05T${hhmm}:00+01:00`) / 60_000;
 
 function dep(time: string, cancelled = false): Departure {
   return {
@@ -172,7 +174,7 @@ describe('terminal direction filtering (task 7.3)', () => {
 
     // nextCells and markerRows also skip isTerminal and "Fahrt endet hier".
     const cells = nextCells([wannseeDirs[0]!, wannseeDirs[1]!, wannseeDirs[5]!], now);
-    expect(cells).toEqual([null, 's\t5 min', null]);
+    expect(cells).toEqual([null, `${minuteOf('14:35')}|s\t5 min`, null]);
     expect(
       markerRows([wannseeDirs[0]!, wannseeDirs[1]!], ['s\t1 min', 's\t5 min']).rows.map(
         (r) => r.direction.headsign,
@@ -210,6 +212,46 @@ describe('markerRows', () => {
   });
 });
 
+describe('markerRows order (task 7.7)', () => {
+  const lines = ['M1', 'M2', 'M3', 'M4', 'M5'].map((line) => direction({ line }));
+  const at = (hhmm: string, label: string) => `${minuteOf(hhmm)}|s\t${label}`;
+  const shown = (cells: (string | null)[]) =>
+    markerRows(lines, cells).rows.map((r) => `${r.direction.line} ${r.next.label}`);
+
+  it('puts the soonest departure on top', () => {
+    expect(shown([at('21:44', '21:44'), at('14:40', '10 min'), at('14:30', 'now')])).toEqual([
+      'M3 now',
+      'M2 10 min',
+      'M1 21:44',
+    ]);
+  });
+
+  it('keeps which directions are shown and sorts only those', () => {
+    // M5 leaves first but is the fifth running direction: counted in "+1", not shown.
+    const { rows, more } = markerRows(lines, [
+      at('14:50', '20 min'),
+      at('14:40', '10 min'),
+      at('14:45', '15 min'),
+      at('14:35', '5 min'),
+      at('14:30', 'now'),
+    ]);
+    expect(rows.map((r) => r.direction.line)).toEqual(['M4', 'M2', 'M3', 'M1']);
+    expect(more).toBe(1);
+  });
+
+  it('keeps the given order for departures in the same minute', () => {
+    expect(shown([at('14:33', '3 min'), at('14:31', '1 min'), at('14:33', '3 min')])).toEqual([
+      'M2 1 min',
+      'M1 3 min',
+      'M3 3 min',
+    ]);
+  });
+
+  it('puts cells without a sort minute last', () => {
+    expect(shown(['s\t2 min', at('14:35', '5 min')])).toEqual(['M2 5 min', 'M1 2 min']);
+  });
+});
+
 describe('nextCells', () => {
   it('encodes the next running departure of each direction', () => {
     const late: Departure = {
@@ -228,8 +270,17 @@ describe('nextCells', () => {
       ],
       now,
     );
-    expect(cells).toEqual(['s\t3 min', 's\t15:45', null, null, 's\t3 min']);
-    expect(nextCells([direction({ departures: [late] })], now)).toEqual(['l+3\t4 min']);
+    expect(cells).toEqual([
+      `${minuteOf('14:33')}|s\t3 min`,
+      `${minuteOf('15:45')}|s\t15:45`,
+      null,
+      null,
+      `${minuteOf('14:33')}|s\t3 min`,
+    ]);
+    // The sort minute is the predicted one, like the countdown.
+    expect(nextCells([direction({ departures: [late] })], now)).toEqual([
+      `${minuteOf('14:34')}|l+3\t4 min`,
+    ]);
   });
 });
 
@@ -266,13 +317,13 @@ describe('ten minutes without new data (task 6.3)', () => {
     );
 
   it('shows the data as fetched', () => {
-    expect(labels(at('14:30'))).toEqual(['U6 2 min', 'M27 3 min', '247 1 min']);
+    expect(labels(at('14:30'))).toEqual(['247 1 min', 'U6 2 min', 'M27 3 min']);
   });
 
-  it('drops what has left and counts down to what is still to come', () => {
+  it('drops what has left, counts down to what is still to come, soonest first', () => {
     // 14:40: U6 14:32 and 14:37 are gone; M27 runs to its predicted 14:40
-    // ("now" for a minute); every 247 has left, so its row is gone.
-    expect(labels(at('14:40'))).toEqual(['U6 2 min', 'M27 now+2']);
+    // ("now" for a minute, so on top); every 247 has left, so its row is gone.
+    expect(labels(at('14:40'))).toEqual(['M27 now+2', 'U6 2 min']);
     expect(labels(at('14:41'))).toEqual(['U6 1 min', 'M27 12 min']);
   });
 
