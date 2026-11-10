@@ -4,8 +4,8 @@
 
 ## Current status
 
-- **Active phase:** Phase 6 — Offline & resilience (Phases 0–5 done; 4.0 closed 2026-11-10)
-- **Next task:** 6.3 drop past departures offline, countdown keeps running
+- **Active phase:** Phase 6 — Offline & resilience: all tasks done (6.1–6.3). Phase 7 (UI polish) starts when the user says so
+- **Next task:** 7.1 design tokens, light/dark mode (Phase 7)
 - **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
@@ -57,7 +57,7 @@
 | 5 | 5.5 Performance numbers in README | done | README "Performance": client 2 req/min standing still (≤ 6), upstream 4/min; 1000 simulated apps: cache hit ratio 93.5 % in a crowd, 13.0 % spread out, p95 ≤ 6.9 ms; measured with the new `nearbyload` tool |
 | 6 | 6.1 Persisted query cache, instant render | done | Newest `/v1/nearby` answer kept in AsyncStorage; cold start opens the map at its place with its data, no location spinner, then revalidates; iPhone: force-quit and reopen shows the last departures at once (user, 2026-11-10) |
 | 6 | 6.2 Staleness UI | done | `StatusBanner` at the top of the map ("Updated X ago", warning after 5 min, "No connection — showing last known data" + "Try again"); live times grey when stale; airplane mode test in the README, simulated in Jest; checked on the iPhone (user) |
-| 6 | 6.3 Drop past departures offline, countdown keeps running | todo | |
+| 6 | 6.3 Drop past departures offline, countdown keeps running | done | Already true by design (labels come from the kept answer and the clock); proven by a 10 min offline test on the map screen; sheet says "No newer data" when stale data runs out |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
 
@@ -106,6 +106,15 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-10 — task 6.3
+- Finding: dropping past departures and the running countdown did not need new logic. Since 3.1/3.5 every label is computed from the kept answer and the clock store (`upcomingDepartures`, `nextCells`, `sheetSignature`), and the 1 s ticker does not depend on requests. The task was to prove it for the offline case and to fix what read wrongly there.
+- Done: `StationSheet`: while the data is stale, the bottom section is titled "No newer data" instead of "No departures soon", and a sheet with nothing left says "The saved departures have left. Newer ones load when the connection is back." instead of "No departures in the next 90 minutes." (both were claims about the timetable that old data cannot support).
+- Decision: when a direction's known departures have all left (`/v1/nearby` has 3 per direction), its marker row goes, and a pole without rows has no marker. The app does not extrapolate the timetable or keep a row with a placeholder. ARCHITECTURE §4.3.
+- Tests: Vitest `directions.test.ts` (+3, "ten minutes without new data": as fetched; at +10 min departed ones gone, the next counts down, a predicted time stays the target; nothing once all have left). Jest `tests/ui/offline-departures.test.tsx` (**acceptance**): map screen loads, connection lost, 10.5 min pass → "updated 10 min ago" line, U6 shows its third departure, M27 counts down to its predicted time in grey, the 247 row is gone, no departure stuck on "now"; the sheet lists only what is still to come, "No newer data"; 5 min later no marker and the "saved departures have left" note; back online the marker returns and the line goes.
+- New deps: none.
+- Phase 6 done: 6.1–6.3.
+- Next: Phase 7 (7.1 design tokens, light/dark mode), when the user starts it.
 
 ### 2026-11-10 — task 6.2 (done)
 - Done: `statusBanner` + `Failure` in `src/core/staleness.ts` (what to say for an age and a failure), `isLive` and `cellDescription(cell, stale)` in `src/core/realtime.ts`, `failureOf` in `src/api/client.ts`, `useDeviceNow` in `src/state/clock.ts`, new `src/ui/StatusBanner.tsx`, `MapScreen` (banner instead of the error box when there is data; `stale` to the layers), layer registry (`stale` prop on `Marker` and `Sheet`), `PoleMarker` / `StationSheet` / `DepartureTime` (live times grey when stale, legend line). Dev place picker moved below the banner.
