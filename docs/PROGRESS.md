@@ -4,8 +4,8 @@
 
 ## Current status
 
-- **Active phase:** Phase 5 — Traffic & cache (Phase 4 done except 4.0's final step; exception, see Decisions 2026-11-09)
-- **Next task:** 5.5 performance numbers in the README; 4.0's final step in between (waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
+- **Active phase:** Phase 5 — Traffic & cache, all tasks done 2026-11-10; Phase 6 is next (Phase 4 done except 4.0's final step; exception, see Decisions 2026-11-09)
+- **Next task:** 4.0's final step, then 6.1 persisted query cache (4.0 waits for the Tuesday 2026-11-10 morning/noon samples: `go -C backend run ./internal/tools/gtfsexplore record -n 2` at ~08:00 and ~12:30, then `coverage`)
 - **Blocked by:** 0.9 only — GitHub Actions does not start jobs ("account is locked due to a billing issue"); user has a ticket open with GitHub
 
 ## Task status
@@ -54,7 +54,7 @@
 | 5 | 5.2 LRU cell cache, TTL, metrics | done | Key (cell, radius bucket, layer versions); LRU 1024, TTL 60 s; one build per key; load test: 1000 requests from one cell → 1 build (1 miss, 99 shared, 900 hits); generatedAt stays the response time |
 | 5 | 5.3 ETag/304 end-to-end, gzip | done | Weak ETags on nearby (cache key) and station (id + version); `curl` with `If-None-Match` → 304, 0 bytes (live); gzip 31.9 KB → 2.9 KB (Wedding) |
 | 5 | 5.4 Mobile fetch policy wired | done | `createFetchLoop` + `useNearby`; interim 30 s refetch removed; dev log per request with count per minute; iPhone: request log within the policy (user, 2026-11-09) |
-| 5 | 5.5 Performance numbers in README | todo | |
+| 5 | 5.5 Performance numbers in README | done | README "Performance": client 2 req/min standing still (≤ 6), upstream 4/min; 1000 simulated apps: cache hit ratio 93.5 % in a crowd, 13.0 % spread out, p95 ≤ 6.9 ms; measured with the new `nearbyload` tool |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
 
@@ -90,6 +90,7 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 | 1 | Server for deployment | user | later |
 | 2 | Alert sources: format/terms of VBB Verkehrsmeldungen | Claude Code (research) | Phase 8 |
 | 3 | Final app name | user | Phase 7 |
+| 4 | ETag from a cell's content instead of the snapshot version? With live realtime only 0.6 % of revalidations are 304s (the version changes with every feed, ~14 s); with a paused feed 50 % (task 5.5). Costs a hash per build; needs an ADR (changes ADR-0006's "ETag derived from the key") | user | before production |
 
 ## Session log
 
@@ -101,6 +102,18 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-10 — task 5.5
+- Done: `backend/internal/tools/nearbyload` — simulates apps standing still against a running backend (one request per client every 30 s, start times spread, `If-None-Match` with the last ETag, `Accept-Encoding: gzip`), reports requests by status, latency p50/p95/max, transfer size and the cell cache's hit ratio (difference of `livestop_cache_hits_total` before and after). Talks only to our backend. README: new "Performance" section; stale status line ("Phase 0, nothing runnable") updated. Command added to CLAUDE.md §5.
+- Measured (dev machine, Compose stack, Tuesday 08:04–08:09, 116,000 departures in the snapshot, live realtime, 1000 clients, 2 min each, 33 req/s):
+  - within 300 m of Alexanderplatz (30 cells): 3,999 requests, 200 99.4 % (p50 2.3 ms, p95 5.7 ms, gzip median 6.5 KB), 304 0.6 %; cache 3,976 lookups → 3,717 hits, 2 shared, 257 builds, **hit ratio 93.5 %**.
+  - within 3 km (787 cells): 3,999 requests, 200 99.4 % (p50 4.1 ms, p95 6.9 ms, gzip median 2.8 KB), 304 0.6 %; cache 3,975 lookups → 516 hits, 3,459 builds, **hit ratio 13.0 %**; the cache filled to its 1024 entries.
+  - With the feed paused (Monday 23:52, version changes once a minute), 300 m: 304 **50.0 %**, hit ratio 97.0 %, 60 builds.
+  - Also: gzip Alexanderplatz 500 m 74.7 KB → 6.5 KB, Wedding 32.3 KB → 2.9 KB; snapshot full load 1.9 s, minute move 111 ms, realtime republish 46 ms (averages of `livestop_snapshot_build_seconds`); backend ~250 MB; client 2.0 requests per minute standing still; upstream 4 polls/min.
+- Found: with live realtime the ETag rarely matches, because it follows the snapshot version and every applied feed (~14 s) makes a new one → open question #4 (content ETag). VBB's feed paused around midnight on two nights in a row (DATA_MODEL §7 #14).
+- Tests: `nearbyload` unit tests (percentile, metrics parsing, points evenly in the disc, centre parsing, a run against a fake backend: one full answer per client, then 304s; report content; bad options). All backend tests and golangci-lint pass.
+- New deps: none.
+- Next: 4.0's final step (daytime samples), then Phase 6 (6.1).
 
 ### 2026-11-09 — task 5.4
 - Done: `src/core/fetchLoop.ts` — `createFetchLoop` runs `decideFetch` (3.3) on events and once at `until` (one timer, one request at a time), keeps the policy state, logs each request with the count of the last minute and each failure. `nearbyDepartureLists` (`fetchPolicy.ts`) feeds `earliestDepartureAt`. `useNearby`: query `enabled: false`; the loop requests through `queryClient.fetchQuery`; latest key/clock/log via `useEffectEvent`; foreground from AppState; `refresh()` for "Try again" (skips the backoff, not the 10 s floor). Interim `refetchInterval` removed.

@@ -113,6 +113,8 @@ go -C backend run ./internal/tools/gtfsexplore download   # VBB zip → backend/
 go -C backend run ./internal/tools/gtfsexplore record -n 2   # 2 GTFS-RT samples (+1 conditional GET) → backend/data/gtfsrt/ (git-ignored)
 go -C backend run ./internal/tools/gtfsexplore coverage (Get-ChildItem backend/data/gtfsrt/*.pb).FullName
                                              # realtime coverage of running trips per mode, against the imported schedule in the Compose db (task 4.0)
+go -C backend run ./internal/tools/nearbyload -users 1000 -spread 300
+                                             # load on /v1/nearby of the Compose stack like 1000 apps standing still: statuses, latency, cache hit ratio (task 5.5)
 $env:LIVESTOP_GTFS_ZIP='data/gtfs/GTFS.zip'; go -C backend test -run RealFeed -v ./internal/transit/static/; Remove-Item Env:LIVESTOP_GTFS_ZIP
                                              # load + full import pipeline on a real zip in a test DB (path relative to backend/; old zip: also set $env:LIVESTOP_TODAY='2026-11-01')
 docker run --rm -v "${PWD}\backend:/app" -v golangci-cache:/root/.cache -w /app golangci/golangci-lint:v2.15.0 golangci-lint run ./...
