@@ -229,17 +229,31 @@ describe('markerRows order (task 7.7)', () => {
     ]);
   });
 
-  it('keeps which directions are shown and sorts only those', () => {
-    // M5 leaves first but is the fifth running direction: counted in "+1", not shown.
-    const { rows, more } = markerRows(lines, [
+  it('shows the soonest departures, whatever their place in the list', () => {
+    // M5 is the fifth running direction but leaves first: shown on top; M1
+    // leaves last and goes into "+1" (user report 2026-11-17, Alexanderplatz).
+    const cells = [
       at('14:50', '20 min'),
       at('14:40', '10 min'),
       at('14:45', '15 min'),
       at('14:35', '5 min'),
       at('14:30', 'now'),
+    ];
+    const { rows, more } = markerRows(lines, cells);
+    expect(rows.map((r) => r.direction.line)).toEqual(['M5', 'M4', 'M2', 'M3']);
+    expect(more).toBe(1);
+  });
+
+  it('changes the shown directions as the clock moves', () => {
+    // 14:31: M5 has left and its next one is at 14:55 → M1 (14:50) comes back.
+    const { rows } = markerRows(lines, [
+      at('14:50', '19 min'),
+      at('14:40', '9 min'),
+      at('14:45', '14 min'),
+      at('14:35', '4 min'),
+      at('14:55', '24 min'),
     ]);
     expect(rows.map((r) => r.direction.line)).toEqual(['M4', 'M2', 'M3', 'M1']);
-    expect(more).toBe(1);
   });
 
   it('keeps the given order for departures in the same minute', () => {
