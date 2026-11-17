@@ -106,7 +106,7 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 | # | Question | Owner | Needed by |
 |---|---|---|---|
 | 1 | Server for deployment | user | later (postponed by the user, 2026-11-17) |
-| 2 | Alert sources: format/terms of VBB Verkehrsmeldungen | Claude Code (research) | Phase 8 |
+| 2 | Alert sources: format/terms of VBB Verkehrsmeldungen. **Researched 2026-11-17** (DATA_MODEL §7 #33): VBB HAFAS API `himsearch`, key from api@vbb.de, live messages only from 2026-11-30. Open: apply for an `accessId`? Then check real messages after 2026-11-30 (volume, categories, IDs, licence) before the Phase 8 ADR | user (apply), Claude Code (check) | Phase 8 |
 | 4 | ETag from a cell's content instead of the snapshot version? With live realtime only 0.6 % of revalidations are 304s (the version changes with every feed, ~14 s); with a paused feed 50 % (task 5.5). Costs a hash per build; needs an ADR (changes ADR-0006's "ETag derived from the key") | user | before production |
 
 ## Session log
@@ -119,6 +119,11 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-17 — alert source research (Phase 8 preparation, open question #2)
+- Done: research only, no code. Findings in DATA_MODEL §7 #33 and §10 (mapping sketch). Main points: VBB's Verkehrsmeldungen come from the HAFAS REST API service `himsearch` (JSON, filters by bbox/line/stop); it needs an `accessId` (e-mail to api@vbb.de, test system first, then production under the usage rules); the new API (`vbb.hafas.cloud`, 2.52) gets the productive messages on 2026-11-30 and returns only a test message until then. GTFS-RT has no alerts. No other official feed for BVG / S-Bahn disruptions found.
+- Not done: no `accessId` requested (needs the user); real messages not seen; Phase 8 not started (needs ADR + approval).
+- New deps: none.
 
 ### 2026-11-17 — Expo SDK 58 patch updates
 - Done: `npx expo install --fix`: expo 58.0.26, expo-linking 58.0.17, expo-location 58.0.22, expo-router 58.0.32, jest-expo 58.0.15 (SDK-matched patch versions); `expo install --check` clean.
