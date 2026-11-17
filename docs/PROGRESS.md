@@ -64,10 +64,10 @@
 | 7 | 7.4 3D pitch toggle, buildings | done | `showsBuildings` + `pitchEnabled` on `MapView`; `"3D"` toggle (`PitchToggle` in `MapScreen.tsx` + `pitchCamera` in `src/core/geo.ts`, tilting to 50° with `altitude ≤ 750 m` on iOS and `zoom ≥ 16.5` on Android so 3D buildings render immediately, and keeping 3D across camera jumps); checked on the iPhone (user, 2026-11-10) |
 | 7 | 7.5 Empty/error states, haptics, accessibility labels | done | `nearbyEmptyState` in `src/core/directions.ts` ("No stops nearby" / "No departures nearby"); `src/lib/haptics.ts` (`hapticSelection` on marker tap / dev picker, `hapticLight` on 3D toggle / retry); VoiceOver `accessible`, `accessibilityRole="button"`, `accessibilityHint`, and full `accessibilityLabel` on `PoleMarker` (`<Marker>` + bubble) and `StationSheet` rows; checked on the iPhone (user, 2026-11-10) |
 | 7 | 7.6 README screenshots/GIF, architecture diagram | done | Portfolio-ready `README.md` with animated/vector previews (`docs/assets/map-light-dark.svg`, `docs/assets/station-sheet-offline.svg`), Mermaid + ASCII architecture diagrams, and ADR summary table |
-| 7 | 7.7 Marker rows ordered by next departure | done | Shown rows sorted soonest first, selection unchanged (user decision); station sheet sorted per platform, platform order kept; sort minute carried in `nextCells` / `sheetSignature`, no extra renders; markers checked on the iPhone (user), sheet to check |
-| 7 | 7.8 Combined stop popup | done | `stopGroups`: same station + main mode; rail ≤ 60 m, tram ≤ 50 m with a shared running line; bus stops never (user decision after the iPhone check); "Combine" switch on the map (default on); sections with a divider, up to 6 rows dealt per section; checked on 6 real areas (DATA_MODEL §7 #32); to check on the iPhone |
+| 7 | 7.7 Marker rows ordered by next departure | done | Shown rows sorted soonest first, selection unchanged (user decision); station sheet sorted per platform, platform order kept; sort minute carried in `nextCells` / `sheetSignature`, no extra renders; markers and sheet checked on the iPhone (user); since 2026-11-17 the shown rows are the soonest ones, see session log |
+| 7 | 7.8 Combined stop popup | done | `stopGroups`: same station + main mode; rail ≤ 60 m, tram ≤ 50 m with a shared running line; bus stops never (user decision after the iPhone check); "Combine" switch on the map (default on); sections with a divider, up to 6 rows dealt per section; checked on 6 real areas (DATA_MODEL §7 #32); checked on the iPhone (user, 2026-11-17) |
 | 7 | 7.9 Marker overlap avoidance | done | `layoutLabels` (greedy, nearest free spot, sideways first) on the map's own projection after each camera move; back in place when zoomed in; checked on the iPhone (user); no line/dot to the stop (user decision) |
-| 7 | 7.10 Mode icons in marker header | done | Header with mode icons + station name in every marker, all zoom levels, and in the station sheet title; S/U drawn by us, tram/bus/RE/ferry Material Icons (Apache-2.0); new dep `react-native-svg`; to check on the iPhone |
+| 7 | 7.10 Mode icons in marker header | done | Header with mode icons + station name in every marker, all zoom levels, and in the station sheet title; S/U drawn by us, tram/bus/RE/ferry Material Icons (Apache-2.0); new dep `react-native-svg`; checked on the iPhone (user, 2026-11-17) |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
 
@@ -97,15 +97,16 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 | 2026-11-09 | Exception to "stay in the current phase": Phase 5 starts with 5.1 while 4.0's final step (daytime samples on 2026-11-10) is still open; 4.0 closes in its own small PR in between — user decision | — |
 | 2026-11-10 | 7.8: bus stops are not combined (rail and tram are): one marker between both sides of a street hides where each stop is — user decision after the iPhone check | — (ARCHITECTURE §4.5) |
 | 2026-11-10 | Phase 7 reopened with 7.7–7.10 (marker order, combined stop popup, overlap avoidance, mode icons) instead of a new phase — user decision. 7.7: keep which directions are shown, sort only those by next departure. 7.8 merge rule as in the task table. 7.10: own icons drawn with `react-native-svg`, no downloaded logos | — (PLAN Phase 7) |
+| 2026-11-17 | Marker rows: the soonest next departures are shown, not the first ones in mode order (replaces the 7.7 rule "keep which directions are shown"); combined stop sections unchanged — user report and decision | — (PLAN 7.7) |
+| 2026-11-17 | Android device checks postponed until the app is further along; deployment postponed; app name `punktchen` (replaces the working name LiveStop everywhere) — user decisions | — |
 | 2026-11-10 | **No additional realtime source for BVG U-Bahn/tram** (task 4.0). VBB's feed has a real delay for ~85 % of the trips running at any measured time: U-Bahn 100 % in the daytime (80 % at midnight), tram 87–92 %, bus 85–89 %. The earlier "U-Bahn 1.7 %" was the mix of TripUpdates, not coverage. The rest stays on the schedule (`source=scheduled`), which the app already shows differently | DATA_MODEL §7 #19, ARCHITECTURE §3.3 |
 
 ## Open questions
 
 | # | Question | Owner | Needed by |
 |---|---|---|---|
-| 1 | Server for deployment | user | later |
+| 1 | Server for deployment | user | later (postponed by the user, 2026-11-17) |
 | 2 | Alert sources: format/terms of VBB Verkehrsmeldungen | Claude Code (research) | Phase 8 |
-| 3 | Final app name | user | Phase 7 |
 | 4 | ETag from a cell's content instead of the snapshot version? With live realtime only 0.6 % of revalidations are 304s (the version changes with every feed, ~14 s); with a paused feed 50 % (task 5.5). Costs a hash per build; needs an ADR (changes ADR-0006's "ETag derived from the key") | user | before production |
 
 ## Session log
@@ -118,6 +119,14 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-17 — review after Phase 7, fix: marker rows soonest first
+- Review with the user: 7.7, 7.8 and 7.10 checked on the iPhone. Android checks postponed until the app is further along (user decision). Deployment postponed. App name decided: `punktchen` (rename follows in its own PR; open question #3 closed).
+- Bug (user, iPhone): at the `stations` zoom (merged station marker with "+N more") the rows did not follow the station sheet. Cause: `markerRows` took the first 4 running directions in the mode-first merge order and sorted only those (7.7), so departures leaving now stayed in "+N". Live check at S+U Alexanderplatz: shown S3 3 min, S7 5 min, S9 13 min, S5 38 min while U8, U2 and M5 left "now".
+- Done: `markerRows` shows the 4 soonest next departures (stable: equal minutes keep the mode-first order, rail wins a tie). Replaces the 7.7 rule "keep which directions are shown" (user decision 2026-11-17). Combined stop sections (`sectionRows`, 7.8) unchanged: the user found them correct.
+- Tests: Vitest `directions.test.ts` (fifth direction leaving first is shown; shown directions change with the clock). Live `/v1/nearby` at Alexanderplatz: marker now shows U8, U5, U2, S7 "now". Vitest 270, Jest 124, typecheck, lint pass.
+- New deps: none.
+- Next: rename LiveStop → punktchen.
 
 ### 2026-11-10 — task 7.10
 - Done:

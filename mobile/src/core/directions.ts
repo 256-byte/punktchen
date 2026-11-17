@@ -173,11 +173,16 @@ export interface MarkerRow {
  * suspended lines) are left to the station sheet (user decision 2026-11-09).
  * No rows: the pole has nothing coming, no marker.
  *
- * Which directions get a row follows the given order (API order, or the
- * mode-first merge of a cluster, task 7.2); the shown rows are then ordered
- * by their next departure, soonest on top ("now", "3 min", "21:44"; task
- * 7.7). Equal minutes keep the given order. The order moves with the clock,
- * because the cells do.
+ * The rows are the `max` soonest next departures, soonest on top ("now",
+ * "3 min", "21:44"), the same order as the station sheet. Equal minutes keep
+ * the given order (API order, or the mode-first merge of a cluster, task
+ * 7.2), so rail wins a tie. Which directions are shown and their order move
+ * with the clock, because the cells do.
+ *
+ * Until 2026-11-17 the rows were the first `max` in the given order, sorted
+ * afterwards (7.7). At a merged station marker with "+N more" that hid the
+ * departures leaving now (S+U Alexanderplatz: four S-Bahn rows at 3–38 min,
+ * U8 / U2 / M5 "now" in "+19 more"), so the marker disagreed with the sheet.
  *
  * cells: nextCells() of the same directions.
  */
@@ -187,7 +192,10 @@ export function markerRows(
   max = MARKER_ROWS,
 ): { rows: MarkerRow[]; more: number } {
   const running = runningRows(directions, cells);
-  return { rows: soonestFirst(running.slice(0, max)), more: Math.max(0, running.length - max) };
+  return {
+    rows: soonestFirst(running).slice(0, max),
+    more: Math.max(0, running.length - max),
+  };
 }
 
 /**
