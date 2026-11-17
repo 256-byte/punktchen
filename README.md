@@ -1,4 +1,4 @@
-# LiveStop
+# punktchen
 
 > Working name. Repository: `punktchen`.
 
@@ -8,13 +8,13 @@ A map-first mobile app that shows **live departures** (regional rail, S-Bahn, U-
 
 ## Preview
 
-![LiveStop map view in light mode and dark 3D mode](docs/assets/map-light-dark.svg)
+![punktchen map view in light mode and dark 3D mode](docs/assets/map-light-dark.svg)
 
-![LiveStop station bottom sheet and offline staleness mode](docs/assets/station-sheet-offline.svg)
+![punktchen station bottom sheet and offline staleness mode](docs/assets/station-sheet-offline.svg)
 
 ## Why
 
-Departure boards are usually one stop at a time, behind a search. LiveStop puts all of them on the map at once so you can compare walking to the bus stop across the street vs. the U-Bahn entrance around the corner at a glance.
+Departure boards are usually one stop at a time, behind a search. punktchen puts all of them on the map at once so you can compare walking to the bus stop across the street vs. the U-Bahn entrance around the corner at a glance.
 
 It is also an engineering portfolio project focused on **backend scalability** and **resilient mobile state**:
 
@@ -152,7 +152,7 @@ curl.exe http://localhost:8080/v1/health
 - API: `http://localhost:8080` (reachable from the LAN for the phone)
 - Metrics: `127.0.0.1:9090`, Postgres: `127.0.0.1:5432` (localhost only)
 - All settings: [`.env.example`](.env.example)
-- Stop: `docker compose down` (data stays in the `livestop_pgdata` volume; `down -v` deletes it)
+- Stop: `docker compose down` (data stays in the `punktchen_pgdata` volume; `down -v` deletes it)
 
 ### Run the app on your phone
 
@@ -171,7 +171,7 @@ The app runs in **Expo Go** and talks to the backend on your PC over the local n
    - Docker Desktop normally adds an inbound rule ("Docker Desktop Backend"), so this works out of the box.
    - If it times out, mark the home network as **Private** (Settings → Network & internet → Wi-Fi → network properties) and allow port 8080 there (PowerShell as admin):
      ```powershell
-     New-NetFirewallRule -DisplayName "LiveStop API 8080" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow -Profile Private
+     New-NetFirewallRule -DisplayName "punktchen API 8080" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow -Profile Private
      ```
    - Expo's dev server (Metro, port 8081) runs as Node.js; allow it when Windows asks on the first `expo start`.
 6. **Expo account.** Expo Go only opens projects when the same (free) Expo account is signed in **in Expo Go and in Expo CLI** (`npx expo whoami`).

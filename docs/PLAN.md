@@ -10,7 +10,7 @@ Goal: an empty but complete, runnable, tested project.
 | ID | Task | Acceptance criteria |
 |---|---|---|
 | 0.1 | Repo layout as in CLAUDE.md §4, `.gitignore` (data dirs, `.env`, node_modules, build output), `.editorconfig`, MIT `LICENSE`, short `README.md` (what/why/how to run) | Tree matches CLAUDE.md §4 |
-| 0.2 | `docker-compose.yml`: `db` (postgis/postgis, current stable major, volume, healthcheck) + `backend` (multi-stage Dockerfile, distroless/alpine runtime). `.env.example` with all `LIVESTOP_*` vars | `docker compose up -d` → both healthy |
+| 0.2 | `docker-compose.yml`: `db` (postgis/postgis, current stable major, volume, healthcheck) + `backend` (multi-stage Dockerfile, distroless/alpine runtime). `.env.example` with all `PUNKTCHEN_*` vars | `docker compose up -d` → both healthy |
 | 0.3 | Go module, `cmd/server`, `internal/config` (env parsing + validation, fails fast), `internal/platform` (slog JSON logger, pgx pool, graceful shutdown on SIGTERM, metrics server) | Server starts, logs config summary (no secrets), shuts down cleanly |
 | 0.4 | `golang-migrate` wired; migration `0001` creates `meta` schema + `feed_imports`; enable PostGIS extension | Migrations run on startup; idempotent |
 | 0.5 | `api/openapi.yaml` v0: `/v1/health`, `/v1/layers`, `/v1/nearby`, `/v1/stations/{id}` with schemas from DATA_MODEL §5. `oapi-codegen` via `go generate`; `/v1/health` implemented, others return 501 | `curl localhost:8080/v1/health` → 200 JSON |
@@ -72,7 +72,7 @@ Goal: see live-counting pins around you on the iPhone.
 | 4.3 | Merge rules (ARCHITECTURE §3.4): stop match (`stop_id`, else `stop_sequence` for bare station numbers), delay propagation, cancellations, skipped stops, `source` flag (`realtime` only for events with `delay`) | Table-driven tests for each rule |
 | 4.4 | Rebuild snapshot on RT change; `realtimeAgeSeconds` from `header.timestamp`; health `degraded` when the feed is > 2 min old | Killing upstream (fake) → degraded, schedule still served; stale empty feed → degraded |
 | 4.5 | Mobile: show delay (e.g. +2), realtime vs scheduled indicator, cancelled style | Visible on device |
-| 4.6 | Metric `livestop_rt_match_ratio` + note in PROGRESS of observed ratio | Ratio observed and documented |
+| 4.6 | Metric `punktchen_rt_match_ratio` + note in PROGRESS of observed ratio | Ratio observed and documented |
 
 ## Phase 5 — Traffic & cache
 

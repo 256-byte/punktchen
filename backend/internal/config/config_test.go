@@ -11,7 +11,7 @@ import (
 	"github.com/256-byte/punktchen/backend/internal/geo"
 )
 
-const testDBURL = "postgres://livestop:s3cret-pw@db:5432/livestop?sslmode=disable"
+const testDBURL = "postgres://punktchen:s3cret-pw@db:5432/punktchen?sslmode=disable"
 
 // env builds a LookupFunc from a map.
 func env(m map[string]string) LookupFunc {

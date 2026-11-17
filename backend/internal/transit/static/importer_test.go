@@ -53,7 +53,7 @@ func newImportEnv(t *testing.T, pool *pgxpool.Pool, files map[string]string) *im
 	t.Cleanup(srv.Close)
 	log := slog.New(slog.DiscardHandler)
 	il := NewImportLog(pool)
-	dl, err := NewDownloader(DownloaderConfig{URL: srv.URL, UserAgent: "livestop-test", Dir: t.TempDir()}, il, log)
+	dl, err := NewDownloader(DownloaderConfig{URL: srv.URL, UserAgent: "punktchen-test", Dir: t.TempDir()}, il, log)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,8 +170,8 @@ func TestImporter(t *testing.T) {
 		// The live data is withExtraStop("Neu") with the current layout.
 		e := newImportEnv(t, pool, withExtraStop("Neu"))
 		for _, stamp := range []string{
-			`COMMENT ON SCHEMA gtfs IS 'livestop layout 0000000000000000'`, // older binary
-			`COMMENT ON SCHEMA gtfs IS NULL`,                               // imported before layouts were stamped
+			`COMMENT ON SCHEMA gtfs IS 'punktchen layout 0000000000000000'`, // older binary
+			`COMMENT ON SCHEMA gtfs IS NULL`,                                // imported before layouts were stamped
 		} {
 			if _, err := pool.Exec(ctx, stamp); err != nil {
 				t.Fatal(err)
@@ -424,11 +424,11 @@ func TestSwapWithoutFailedReads(t *testing.T) {
 // TestImportRealFeed runs the whole pipeline on a real VBB zip with the
 // production sanity limits: the checks must pass, a second run must skip.
 //
-//	$env:LIVESTOP_GTFS_ZIP='data/gtfs/GTFS.zip'; go -C backend test -run ImportRealFeed -v ./internal/transit/static/
+//	$env:PUNKTCHEN_GTFS_ZIP='data/gtfs/GTFS.zip'; go -C backend test -run ImportRealFeed -v ./internal/transit/static/
 func TestImportRealFeed(t *testing.T) {
-	zipPath := os.Getenv("LIVESTOP_GTFS_ZIP")
+	zipPath := os.Getenv("PUNKTCHEN_GTFS_ZIP")
 	if zipPath == "" {
-		t.Skip("set LIVESTOP_GTFS_ZIP to a VBB GTFS zip")
+		t.Skip("set PUNKTCHEN_GTFS_ZIP to a VBB GTFS zip")
 	}
 	if !filepath.IsAbs(zipPath) {
 		zipPath = filepath.Join("..", "..", "..", zipPath)
@@ -443,12 +443,12 @@ func TestImportRealFeed(t *testing.T) {
 	t.Cleanup(srv.Close)
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	il := NewImportLog(pool)
-	dl, err := NewDownloader(DownloaderConfig{URL: srv.URL, UserAgent: "livestop-test", Dir: t.TempDir()}, il, log)
+	dl, err := NewDownloader(DownloaderConfig{URL: srv.URL, UserAgent: "punktchen-test", Dir: t.TempDir()}, il, log)
 	if err != nil {
 		t.Fatal(err)
 	}
 	im := NewImporter(pool, dl, NewLoader(pool, testScope(t), log), il, DefaultSanityLimits, log)
-	if day := os.Getenv("LIVESTOP_TODAY"); day != "" { // e.g. an old feed: LIVESTOP_TODAY=2026-11-01
+	if day := os.Getenv("PUNKTCHEN_TODAY"); day != "" { // e.g. an old feed: PUNKTCHEN_TODAY=2026-11-01
 		d, err := time.Parse(time.DateOnly, day)
 		if err != nil {
 			t.Fatal(err)

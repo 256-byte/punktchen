@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "LiveStop",
-    "slug": "livestop",
+    "name": "punktchen",
+    "slug": "punktchen",
     "version": "0.1.0",
     "orientation": "portrait",
-    "scheme": "livestop",
+    "scheme": "punktchen",
     "userInterfaceStyle": "automatic",
     "platforms": ["ios", "android"],
     "plugins": [
@@ -12,7 +12,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "LiveStop shows live departures at the stops around you."
+          "locationWhenInUsePermission": "punktchen shows live departures at the stops around you."
         }
       ]
     ],

@@ -25,7 +25,7 @@ import (
 const (
 	defaultZip    = "data/gtfs/GTFS.zip"
 	defaultRawDir = "data/gtfsrt"
-	userAgent     = "livestop-dev (data exploration; https://github.com/256-byte/punktchen)"
+	userAgent     = "punktchen-dev (data exploration; https://github.com/256-byte/punktchen)"
 )
 
 // printer writes the report. Write errors stick in the bufio.Writer and are

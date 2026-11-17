@@ -26,16 +26,16 @@ type Metrics struct {
 func NewMetrics(reg prometheus.Registerer) *Metrics {
 	m := &Metrics{
 		runs: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "livestop_import_runs_total",
+			Name: "punktchen_import_runs_total",
 			Help: "GTFS import runs by trigger and result (succeeded, skipped, failed, busy).",
 		}, []string{"trigger", "result"}),
 		duration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
-			Name:    "livestop_import_duration_seconds",
+			Name:    "punktchen_import_duration_seconds",
 			Help:    "Duration of GTFS import runs, by result.",
 			Buckets: []float64{1, 5, 15, 30, 60, 120, 180, 300, 600},
 		}, []string{"result"}),
 		lastSuccess: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "livestop_import_last_success_timestamp_seconds",
+			Name: "punktchen_import_last_success_timestamp_seconds",
 			Help: "Unix time when the schedule was last confirmed current (import succeeded or feed unchanged).",
 		}),
 	}

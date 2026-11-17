@@ -20,7 +20,7 @@ func NewPool(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("parse database url: %w", err)
 	}
 	// Shows up in pg_stat_activity.
-	cfg.ConnConfig.RuntimeParams["application_name"] = "livestop"
+	cfg.ConnConfig.RuntimeParams["application_name"] = "punktchen"
 
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {

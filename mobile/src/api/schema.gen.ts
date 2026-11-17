@@ -100,10 +100,10 @@ export interface paths {
         put?: never;
         /**
          * Start a GTFS import now (development only)
-         * @description Only enabled when the server runs with `LIVESTOP_DEV=true`; otherwise
+         * @description Only enabled when the server runs with `PUNKTCHEN_DEV=true`; otherwise
          *     it answers 404. Starts the import in the background and returns at
          *     once: a full import takes minutes. The outcome is in the logs, in the
-         *     `livestop_import_*` metrics and in `meta.feed_imports`. Not for apps.
+         *     `punktchen_import_*` metrics and in `meta.feed_imports`. Not for apps.
          */
         post: operations["triggerImport"];
         delete?: never;

@@ -23,14 +23,14 @@ func TestNewPoolConnects(t *testing.T) {
 	if err := pool.QueryRow(ctx, "SELECT current_setting('application_name')").Scan(&app); err != nil {
 		t.Fatal(err)
 	}
-	if app != "livestop" {
-		t.Fatalf("application_name = %q, want livestop", app)
+	if app != "punktchen" {
+		t.Fatalf("application_name = %q, want punktchen", app)
 	}
 }
 
 func TestNewPoolFailsFastWhenUnreachable(t *testing.T) {
 	// Port 1 on localhost: nothing listens there, connection is refused at once.
-	const url = "postgres://livestop:s3cret-pw@127.0.0.1:1/livestop?sslmode=disable&connect_timeout=2"
+	const url = "postgres://punktchen:s3cret-pw@127.0.0.1:1/punktchen?sslmode=disable&connect_timeout=2"
 
 	start := time.Now()
 	pool, err := NewPool(context.Background(), url)

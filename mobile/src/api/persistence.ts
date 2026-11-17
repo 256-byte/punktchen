@@ -15,7 +15,7 @@ export const PERSIST_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 /** Bump when the kept shape changes (Kept<T>, the API schema): older data is dropped. */
 export const PERSIST_BUSTER = 'v1';
 /** The AsyncStorage key of the kept cache. */
-export const PERSIST_KEY = 'livestop.query-cache';
+export const PERSIST_KEY = 'punktchen.query-cache';
 
 /** The /v1/nearby query whose data is the newest; undefined without any. */
 export function lastNearbyQuery(client: QueryClient): Query | undefined {

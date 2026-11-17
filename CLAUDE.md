@@ -1,6 +1,6 @@
-# CLAUDE.md — LiveStop
+# CLAUDE.md — punktchen
 
-> Working name: **LiveStop**. A map-first mobile app that shows live departures (bus, tram, U-Bahn, S-Bahn) directly on the stops around the user in Berlin.
+> **punktchen** (renamed from the working name in 2026-11). A map-first mobile app that shows live departures (bus, tram, U-Bahn, S-Bahn) directly on the stops around the user in Berlin.
 > Hobby / portfolio project. The **backend architecture is the showcase**: clean, efficient, well-tested, well-documented.
 
 ## 0. Read this first, every session
@@ -101,13 +101,13 @@ If something you are asked to do contradicts these documents, **stop and ask the
 docker compose up -d --build --wait          # build + start db and backend, wait until healthy
 curl.exe http://localhost:8080/v1/health     # curl.exe, not curl: in PowerShell 5.1 `curl` is Invoke-WebRequest
 docker compose logs -f backend               # follow backend logs (Ctrl+C stops following)
-docker compose down                          # stop; data stays in volume livestop_pgdata (`down -v` deletes it)
+docker compose down                          # stop; data stays in volume punktchen_pgdata (`down -v` deletes it)
 
 # --- backend checks ---
 go -C backend vet ./...
 go -C backend test ./...                     # unit + integration tests (starts PostGIS containers)
 go -C backend test -short ./...              # unit tests only, no Docker
-$env:LIVESTOP_LIVE_TESTS='1'; go -C backend test -run Live ./...; Remove-Item Env:LIVESTOP_LIVE_TESTS
+$env:PUNKTCHEN_LIVE_TESTS='1'; go -C backend test -run Live ./...; Remove-Item Env:PUNKTCHEN_LIVE_TESTS
                                              # tests against real VBB servers (downloads ~170 MB); never in CI
 go -C backend run ./internal/tools/gtfsexplore download   # VBB zip → backend/data/gtfs/GTFS.zip (git-ignored)
 go -C backend run ./internal/tools/gtfsexplore record -n 2   # 2 GTFS-RT samples (+1 conditional GET) → backend/data/gtfsrt/ (git-ignored)
@@ -115,8 +115,8 @@ go -C backend run ./internal/tools/gtfsexplore coverage (Get-ChildItem backend/d
                                              # realtime coverage of running trips per mode, against the imported schedule in the Compose db (task 4.0)
 go -C backend run ./internal/tools/nearbyload -users 1000 -spread 300
                                              # load on /v1/nearby of the Compose stack like 1000 apps standing still: statuses, latency, cache hit ratio (task 5.5)
-$env:LIVESTOP_GTFS_ZIP='data/gtfs/GTFS.zip'; go -C backend test -run RealFeed -v ./internal/transit/static/; Remove-Item Env:LIVESTOP_GTFS_ZIP
-                                             # load + full import pipeline on a real zip in a test DB (path relative to backend/; old zip: also set $env:LIVESTOP_TODAY='2026-11-01')
+$env:PUNKTCHEN_GTFS_ZIP='data/gtfs/GTFS.zip'; go -C backend test -run RealFeed -v ./internal/transit/static/; Remove-Item Env:PUNKTCHEN_GTFS_ZIP
+                                             # load + full import pipeline on a real zip in a test DB (path relative to backend/; old zip: also set $env:PUNKTCHEN_TODAY='2026-11-01')
 docker run --rm -v "${PWD}\backend:/app" -v golangci-cache:/root/.cache -w /app golangci/golangci-lint:v2.15.0 golangci-lint run ./...
                                              # lint: same version as CI, config backend/.golangci.yml (incl. gofmt)
 
@@ -134,7 +134,7 @@ npm --prefix mobile start                    # Expo dev server: scan QR with Exp
 npm --prefix mobile start -- --clear         # after npm install or a mobile/.env change (Metro cache)
 cd mobile; npx expo install <package>; cd .. # add an Expo/RN dependency with the SDK-matched version
 
-# --- dev-only (needs LIVESTOP_DEV=true in .env) ---
+# --- dev-only (needs PUNKTCHEN_DEV=true in .env) ---
 curl.exe -X POST http://localhost:8080/internal/import   # start a GTFS import now (202); follow it with: docker compose logs -f backend
 ```
 

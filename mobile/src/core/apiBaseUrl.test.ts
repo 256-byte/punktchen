@@ -8,7 +8,7 @@ describe('parseApiBaseUrl', () => {
     ['http://192.168.178.29:8080/', 'http://192.168.178.29:8080'],
     ['  http://10.0.2.2:8080  ', 'http://10.0.2.2:8080'],
     ['https://api.example.com', 'https://api.example.com'],
-    ['https://example.com/livestop//', 'https://example.com/livestop'],
+    ['https://example.com/punktchen//', 'https://example.com/punktchen'],
     ['http://localhost:8080', 'http://localhost:8080'],
     ['http://[::1]:8080', 'http://[::1]:8080'],
   ])('accepts %s', (raw, url) => {

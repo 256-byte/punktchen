@@ -51,12 +51,12 @@ export function LocationGate({ children, lastPlace = null, store = locationStore
         <View style={styles.container}>
           <Text style={styles.title}>Location is off</Text>
           <Text style={styles.body}>
-            LiveStop shows live departures at the stops around you. Allow location access, or look
+            punktchen shows live departures at the stops around you. Allow location access, or look
             around the center of the map instead.
           </Text>
           {view.canAskAgain ? null : (
             <Text style={styles.hint}>
-              Turn on location for LiveStop in the Settings app, then come back.
+              Turn on location for punktchen in the Settings app, then come back.
             </Text>
           )}
           <Button

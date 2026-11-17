@@ -39,7 +39,7 @@ type Feed struct {
 // forgets the ETag, so the next poll fetches the feed again.
 type Handler func(ctx context.Context, f Feed) error
 
-// Result of one poll, also the label of livestop_gtfsrt_poll_total.
+// Result of one poll, also the label of punktchen_gtfsrt_poll_total.
 type Result string
 
 const (

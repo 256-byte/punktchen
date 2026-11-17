@@ -1,4 +1,4 @@
-// Package config loads the backend configuration from LIVESTOP_* environment
+// Package config loads the backend configuration from PUNKTCHEN_* environment
 // variables. Load validates everything up front and reports all problems at
 // once, so a misconfigured server fails at startup instead of at first use.
 //
@@ -20,16 +20,16 @@ import (
 
 // Environment variable names.
 const (
-	EnvDev                = "LIVESTOP_DEV"
-	EnvLogLevel           = "LIVESTOP_LOG_LEVEL"
-	EnvHTTPAddr           = "LIVESTOP_HTTP_ADDR"
-	EnvMetricsAddr        = "LIVESTOP_METRICS_ADDR"
-	EnvDatabaseURL        = "LIVESTOP_DATABASE_URL"
-	EnvGTFSURL            = "LIVESTOP_GTFS_URL"
-	EnvGTFSImportTime     = "LIVESTOP_GTFS_IMPORT_TIME"
-	EnvScopeBBox          = "LIVESTOP_SCOPE_BBOX"
-	EnvGTFSRTURL          = "LIVESTOP_GTFSRT_URL"
-	EnvGTFSRTPollInterval = "LIVESTOP_GTFSRT_POLL_INTERVAL"
+	EnvDev                = "PUNKTCHEN_DEV"
+	EnvLogLevel           = "PUNKTCHEN_LOG_LEVEL"
+	EnvHTTPAddr           = "PUNKTCHEN_HTTP_ADDR"
+	EnvMetricsAddr        = "PUNKTCHEN_METRICS_ADDR"
+	EnvDatabaseURL        = "PUNKTCHEN_DATABASE_URL"
+	EnvGTFSURL            = "PUNKTCHEN_GTFS_URL"
+	EnvGTFSImportTime     = "PUNKTCHEN_GTFS_IMPORT_TIME"
+	EnvScopeBBox          = "PUNKTCHEN_SCOPE_BBOX"
+	EnvGTFSRTURL          = "PUNKTCHEN_GTFSRT_URL"
+	EnvGTFSRTPollInterval = "PUNKTCHEN_GTFSRT_POLL_INTERVAL"
 )
 
 // Defaults. They match .env.example.
@@ -202,7 +202,7 @@ func (p *parser) addr(key, def string) string {
 func (p *parser) postgresURL(key string) string {
 	v, ok := p.get(key)
 	if !ok {
-		p.fail(key, "is required (e.g. postgres://user:pass@localhost:5432/livestop?sslmode=disable)")
+		p.fail(key, "is required (e.g. postgres://user:pass@localhost:5432/punktchen?sslmode=disable)")
 		return ""
 	}
 	u, err := url.Parse(v)
