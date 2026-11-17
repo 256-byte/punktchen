@@ -229,7 +229,7 @@ func fetch(t *testing.T, client *http.Client, url string) string {
 	return string(b)
 }
 
-// cacheHits reads livestop_cache_hits_total by result from reg.
+// cacheHits reads punktchen_cache_hits_total by result from reg.
 func cacheHits(t *testing.T, reg *prometheus.Registry) map[string]float64 {
 	t.Helper()
 	mfs, err := reg.Gather()
@@ -238,7 +238,7 @@ func cacheHits(t *testing.T, reg *prometheus.Registry) map[string]float64 {
 	}
 	out := map[string]float64{}
 	for _, mf := range mfs {
-		if mf.GetName() == "livestop_cache_hits_total" {
+		if mf.GetName() == "punktchen_cache_hits_total" {
 			for _, m := range mf.GetMetric() {
 				out[m.GetLabel()[0].GetValue()] = m.GetCounter().GetValue()
 			}

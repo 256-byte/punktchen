@@ -17,11 +17,11 @@ type Metrics struct {
 func NewMetrics(reg prometheus.Registerer) *Metrics {
 	m := &Metrics{
 		polls: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "livestop_gtfsrt_poll_total",
+			Name: "punktchen_gtfsrt_poll_total",
 			Help: "GTFS-RT polls by result (updated, not_modified, rejected, error).",
 		}, []string{"result"}),
 		matchRatio: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "livestop_rt_match_ratio",
+			Name: "punktchen_rt_match_ratio",
 			Help: "Share of scheduled departures within 15 min of now whose trip instance has a GTFS-RT TripUpdate, at the last snapshot merge; 0 when no realtime state is merged.",
 		}),
 	}
@@ -46,12 +46,12 @@ func (m *Metrics) polled(r Result) {
 	m.polls.WithLabelValues(string(r)).Inc()
 }
 
-// RegisterFeedAge exports livestop_gtfsrt_feed_age_seconds: now minus the
+// RegisterFeedAge exports punktchen_gtfsrt_feed_age_seconds: now minus the
 // header.timestamp of the store's current state, read at scrape time; 0
 // before the first feed.
 func RegisterFeedAge(reg prometheus.Registerer, s *Store, now func() time.Time) {
 	reg.MustRegister(prometheus.NewGaugeFunc(prometheus.GaugeOpts{
-		Name: "livestop_gtfsrt_feed_age_seconds",
+		Name: "punktchen_gtfsrt_feed_age_seconds",
 		Help: "Age of the applied GTFS-RT feed by its header.timestamp; 0 before the first feed.",
 	}, func() float64 {
 		st := s.Current()

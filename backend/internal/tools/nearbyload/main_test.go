@@ -35,17 +35,17 @@ func TestPercentile(t *testing.T) {
 }
 
 func TestParseCacheCounters(t *testing.T) {
-	got, err := parseCacheCounters(strings.NewReader(`# HELP livestop_cache_hits_total ...
-# TYPE livestop_cache_hits_total counter
-livestop_cache_entries 12
-livestop_cache_hits_total{result="hit"} 900
-livestop_cache_hits_total{result="miss"} 1
-livestop_cache_hits_total{result="shared"} 9.9e+01
+	got, err := parseCacheCounters(strings.NewReader(`# HELP punktchen_cache_hits_total ...
+# TYPE punktchen_cache_hits_total counter
+punktchen_cache_entries 12
+punktchen_cache_hits_total{result="hit"} 900
+punktchen_cache_hits_total{result="miss"} 1
+punktchen_cache_hits_total{result="shared"} 9.9e+01
 `))
 	if err != nil || got["hit"] != 900 || got["miss"] != 1 || got["shared"] != 99 || len(got) != 3 {
 		t.Errorf("%v, %v", got, err)
 	}
-	if _, err := parseCacheCounters(strings.NewReader(`livestop_cache_hits_total{result="hit"} x`)); err == nil {
+	if _, err := parseCacheCounters(strings.NewReader(`punktchen_cache_hits_total{result="hit"} x`)); err == nil {
 		t.Error("a bad value was accepted")
 	}
 }
@@ -86,7 +86,7 @@ func TestRun(t *testing.T) {
 	var hits atomic.Int64
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/metrics" {
-			_, _ = fmt.Fprintf(w, "livestop_cache_hits_total{result=\"hit\"} %d\nlivestop_cache_hits_total{result=\"miss\"} 5\n", 100+hits.Load())
+			_, _ = fmt.Fprintf(w, "punktchen_cache_hits_total{result=\"hit\"} %d\npunktchen_cache_hits_total{result=\"miss\"} 5\n", 100+hits.Load())
 			return
 		}
 		if r.Header.Get("Accept-Encoding") != "gzip" || r.URL.Query().Get("lat") == "" {

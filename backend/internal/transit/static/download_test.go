@@ -93,7 +93,7 @@ func newEnv(t *testing.T, pool *pgxpool.Pool, feed *fakeFeed, maxBytes int64) *e
 	dir := t.TempDir()
 	il := NewImportLog(pool)
 	d, err := NewDownloader(DownloaderConfig{
-		Source: t.Name(), URL: srv.URL + "/gtfs.zip", UserAgent: "livestop-test", Dir: dir, MaxBytes: maxBytes,
+		Source: t.Name(), URL: srv.URL + "/gtfs.zip", UserAgent: "punktchen-test", Dir: dir, MaxBytes: maxBytes,
 	}, il, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
@@ -200,7 +200,7 @@ func TestDownloader(t *testing.T) {
 		if h := e.feed.lastRequest(); h.Get("If-None-Match") != "" || h.Get("If-Modified-Since") != "" {
 			t.Fatalf("sent validators the server never gave: %v", h)
 		}
-		if ua := e.feed.lastRequest().Get("User-Agent"); ua != "livestop-test" {
+		if ua := e.feed.lastRequest().Get("User-Agent"); ua != "punktchen-test" {
 			t.Fatalf("User-Agent %q", ua)
 		}
 
@@ -348,10 +348,10 @@ func TestDownloader(t *testing.T) {
 }
 
 // TestDownloaderLiveVBB downloads the real feed twice (2 × ~85 MB). Run it on
-// purpose only: LIVESTOP_LIVE_TESTS=1 go test -run LiveVBB ./internal/transit/static/
+// purpose only: PUNKTCHEN_LIVE_TESTS=1 go test -run LiveVBB ./internal/transit/static/
 func TestDownloaderLiveVBB(t *testing.T) {
-	if os.Getenv("LIVESTOP_LIVE_TESTS") != "1" {
-		t.Skip("set LIVESTOP_LIVE_TESTS=1 to download from VBB")
+	if os.Getenv("PUNKTCHEN_LIVE_TESTS") != "1" {
+		t.Skip("set PUNKTCHEN_LIVE_TESTS=1 to download from VBB")
 	}
 	ctx := context.Background()
 	pool, err := platform.NewPool(ctx, pgtest.Start(t))
@@ -364,7 +364,7 @@ func TestDownloaderLiveVBB(t *testing.T) {
 	}
 	il := NewImportLog(pool)
 	d, err := NewDownloader(DownloaderConfig{
-		URL: config.DefaultGTFSURL, UserAgent: "livestop-test (+https://github.com/256-byte/punktchen)", Dir: t.TempDir(),
+		URL: config.DefaultGTFSURL, UserAgent: "punktchen-test (+https://github.com/256-byte/punktchen)", Dir: t.TempDir(),
 	}, il, slog.New(slog.NewTextHandler(os.Stderr, nil)))
 	if err != nil {
 		t.Fatal(err)

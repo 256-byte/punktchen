@@ -186,7 +186,7 @@ func pointInDisc(rng *rand.Rand, lat, lng, radius float64) (float64, float64) {
 		lng + r*math.Sin(angle)/(metresPerDegree*math.Cos(lat*math.Pi/180))
 }
 
-// cacheCounters reads livestop_cache_hits_total by result; nil without a URL.
+// cacheCounters reads punktchen_cache_hits_total by result; nil without a URL.
 func cacheCounters(ctx context.Context, client *http.Client, url string) (map[string]float64, error) {
 	if url == "" {
 		return nil, nil
@@ -204,7 +204,7 @@ func cacheCounters(ctx context.Context, client *http.Client, url string) (map[st
 }
 
 func parseCacheCounters(r io.Reader) (map[string]float64, error) {
-	const prefix = `livestop_cache_hits_total{result="`
+	const prefix = `punktchen_cache_hits_total{result="`
 	out := map[string]float64{}
 	sc := bufio.NewScanner(r)
 	for sc.Scan() {

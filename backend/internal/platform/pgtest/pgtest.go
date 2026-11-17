@@ -23,9 +23,9 @@ func Start(t testing.TB) string {
 	ctx := context.Background()
 
 	ctr, err := postgres.Run(ctx, Image,
-		postgres.WithDatabase("livestop_test"),
-		postgres.WithUsername("livestop"),
-		postgres.WithPassword("livestop"),
+		postgres.WithDatabase("punktchen_test"),
+		postgres.WithUsername("punktchen"),
+		postgres.WithPassword("punktchen"),
 		postgres.BasicWaitStrategies(),
 	)
 	testcontainers.CleanupContainer(t, ctr)

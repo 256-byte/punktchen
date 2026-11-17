@@ -282,11 +282,11 @@ func TestLoad(t *testing.T) {
 // TestLoadRealFeed imports a real VBB zip and checks the PLAN 1.3 acceptance:
 // import finishes, row counts logged, memory of this process < 500 MB.
 //
-//	$env:LIVESTOP_GTFS_ZIP='data\gtfs-www\GTFS.zip'; go -C backend test -run LoadRealFeed -v ./internal/transit/static/
+//	$env:PUNKTCHEN_GTFS_ZIP='data\gtfs-www\GTFS.zip'; go -C backend test -run LoadRealFeed -v ./internal/transit/static/
 func TestLoadRealFeed(t *testing.T) {
-	zipPath := os.Getenv("LIVESTOP_GTFS_ZIP")
+	zipPath := os.Getenv("PUNKTCHEN_GTFS_ZIP")
 	if zipPath == "" {
-		t.Skip("set LIVESTOP_GTFS_ZIP to a VBB GTFS zip")
+		t.Skip("set PUNKTCHEN_GTFS_ZIP to a VBB GTFS zip")
 	}
 	if !filepath.IsAbs(zipPath) {
 		zipPath = filepath.Join("..", "..", "..", zipPath) // relative to backend/

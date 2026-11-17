@@ -35,7 +35,7 @@ func layoutOf(revision int, sqlFiles ...string) string {
 }
 
 // layoutComment is the schema comment that carries the stamp.
-func layoutComment(layout string) string { return "livestop layout " + layout }
+func layoutComment(layout string) string { return "punktchen layout " + layout }
 
 // stampLayout marks the staging schema with Layout (inside the load tx).
 func stampLayout(ctx context.Context, tx pgx.Tx) error {

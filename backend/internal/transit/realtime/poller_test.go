@@ -17,7 +17,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const ua = "livestop/test (+https://github.com/256-byte/punktchen)"
+const ua = "punktchen/test (+https://github.com/256-byte/punktchen)"
 
 // clock is a fake clock: wait advances it instead of sleeping and records
 // each wait; after stopAfter waits it cancels the context.
@@ -132,7 +132,7 @@ func polls(t *testing.T, reg *prometheus.Registry, r Result) float64 {
 		t.Fatal(err)
 	}
 	for _, mf := range mfs {
-		if mf.GetName() != "livestop_gtfsrt_poll_total" {
+		if mf.GetName() != "punktchen_gtfsrt_poll_total" {
 			continue
 		}
 		for _, metric := range mf.GetMetric() {

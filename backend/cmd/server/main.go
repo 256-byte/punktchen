@@ -1,4 +1,4 @@
-// Command server is the LiveStop backend: one binary that will run the GTFS
+// Command server is the punktchen backend: one binary that will run the GTFS
 // importer, the realtime poller and the HTTP API (ADR-0002).
 //
 // Startup order: config → logger → database → migrations → listeners → serve.
@@ -62,7 +62,7 @@ func run() int {
 	}
 
 	log := platform.NewLogger(os.Stdout, cfg.LogLevel)
-	log.Info("starting livestop", "version", version, "go", runtime.Version(), "config", cfg)
+	log.Info("starting punktchen", "version", version, "go", runtime.Version(), "config", cfg)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -179,14 +179,14 @@ func runBackground(ctx context.Context, fn func(context.Context)) (stop func()) 
 // userAgent names the project to upstream servers, as VBB asks
 // (DATA_MODEL §7 #20). No personal contact data.
 func userAgent() string {
-	return "livestop/" + version + " (+https://github.com/256-byte/punktchen)"
+	return "punktchen/" + version + " (+https://github.com/256-byte/punktchen)"
 }
 
 // healthcheck calls the local health endpoint and fails on any non-200 answer.
 // It is a liveness check: /v1/health answers 200 even when the data is
 // "down", so a container is not restarted during e.g. a long first import.
 // The distroless runtime image has no shell, curl or wget, so the binary
-// checks itself. It reads only LIVESTOP_HTTP_ADDR, not the full config.
+// checks itself. It reads only PUNKTCHEN_HTTP_ADDR, not the full config.
 func healthcheck() error {
 	addr := os.Getenv(config.EnvHTTPAddr)
 	if addr == "" {

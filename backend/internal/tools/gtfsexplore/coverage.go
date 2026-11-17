@@ -15,7 +15,7 @@ import (
 )
 
 // defaultDevDB is the Docker Compose database as seen from the host.
-const defaultDevDB = "postgres://livestop:livestop@127.0.0.1:5432/livestop?sslmode=disable"
+const defaultDevDB = "postgres://punktchen:punktchen@127.0.0.1:5432/punktchen?sslmode=disable"
 
 // modeOrder is the API's mode order (DATA_MODEL §5.2).
 var modeOrder = []string{"regional", "sbahn", "ubahn", "tram", "bus", "ferry", "other"}

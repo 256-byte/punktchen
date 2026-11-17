@@ -51,7 +51,7 @@ type Config struct {
 	Layers   Layers          // /v1/layers, /v1/nearby
 	Transit  TransitStations // /v1/stations/{id}
 	Imports  ImportTrigger   // used only when Dev
-	Dev      bool            // LIVESTOP_DEV: enables /internal/*
+	Dev      bool            // PUNKTCHEN_DEV: enables /internal/*
 	Log      *slog.Logger
 
 	// Metrics gets the cell cache metrics (nil: not exported).

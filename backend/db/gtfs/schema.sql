@@ -82,7 +82,7 @@ CREATE TABLE gtfs.stops (
     wheelchair_boarding smallint,
     level_id            text,
     platform_code       text,
-    -- Not from the CSV: set after loading from LIVESTOP_SCOPE_BBOX (DATA_MODEL §4).
+    -- Not from the CSV: set after loading from PUNKTCHEN_SCOPE_BBOX (DATA_MODEL §4).
     in_scope            boolean NOT NULL DEFAULT false,
     -- Not from the CSV: the station of a pole (DATA_MODEL §3.4), set by derived.sql.
     station_id          text DEFAULT NULL,

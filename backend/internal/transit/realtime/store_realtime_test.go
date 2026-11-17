@@ -71,7 +71,7 @@ func TestFeedAgeMetric(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	now := time.Date(2026, 11, 8, 23, 0, 40, 0, time.UTC)
 	RegisterFeedAge(reg, s, func() time.Time { return now })
-	if n, err := testutil.GatherAndCount(reg, "livestop_gtfsrt_feed_age_seconds"); err != nil || n != 1 {
+	if n, err := testutil.GatherAndCount(reg, "punktchen_gtfsrt_feed_age_seconds"); err != nil || n != 1 {
 		t.Fatalf("gauge: %d, %v", n, err)
 	}
 	mfs, _ := reg.Gather()

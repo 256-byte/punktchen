@@ -25,7 +25,7 @@ const (
 	cacheBuildTimeout = 10 * time.Second
 )
 
-// cacheResult labels livestop_cache_hits_total.
+// cacheResult labels punktchen_cache_hits_total.
 type cacheResult string
 
 const (
@@ -75,18 +75,18 @@ type cacheCall[V any] struct {
 }
 
 // newCellCache returns a cache of up to max entries that live ttl; reg
-// (nil: none) gets livestop_cache_hits_total{result} and
-// livestop_cache_entries.
+// (nil: none) gets punktchen_cache_hits_total{result} and
+// punktchen_cache_entries.
 func newCellCache[V any](max int, ttl time.Duration, now func() time.Time, reg prometheus.Registerer) *cellCache[V] {
 	c := &cellCache[V]{
 		max: max, ttl: ttl, now: now,
 		order: list.New(), items: map[string]*list.Element{}, inflight: map[string]*cacheCall[V]{},
 		hits: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "livestop_cache_hits_total",
+			Name: "punktchen_cache_hits_total",
 			Help: "/v1/nearby cell cache lookups by result: hit, shared (waited for another request's build), miss (built).",
 		}, []string{"result"}),
 		entries: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "livestop_cache_entries",
+			Name: "punktchen_cache_entries",
 			Help: "Answers in the /v1/nearby cell cache.",
 		}),
 	}
