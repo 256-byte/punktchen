@@ -106,7 +106,7 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 | # | Question | Owner | Needed by |
 |---|---|---|---|
 | 1 | Server for deployment | user | later (postponed by the user, 2026-11-17) |
-| 2 | Alert sources: format/terms of VBB Verkehrsmeldungen. **Researched 2026-11-17** (DATA_MODEL §7 #33): VBB HAFAS API `himsearch`, key from api@vbb.de, live messages only from 2026-11-30. Open: apply for an `accessId`? Then check real messages after 2026-11-30 (volume, categories, IDs, licence) before the Phase 8 ADR | user (apply), Claude Code (check) | Phase 8 |
+| 2 | Alert sources: format/terms of VBB Verkehrsmeldungen. **Researched 2026-11-17** (DATA_MODEL §7 #33): VBB HAFAS API `himsearch`, key from api@vbb.de, live messages only from 2026-11-30. Applying for an `accessId` is on hold (user decision 2026-11-18). When resumed: apply, then check real messages after 2026-11-30 (volume, categories, IDs, licence) before the Phase 8 ADR | user (apply), Claude Code (check) | Phase 8 |
 | 4 | ETag from a cell's content instead of the snapshot version? With live realtime only 0.6 % of revalidations are 304s (the version changes with every feed, ~14 s); with a paused feed 50 % (task 5.5). Costs a hash per build; needs an ADR (changes ADR-0006's "ETag derived from the key") | user | before production |
 
 ## Session log
