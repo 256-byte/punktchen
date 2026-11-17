@@ -120,6 +120,11 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Next:
 -->
 
+### 2026-11-17 — Expo SDK 58 patch updates
+- Done: `npx expo install --fix`: expo 58.0.26, expo-linking 58.0.17, expo-location 58.0.22, expo-router 58.0.32, jest-expo 58.0.15 (SDK-matched patch versions); `expo install --check` clean.
+- Tests: typecheck, lint, Vitest 270, Jest 124.
+- New deps: none.
+
 ### 2026-11-17 — rename to punktchen
 - Done: the working name is gone everywhere (user decision): display name, docs, OpenAPI title, env vars `LIVESTOP_*` → `PUNKTCHEN_*`, metrics `livestop_*` → `punktchen_*`, Compose project / containers / image / volume (`punktchen_pgdata`), DB user and name, binary, User-Agent, `application_name`, layout stamp, Expo name / slug / scheme, npm package, AsyncStorage key (`punktchen.query-cache`: the kept answer is lost once). Go module was already `punktchen`. `liveStops` in `importer_test.go` means live stops and stays.
 - Local setup: rename the variables in `.env` (copy from `.env.example`); the new volume starts empty and the schedule imports at startup (~1–2 min); the old `livestop-backend:dev` image can be removed.
