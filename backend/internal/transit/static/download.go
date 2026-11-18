@@ -13,6 +13,15 @@ import (
 	"time"
 
 	"github.com/256-byte/punktchen/backend/gen/queries"
+	"github.com/256-byte/punktchen/backend/internal/platform/importlog"
+)
+
+// Import attempt states, re-exported for this package's callers and tests.
+const (
+	StatusRunning   = importlog.StatusRunning
+	StatusSucceeded = importlog.StatusSucceeded
+	StatusFailed    = importlog.StatusFailed
+	StatusSkipped   = importlog.StatusSkipped
 )
 
 // SourceGTFS is the meta.feed_imports source name of the static VBB feed.
@@ -43,12 +52,12 @@ type DownloaderConfig struct {
 // downloaded file is compared with the last successful import.
 type Downloader struct {
 	cfg  DownloaderConfig
-	log  *ImportLog
+	log  *importlog.Log
 	slog *slog.Logger
 }
 
 // NewDownloader returns a Downloader that records attempts in il.
-func NewDownloader(cfg DownloaderConfig, il *ImportLog, log *slog.Logger) (*Downloader, error) {
+func NewDownloader(cfg DownloaderConfig, il *importlog.Log, log *slog.Logger) (*Downloader, error) {
 	if cfg.URL == "" {
 		return nil, errors.New("downloader: URL is required")
 	}
@@ -74,7 +83,7 @@ type Download struct {
 	// already closed as "skipped" and there is no file.
 	Changed bool
 	// Path of the downloaded zip when Changed. The caller imports it, closes
-	// the attempt with ImportLog.Succeed or Fail, and calls Remove.
+	// the attempt with importlog.Log.Succeed or Fail, and calls Remove.
 	Path         string
 	SHA256       string
 	Size         int64
@@ -99,14 +108,14 @@ func (d *Download) Remove() error {
 // headers or comparing the SHA-256. On error the attempt is closed as
 // "failed".
 func (d *Downloader) Fetch(ctx context.Context, force bool) (*Download, error) {
-	last, err := d.log.lastSuccessful(ctx, d.cfg.Source)
+	last, err := d.log.LastSuccessful(ctx, d.cfg.Source)
 	if err != nil {
 		return nil, err
 	}
 	if force {
 		last = nil
 	}
-	id, err := d.log.start(ctx, d.cfg.Source, d.cfg.URL)
+	id, err := d.log.Start(ctx, d.cfg.Source, d.cfg.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +153,7 @@ func (d *Downloader) fetch(ctx context.Context, id int64, last *queries.MetaFeed
 	case resp.StatusCode == http.StatusNotModified && last != nil:
 		// A 304 may omit the validators; keep the ones we sent.
 		etag, lastModified = orDeref(etag, last.Etag), orDeref(lastModified, last.LastModified)
-		if err := d.log.recordDownload(ctx, id, etag, lastModified, ""); err != nil {
+		if err := d.log.RecordDownload(ctx, id, etag, lastModified, ""); err != nil {
 			return nil, err
 		}
 		d.slog.Info("gtfs unchanged", "reason", "not modified", "import_id", id)
@@ -157,7 +166,7 @@ func (d *Downloader) fetch(ctx context.Context, id int64, last *queries.MetaFeed
 	if err != nil {
 		return nil, err
 	}
-	if err := d.log.recordDownload(ctx, id, etag, lastModified, sum); err != nil {
+	if err := d.log.RecordDownload(ctx, id, etag, lastModified, sum); err != nil {
 		return nil, errors.Join(err, os.Remove(path))
 	}
 	if last != nil && last.SHA256 != nil && *last.SHA256 == sum {
@@ -173,7 +182,7 @@ func (d *Downloader) fetch(ctx context.Context, id int64, last *queries.MetaFeed
 }
 
 func (d *Downloader) unchanged(ctx context.Context, id int64, etag, lastModified, sum string) (*Download, error) {
-	if err := d.log.skip(ctx, id); err != nil {
+	if err := d.log.Skip(ctx, id); err != nil {
 		return nil, err
 	}
 	return &Download{ImportID: id, SHA256: sum, ETag: etag, LastModified: lastModified}, nil

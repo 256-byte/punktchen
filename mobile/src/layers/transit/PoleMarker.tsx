@@ -47,6 +47,9 @@ const MARKER_A11Y_HINT = 'Opens station departures';
  * minute), not on every tick. With stale data live countdowns are greyed out
  * (6.2). Colours follow light/dark mode (7.1).
  */
+/** Above the amenity icons (AMENITY_Z_INDEX): departures matter more. */
+export const TRANSIT_Z_INDEX = 2;
+
 export function PoleMarker({
   feature,
   onPress,
@@ -112,6 +115,7 @@ export function PoleMarker({
       <Marker
         coordinate={coordinate}
         anchor={{ x: 0.5, y: 1 }}
+        zIndex={TRANSIT_Z_INDEX}
         tracksViewChanges={tracks}
         accessibilityLabel={label}
         accessibilityHint={MARKER_A11Y_HINT}
@@ -145,6 +149,7 @@ export function PoleMarker({
     <Marker
       coordinate={coordinate}
       anchor={{ x: 0.5, y: 1 }}
+      zIndex={TRANSIT_Z_INDEX}
       tracksViewChanges={tracks}
       accessibilityLabel={label}
       accessibilityHint={MARKER_A11Y_HINT}

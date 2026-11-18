@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/256-byte/punktchen/backend/internal/platform"
+	"github.com/256-byte/punktchen/backend/internal/platform/importlog"
 )
 
 // Extra keys in meta.feed_imports.row_counts next to the table names.
@@ -26,20 +27,24 @@ const importLockKey int64 = 0x47544653
 // ErrImportRunning is returned when another import holds the lock.
 var ErrImportRunning = errors.New("another gtfs import is running")
 
+// unlockTimeout bounds releasing the advisory lock, which runs even when the
+// caller's context is already cancelled.
+const unlockTimeout = 5 * time.Second
+
 // Importer runs one complete import: download → load into staging → sanity
 // checks → swap → record the outcome (ARCHITECTURE §3.1).
 type Importer struct {
 	pool   *pgxpool.Pool
 	dl     *Downloader
 	loader *Loader
-	il     *ImportLog
+	il     *importlog.Log
 	limits SanityLimits
 	log    *slog.Logger
 	now    func() time.Time
 }
 
 // NewImporter wires the steps. il must write to the same database as pool.
-func NewImporter(pool *pgxpool.Pool, dl *Downloader, loader *Loader, il *ImportLog, limits SanityLimits, log *slog.Logger) *Importer {
+func NewImporter(pool *pgxpool.Pool, dl *Downloader, loader *Loader, il *importlog.Log, limits SanityLimits, log *slog.Logger) *Importer {
 	return &Importer{pool: pool, dl: dl, loader: loader, il: il, limits: limits, log: log, now: time.Now}
 }
 
@@ -68,7 +73,7 @@ func (im *Importer) Run(ctx context.Context) (*Outcome, error) {
 	}
 	defer func() {
 		// Session-level lock: release on the same connection, even if ctx is done.
-		uctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), bookkeepingTimeout)
+		uctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), unlockTimeout)
 		defer cancel()
 		_, _ = conn.Exec(uctx, `SELECT pg_advisory_unlock($1)`, importLockKey)
 	}()
@@ -130,7 +135,7 @@ func (im *Importer) loadCheckSwap(ctx context.Context, dl *Download) (map[string
 
 // previousCounts are the row counts of the last successful import, or nil.
 func (im *Importer) previousCounts(ctx context.Context) (map[string]int64, error) {
-	last, err := im.il.lastSuccessful(ctx, im.dl.cfg.Source)
+	last, err := im.il.LastSuccessful(ctx, im.dl.cfg.Source)
 	if err != nil || last == nil || len(last.RowCounts) == 0 {
 		return nil, err
 	}

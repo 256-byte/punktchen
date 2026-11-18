@@ -1,5 +1,7 @@
-// Package static downloads and imports the GTFS schedule (ARCHITECTURE §3.1).
-package static
+// Package importlog records import attempts of upstream feeds in
+// meta.feed_imports (DATA_MODEL §3.3): the static GTFS (ARCHITECTURE §3.1)
+// and the amenity datasets (ADR-0010).
+package importlog
 
 import (
 	"context"
@@ -25,18 +27,18 @@ const (
 // when the caller's context is already cancelled, so no row stays "running".
 const bookkeepingTimeout = 5 * time.Second
 
-// ImportLog records import attempts in meta.feed_imports.
-type ImportLog struct {
+// Log records import attempts in meta.feed_imports.
+type Log struct {
 	q *queries.Queries
 }
 
-// NewImportLog returns an ImportLog on db (a pool or a transaction).
-func NewImportLog(db queries.DBTX) *ImportLog {
-	return &ImportLog{q: queries.New(db)}
+// New returns a Log on db (a pool or a transaction).
+func New(db queries.DBTX) *Log {
+	return &Log{q: queries.New(db)}
 }
 
-// lastSuccessful returns the newest succeeded attempt of source, or nil.
-func (l *ImportLog) lastSuccessful(ctx context.Context, source string) (*queries.MetaFeedImport, error) {
+// LastSuccessful returns the newest succeeded attempt of source, or nil.
+func (l *Log) LastSuccessful(ctx context.Context, source string) (*queries.MetaFeedImport, error) {
 	row, err := l.q.LastSuccessfulFeedImport(ctx, source)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -47,7 +49,8 @@ func (l *ImportLog) lastSuccessful(ctx context.Context, source string) (*queries
 	return &row, nil
 }
 
-func (l *ImportLog) start(ctx context.Context, source, url string) (int64, error) {
+// Start opens a "running" attempt before anything is downloaded.
+func (l *Log) Start(ctx context.Context, source, url string) (int64, error) {
 	id, err := l.q.StartFeedImport(ctx, queries.StartFeedImportParams{Source: source, URL: url})
 	if err != nil {
 		return 0, fmt.Errorf("start import of %s: %w", source, err)
@@ -55,7 +58,9 @@ func (l *ImportLog) start(ctx context.Context, source, url string) (int64, error
 	return id, nil
 }
 
-func (l *ImportLog) recordDownload(ctx context.Context, id int64, etag, lastModified, sha256 string) error {
+// RecordDownload stores the validators as received and the SHA-256 of the
+// download (empty: nothing downloaded, e.g. 304).
+func (l *Log) RecordDownload(ctx context.Context, id int64, etag, lastModified, sha256 string) error {
 	n, err := l.q.RecordFeedDownload(ctx, queries.RecordFeedDownloadParams{
 		ID: id, Etag: nonEmpty(etag), LastModified: nonEmpty(lastModified), SHA256: nonEmpty(sha256),
 	})
@@ -63,7 +68,7 @@ func (l *ImportLog) recordDownload(ctx context.Context, id int64, etag, lastModi
 }
 
 // Succeed closes attempt id as succeeded with the imported row counts.
-func (l *ImportLog) Succeed(ctx context.Context, id int64, rowCounts map[string]int64) error {
+func (l *Log) Succeed(ctx context.Context, id int64, rowCounts map[string]int64) error {
 	counts, err := json.Marshal(rowCounts)
 	if err != nil {
 		return err
@@ -72,7 +77,7 @@ func (l *ImportLog) Succeed(ctx context.Context, id int64, rowCounts map[string]
 }
 
 // Fail closes attempt id as failed with the cause.
-func (l *ImportLog) Fail(ctx context.Context, id int64, cause error) error {
+func (l *Log) Fail(ctx context.Context, id int64, cause error) error {
 	msg := "unknown error"
 	if cause != nil {
 		msg = cause.Error()
@@ -80,11 +85,12 @@ func (l *ImportLog) Fail(ctx context.Context, id int64, cause error) error {
 	return l.finish(ctx, id, StatusFailed, nil, &msg)
 }
 
-func (l *ImportLog) skip(ctx context.Context, id int64) error {
+// Skip closes attempt id as skipped: upstream did not change.
+func (l *Log) Skip(ctx context.Context, id int64) error {
 	return l.finish(ctx, id, StatusSkipped, nil, nil)
 }
 
-func (l *ImportLog) finish(ctx context.Context, id int64, status string, rowCounts json.RawMessage, errMsg *string) error {
+func (l *Log) finish(ctx context.Context, id int64, status string, rowCounts json.RawMessage, errMsg *string) error {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), bookkeepingTimeout)
 	defer cancel()
 	n, err := l.q.FinishFeedImport(ctx, queries.FinishFeedImportParams{

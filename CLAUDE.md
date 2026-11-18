@@ -60,13 +60,14 @@ If something you are asked to do contradicts these documents, **stop and ask the
 │   ├── cmd/server/               # main: wires everything
 │   ├── internal/
 │   │   ├── config/               # env config
-│   │   ├── platform/             # db pool, logging, metrics, http server
+│   │   ├── platform/             # db pool, logging, metrics, http server, import log (meta.feed_imports)
 │   │   ├── layer/                # generic Provider/Feature types + registry
 │   │   ├── transit/
 │   │   │   ├── static/           # GTFS download + import + derived tables
 │   │   │   ├── realtime/         # GTFS-RT poller + parser
 │   │   │   ├── departures/       # schedule window + RT merge → Snapshot
 │   │   │   └── provider.go       # transit implementation of layer.Provider
+│   │   ├── amenities/            # toilet + drinking fountain layers (WFS import, ADR-0010)
 │   │   ├── geo/                  # geohash cells, scope (Berlin) filter
 │   │   └── api/                  # handlers, cache, etag (uses generated types)
 │   ├── db/
@@ -135,7 +136,7 @@ npm --prefix mobile start -- --clear         # after npm install or a mobile/.en
 cd mobile; npx expo install <package>; cd .. # add an Expo/RN dependency with the SDK-matched version
 
 # --- dev-only (needs PUNKTCHEN_DEV=true in .env) ---
-curl.exe -X POST http://localhost:8080/internal/import   # start a GTFS import now (202); follow it with: docker compose logs -f backend
+curl.exe -X POST http://localhost:8080/internal/import   # start the GTFS + amenity imports now (202); follow them with: docker compose logs -f backend
 ```
 
 Notes:

@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 9 — Amenities: public toilets and drinking fountains (added 2026-11-18; Phase 8 alerts on hold)
-- **Next task:** 9.1 migration + queries
+- **Next task:** check 9.5 on the iPhone; then Phase 9 is done
 - **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
@@ -70,12 +70,12 @@
 | 7 | 7.10 Mode icons in marker header | done | Header with mode icons + station name in every marker, all zoom levels, and in the station sheet title; S/U drawn by us, tram/bus/RE/ferry Material Icons (Apache-2.0); new dep `react-native-svg`; checked on the iPhone (user, 2026-11-17) |
 
 | 9 | 9.0 Data exploration | done | Facts in DATA_MODEL §7 #34; ADR-0010 accepted (user, 2026-11-18) |
-| 9 | 9.1 Migration + queries | todo | |
-| 9 | 9.2 WFS import | todo | |
-| 9 | 9.3 Scheduler | todo | |
-| 9 | 9.4 API + providers | todo | |
-| 9 | 9.5 Mobile layers | todo | |
-| 9 | 9.6 Docs | todo | |
+| 9 | 9.1 Migration + queries | done | `0002_amenities` (toilets, fountains, generated geom + GiST); sqlc replace (COPY) and nearby with the 3-within-2-km fill; DATA_MODEL §3.7 |
+| 9 | 9.2 WFS import | done | `internal/amenities`: generic `Importer[R]`, SHA-256 skip, parse + mapping, sanity checks, one-transaction replace; `ImportLog` moved to `internal/platform/importlog`; fixtures `backend/testdata/amenities/` |
+| 9 | 9.3 Scheduler | done | `amenities.Scheduler`: startup when empty (forced), daily 04:15, retry 1 h; dev trigger starts GTFS + amenities; metrics; hash of `features` only (WFS `timeStamp`) |
+| 9 | 9.4 API + providers | done | `ToiletsLayer`, `FountainsLayer` in OpenAPI; `ToiletsProvider`, `FountainsProvider` (version + rows in one REPEATABLE READ tx); registered with transit; contract + ETag tests |
+| 9 | 9.5 Mobile layers | done | `toiletsLayer`, `fountainsLayer`: own icons, greyed when not usable now, below transit; sheets; "WC" / "Water" switches (registry `toggle`); one request for all layers; to check on the iPhone |
+| 9 | 9.6 Docs | done | README: status, layers, architecture diagram, ADR table (links fixed, 0009 corrected, 0010 added), data licences |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
 
@@ -130,6 +130,52 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-18 — task 9.6
+- Done: README: status and intro mention toilets and drinking fountains, a "generic layers in practice" point, Geoportal Berlin in the architecture diagram (WFS → amenity importer → PostGIS, registry with three layers), ADR table: six broken links fixed (file names had changed), 0001 and 0009 descriptions corrected (0009 is React Native + Expo, not PostGIS), 0010 added; repository layout; data licences (dl-de/zero-2-0).
+- Docs checked for Phase 9: ARCHITECTURE §3.5, §3.7, §3.8, §4.4, §6; DATA_MODEL §3.7, §5, §7 #34; PLAN Phase 9; ADR-0010.
+- Note: ADR-0010 still says "SHA-256 of the body"; since 9.3 the hash covers the `features` array (the WFS adds a `timeStamp` to every answer). Documented in ARCHITECTURE §3.8 and DATA_MODEL §7 #34; the ADR text is unchanged (changing an ADR needs the user).
+- Next: 9.5 on the iPhone.
+
+### 2026-11-18 — task 9.5
+- Done:
+  - `src/core/amenities.ts` (pure TS): `inSeason` (also across the new year), `seasonText`, `fountainStatus` (running / off season / out of service with the reason), `toiletNote` (events / funerals), `openingText`, `feeText`, `paymentText` ("Karte/App" → "Card or app only"), `accessibleText`, `changingTableText`, `distanceText` (rounded: distances are from the cell centre), `toiletLabel`, `fountainLabel`.
+  - `src/layers/amenities`: `AmenityIcon` (own drawings: "WC" on teal, drop on blue), `AmenityMarker` (round icon, greyed when not usable now, size report for 7.9, `zIndex` below transit), `ToiletSheet` / `FountainSheet`, `toiletsLayer` / `fountainsLayer` with a registry `toggle`.
+  - Registry: optional `toggle` per layer; `mapLayers` = transit, toilets, fountains (transit first: it wins in the overlap layout). `MapScreen`: one `/v1/nearby` request for all layers, a switch per toggled layer (hides without a request), `PoleMarker` gets `TRANSIT_Z_INDEX`.
+- Tests: Vitest `amenities.test.ts` (10; core coverage stays > 99 %); Jest `amenity-layers.test.tsx` (8): request with `layers=transit,toilets,fountains`, one marker each, in season in July, greyed in November and for event-only toilets, screen reader labels, switches hide/show without a request, tap opens the toilet sheet, sheet rows and notes (funeral note, unknown fields left out), fountain off season / out of service / running. All mobile tests (Vitest 280, Jest 132), typecheck, lint pass.
+- Found while testing: the app's clock follows `generatedAt` (ADR-0007), so a test on a fake date must build its answer on that date.
+- New deps: none.
+- Not verified yet: on the iPhone (icons, greying, switches, sheets, how icons and bubbles share the map).
+- Next: 9.6 README.
+
+### 2026-11-18 — task 9.4
+- Done: contract first: `LayerId` + `toilets`, `fountains`; schemas `ToiletsLayer` / `Toilet`, `FountainsLayer` / `Fountain` / `Season` (`feeEuro` as double); Go and TypeScript regenerated. `amenities.ToiletsProvider` / `FountainsProvider`: `Nearby` reads version + rows in one read-only REPEATABLE READ transaction; `Refresh` (startup, and after every scheduler run through the new `SchedulerConfig.AfterRun`) loads version and last confirmation; health down / degraded (72 h) / ok. Registered in `cmd/server` after transit; `/v1/nearby` maps the payloads. ARCHITECTURE §3.5, §3.8; DATA_MODEL §5.1, §5.2.
+- Tests: `provider_test.go` (Docker): down before data, version = import id, unchanged run keeps it, changed run changes it, nearest first (Alexanderplatz: Bahnhof Alexanderplatz 16 m; WC-Center fields), health ok → degraded after 73 h; fountains at Wedding with season. `contract_test.go`: the recorded answers imported through the real importer; `/v1/layers` lists 3; `/v1/nearby?layers=transit,toilets,fountains` valid against the contract, 8 / ≥3 / ≥3 features, 3 meta entries, 2 attribution texts; far out with radius 100 → at most 3; revalidation (304) for amenity layers; a new toilets import → old ETag no longer matches. Manual (Compose): `/v1/layers` lists 3; Alexanderplatz 4 toilets (71–400 m), 3 fountains (555–767 m, two filled in beyond the radius). All backend tests, golangci-lint, mobile typecheck pass.
+- New deps: none.
+- Next: 9.5 mobile layers.
+
+### 2026-11-18 — task 9.3
+- Done: `amenities.Scheduler` (jobs = the two importers): startup run for datasets without rows (forced), daily at `PUNKTCHEN_AMENITIES_IMPORT_TIME` (04:15), retry after 1 h on failure, manual trigger; metrics `punktchen_amenities_import_runs_total{source,trigger,result}`, `…_last_success_timestamp_seconds{source}`, `punktchen_amenities_rows{source}`. Config `PUNKTCHEN_AMENITIES_IMPORT_TIME`, `PUNKTCHEN_TOILETS_URL`, `PUNKTCHEN_FOUNTAINS_URL` (defaults now live in `internal/config`), `.env.example`. `platform.NextDaily` shared with the GTFS scheduler. `POST /internal/import` starts both imports (OpenAPI description updated, code regenerated).
+- Found on the live stack: every WFS answer carries its own top-level `timeStamp`, so the SHA-256 of the body never repeated and every run "succeeded". Now the hash covers the `features` array only (DATA_MODEL §7 #34). Checked again: first run after the change succeeded, the next one `skipped`.
+- Tests: `scheduler_test.go` (fake clock and jobs): startup imports only the empty dataset (forced), daily runs both unforced, a failed dataset does not stop the other and schedules a retry in 1 h (still forced while empty), manual trigger, stop on cancel, metrics; `importer_test.go` (+ answer with a new `timeStamp` only → skipped); config defaults / all set / invalid. Manual (Compose): startup import 525 + 242 rows in 0.2 s, metrics present, `/internal/import` → manual runs (succeeded, then skipped). All backend tests and golangci-lint pass.
+- New deps: none.
+- Next: 9.4 API + providers.
+
+### 2026-11-18 — task 9.2
+- Done:
+  - `internal/platform/importlog`: `static.ImportLog` moved here as `importlog.Log` (exported `LastSuccessful`, `Start`, `RecordDownload`, `Skip`) so the GTFS and the amenity imports share the `meta.feed_imports` bookkeeping; `static` keeps its `StatusX` names as aliases.
+  - `internal/amenities`: `Dataset[R]` (source, URL, limits, `Parse`, `Replace`), `Toilets` / `Fountains`, generic `Importer[R].Run(ctx, force)`: download, SHA-256 skip, parse, sanity check (min rows, max 30 % drop), `DeleteX` + `InsertX` in one transaction, attempt closed as succeeded / skipped / failed. ARCHITECTURE §3.8.
+  - Mapping (`ParseToilets`, `ParseFountains`): kind (Pissoir → urinal), `eventOnly` (symbol or hours "bei Veranstaltungen", hours "Trauerfeier"), opening hours with stray empty lines dropped, `open24h`, ja/nein → bool (NULL when missing, error otherwise), season from "Betriebszeit: Mai bis Oktober" (German month names; unreadable → import fails, old rows stay), `out_of_service` from `einschraenkungen`.
+  - Fixtures: the recorded WFS answers of 2026-11-18 in `backend/testdata/amenities/` (290 KB, 116 KB; dl-de/zero-2-0) with a README.
+- Tests: `parse_test.go` (recorded answers: 525 toilets with 14 urinals, 16 event-only, 330 open 24h, 323 free, 170 card/app only, 367 accessible, 137 changing tables; 242 fountains all May–October, 8 out of service; field mapping of single rows; 11 rejected inputs; sanity check; `TestLiveWFS` against gdi.berlin.de with `PUNKTCHEN_LIVE_TESTS=1`: 525 / 242). `importer_test.go` (Docker, fake WFS): first import, unchanged → skipped, forced, smaller answer within the limit, then 500 / HTML / 38 % drop / too few rows → failed with the old 400 rows kept; fountains import + nearby at Alexanderplatz filled with the nearest at 633 m. All backend tests and golangci-lint pass.
+- New deps: none.
+- Next: 9.3 scheduler + metrics.
+
+### 2026-11-18 — task 9.1
+- Done: migration `0002_amenities` (schema `amenities`, tables `toilets` and `fountains` with typed columns, `geom` generated from lat/lng, GiST indexes); `db/queries/amenities.sql`: `DeleteX` + `InsertX` (`:copyfrom`) for a one-transaction replace, `CountX`, `NearbyX` (all within the radius plus the nearest `min_results` within `max_m`, KNN `<->`, nearest first). DATA_MODEL §3.7.
+- Tests: `db/amenities_queries_test.go` (Docker): radius with 2 → filled with the 3rd, radius with 1 → 3, radius with 4 → all 4, fill stops at max distance, nothing within max → empty, nearest first, nullable types, distance; fountains with season and out-of-service. `platform/migrate_test.go`: version 2, new tables after up, gone after down. All backend tests and golangci-lint pass.
+- New deps: none.
+- Next: 9.2 WFS import.
 
 ### 2026-11-18 — Berlin open-data research, Phase 9 planned, task 9.0
 - Research (user request): which free Berlin location data fits the app. Checked with real WFS/GBFS requests: toilets (525), drinking fountains (242), nextbike GBFS (1,080 stations, CC0, live), bike parking (2,374, Senate projects only), playgrounds (1,886, no equipment data), chargers (4,960, no live status), street trees (434,765), bathing spots (API not found), Free WiFi (no open dataset), FIS-Broker (retired; gdi.berlin.de serves the WFS). daten.berlin.de's CKAN API is behind a bot challenge.

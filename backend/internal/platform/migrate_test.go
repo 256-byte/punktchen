@@ -58,11 +58,15 @@ func TestMigrateAppliesAndIsIdempotent(t *testing.T) {
 	if err := pool.QueryRow(ctx, "SELECT version, dirty FROM meta.schema_migrations").Scan(&version, &dirty); err != nil {
 		t.Fatalf("read meta.schema_migrations: %v", err)
 	}
-	if version != 1 || dirty {
-		t.Fatalf("schema_migrations = (%d, dirty=%v), want (1, false)", version, dirty)
+	if version != 2 || dirty {
+		t.Fatalf("schema_migrations = (%d, dirty=%v), want (2, false)", version, dirty)
 	}
-	if !tableExists(t, pool, "meta", "feed_imports") {
-		t.Fatal("meta.feed_imports missing")
+	for _, table := range []struct{ schema, name string }{
+		{"meta", "feed_imports"}, {"amenities", "toilets"}, {"amenities", "fountains"},
+	} {
+		if !tableExists(t, pool, table.schema, table.name) {
+			t.Fatalf("%s.%s missing", table.schema, table.name)
+		}
 	}
 	if !exists(t, pool, "SELECT 1 FROM pg_extension WHERE extname = 'postgis'") {
 		t.Fatal("postgis extension not installed")
@@ -128,13 +132,13 @@ func TestMigrateDownThenUp(t *testing.T) {
 		t.Fatalf("Down: %v", err)
 	}
 	_, _ = m.Close()
-	if tableExists(t, pool, "meta", "feed_imports") {
-		t.Fatal("meta.feed_imports still exists after down")
+	if tableExists(t, pool, "meta", "feed_imports") || tableExists(t, pool, "amenities", "toilets") {
+		t.Fatal("tables still exist after down")
 	}
 
 	migrateReal(t, pool)
-	if !tableExists(t, pool, "meta", "feed_imports") {
-		t.Fatal("meta.feed_imports missing after up again")
+	if !tableExists(t, pool, "meta", "feed_imports") || !tableExists(t, pool, "amenities", "fountains") {
+		t.Fatal("tables missing after up again")
 	}
 }
 

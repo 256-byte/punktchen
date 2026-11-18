@@ -18,3 +18,15 @@ func mustLoadLocation(name string) *time.Location {
 	}
 	return loc
 }
+
+// NextDaily is the first hour:minute in loc strictly after now. time.Date
+// keeps the wall clock across DST changes (03:30 stays 03:30). Used by the
+// daily imports (GTFS, amenities).
+func NextDaily(now time.Time, hour, minute int, loc *time.Location) time.Time {
+	l := now.In(loc)
+	t := time.Date(l.Year(), l.Month(), l.Day(), hour, minute, 0, 0, loc)
+	if !t.After(now) {
+		t = time.Date(l.Year(), l.Month(), l.Day()+1, hour, minute, 0, 0, loc)
+	}
+	return t
+}

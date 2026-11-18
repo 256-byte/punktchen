@@ -11,6 +11,39 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AmenitiesFountain struct {
+	ID              string
+	Lat             float64
+	Lng             float64
+	Location        string
+	District        *string
+	Model           *string
+	BuiltYear       *int16
+	SeasonFromMonth int16
+	SeasonToMonth   int16
+	OutOfService    *string
+	Geom            interface{}
+}
+
+type AmenitiesToilet struct {
+	ID               string
+	Lat              float64
+	Lng              float64
+	Address          string
+	District         *string
+	Operator         *string
+	Kind             string
+	EventOnly        bool
+	OpeningHours     *string
+	Open24h          bool
+	FeeEur           *float64
+	Payment          *string
+	Accessible       *bool
+	MostlyAccessible *bool
+	ChangingTable    *bool
+	Geom             interface{}
+}
+
 type GtfsAgency struct {
 	AgencyID       *string
 	AgencyName     string

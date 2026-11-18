@@ -27,16 +27,19 @@ func TestLoadDefaults(t *testing.T) {
 		t.Fatalf("Load: %v", err)
 	}
 	want := Config{
-		Dev:                false,
-		LogLevel:           slog.LevelInfo,
-		HTTPAddr:           ":8080",
-		MetricsAddr:        ":9090",
-		DatabaseURL:        Secret(testDBURL),
-		GTFSURL:            DefaultGTFSURL,
-		GTFSImportTime:     ClockTime{Hour: 3, Minute: 30},
-		ScopeBBox:          geo.BBox{MinLon: 13.088, MinLat: 52.338, MaxLon: 13.761, MaxLat: 52.675},
-		GTFSRTURL:          DefaultGTFSRTURL,
-		GTFSRTPollInterval: 15 * time.Second,
+		Dev:                 false,
+		LogLevel:            slog.LevelInfo,
+		HTTPAddr:            ":8080",
+		MetricsAddr:         ":9090",
+		DatabaseURL:         Secret(testDBURL),
+		GTFSURL:             DefaultGTFSURL,
+		GTFSImportTime:      ClockTime{Hour: 3, Minute: 30},
+		ScopeBBox:           geo.BBox{MinLon: 13.088, MinLat: 52.338, MaxLon: 13.761, MaxLat: 52.675},
+		GTFSRTURL:           DefaultGTFSRTURL,
+		GTFSRTPollInterval:  15 * time.Second,
+		ToiletsURL:          DefaultToiletsURL,
+		FountainsURL:        DefaultFountainsURL,
+		AmenitiesImportTime: ClockTime{Hour: 4, Minute: 15},
 	}
 	if cfg != want {
 		t.Fatalf("Load defaults:\n got %+v\nwant %+v", cfg, want)
@@ -55,6 +58,9 @@ func TestLoadAllSet(t *testing.T) {
 		EnvScopeBBox:          "13,52,14,53",
 		EnvGTFSRTURL:          "https://example.test/rt",
 		EnvGTFSRTPollInterval: "30s",
+		EnvToiletsURL:         "http://example.test/toilets",
+		EnvFountainsURL:       "http://example.test/fountains",
+		EnvAmenitiesImport:    "05:00",
 	}))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -62,7 +68,9 @@ func TestLoadAllSet(t *testing.T) {
 	if !cfg.Dev || cfg.LogLevel != slog.LevelDebug || cfg.HTTPAddr != "127.0.0.1:8081" ||
 		cfg.MetricsAddr != ":9191" || cfg.GTFSImportTime != (ClockTime{4, 5}) ||
 		cfg.ScopeBBox != (geo.BBox{MinLon: 13, MinLat: 52, MaxLon: 14, MaxLat: 53}) ||
-		cfg.GTFSRTPollInterval != 30*time.Second || cfg.GTFSURL != "http://example.test/gtfs.zip" {
+		cfg.GTFSRTPollInterval != 30*time.Second || cfg.GTFSURL != "http://example.test/gtfs.zip" ||
+		cfg.ToiletsURL != "http://example.test/toilets" || cfg.FountainsURL != "http://example.test/fountains" ||
+		cfg.AmenitiesImportTime != (ClockTime{5, 0}) {
 		t.Fatalf("unexpected config: %+v", cfg)
 	}
 }
@@ -90,6 +98,8 @@ func TestLoadInvalid(t *testing.T) {
 		{EnvDatabaseURL, "host=localhost user=x"},
 		{EnvGTFSURL, "ftp://example.test/x.zip"},
 		{EnvGTFSImportTime, "25:00"},
+		{EnvAmenitiesImport, "4:15am"},
+		{EnvToiletsURL, "file:///etc/passwd"},
 		{EnvGTFSImportTime, "3:30pm"},
 		{EnvScopeBBox, "13,52,14"},
 		{EnvGTFSRTURL, "not a url"},

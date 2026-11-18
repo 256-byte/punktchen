@@ -38,7 +38,7 @@ type ScheduleSource interface {
 	ScheduleState(ctx context.Context) (static.ScheduleState, error)
 }
 
-// ImportTrigger starts an import in the background (static.Scheduler).
+// ImportTrigger starts the imports in the background (GTFS and amenities).
 type ImportTrigger interface {
 	Trigger() error
 }
@@ -153,7 +153,7 @@ func (s *Server) GetHealth(ctx context.Context, _ openapi.GetHealthRequestObject
 	return resp, nil
 }
 
-// TriggerImport starts a GTFS import in the background; dev only.
+// TriggerImport starts the GTFS and amenity imports in the background; dev only.
 func (s *Server) TriggerImport(context.Context, openapi.TriggerImportRequestObject) (openapi.TriggerImportResponseObject, error) {
 	if !s.cfg.Dev || s.cfg.Imports == nil {
 		return openapi.TriggerImport404JSONResponse{NotFoundJSONResponse: openapi.NotFoundJSONResponse(errorBody(codeNotFound, "no such endpoint"))}, nil
@@ -164,7 +164,7 @@ func (s *Server) TriggerImport(context.Context, openapi.TriggerImportRequestObje
 	case err != nil:
 		return nil, err
 	}
-	s.log.Info("gtfs import triggered via /internal/import")
+	s.log.Info("imports triggered via /internal/import")
 	return openapi.TriggerImport202JSONResponse{Status: openapi.ImportStartedStatusStarted}, nil
 }
 

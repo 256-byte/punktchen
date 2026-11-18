@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"sync/atomic"
 	"time"
+
+	"github.com/256-byte/punktchen/backend/internal/platform"
 )
 
 // Trigger names a reason for an import run (metric label).
@@ -113,16 +115,8 @@ func (s *Scheduler) next(now time.Time, lastFailed bool) (time.Time, Trigger) {
 	return daily, TriggerScheduled
 }
 
-// nextDaily is the first hour:minute in loc strictly after now. time.Date
-// keeps the wall clock across DST changes (03:30 stays 03:30).
-func nextDaily(now time.Time, hour, minute int, loc *time.Location) time.Time {
-	l := now.In(loc)
-	t := time.Date(l.Year(), l.Month(), l.Day(), hour, minute, 0, 0, loc)
-	if !t.After(now) {
-		t = time.Date(l.Year(), l.Month(), l.Day()+1, hour, minute, 0, 0, loc)
-	}
-	return t
-}
+// nextDaily is platform.NextDaily (kept for this package's tests).
+var nextDaily = platform.NextDaily
 
 // runOnce runs one import and reports whether it ended without error.
 func (s *Scheduler) runOnce(ctx context.Context, why Trigger) bool {
