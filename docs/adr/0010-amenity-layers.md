@@ -1,6 +1,6 @@
 # 0010 — Amenity layers: public toilets and drinking fountains
 
-- **Status:** proposed
+- **Status:** accepted (user, 2026-11-18)
 - **Date:** 2026-11-18
 
 ## Context

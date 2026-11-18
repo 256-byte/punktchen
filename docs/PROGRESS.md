@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 9 — Amenities: public toilets and drinking fountains (added 2026-11-18; Phase 8 alerts on hold)
-- **Next task:** 9.0 waits for the user to accept ADR-0010; then 9.1
+- **Next task:** 9.1 migration + queries
 - **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
@@ -69,7 +69,7 @@
 | 7 | 7.9 Marker overlap avoidance | done | `layoutLabels` (greedy, nearest free spot, sideways first) on the map's own projection after each camera move; back in place when zoomed in; checked on the iPhone (user); no line/dot to the stop (user decision) |
 | 7 | 7.10 Mode icons in marker header | done | Header with mode icons + station name in every marker, all zoom levels, and in the station sheet title; S/U drawn by us, tram/bus/RE/ferry Material Icons (Apache-2.0); new dep `react-native-svg`; checked on the iPhone (user, 2026-11-17) |
 
-| 9 | 9.0 Data exploration | in progress | Facts in DATA_MODEL §7 #34; ADR-0010 proposed, waiting for approval |
+| 9 | 9.0 Data exploration | done | Facts in DATA_MODEL §7 #34; ADR-0010 accepted (user, 2026-11-18) |
 | 9 | 9.1 Migration + queries | todo | |
 | 9 | 9.2 WFS import | todo | |
 | 9 | 9.3 Scheduler | todo | |
@@ -109,8 +109,8 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 | 2026-11-17 | Android device checks postponed until the app is further along; deployment postponed; app name `punktchen` (replaces the working name punktchen everywhere) — user decisions | — |
 | 2026-11-10 | **No additional realtime source for BVG U-Bahn/tram** (task 4.0). VBB's feed has a real delay for ~85 % of the trips running at any measured time: U-Bahn 100 % in the daytime (80 % at midnight), tram 87–92 %, bus 85–89 %. The earlier "U-Bahn 1.7 %" was the mix of TripUpdates, not coverage. The rest stays on the schedule (`source=scheduled`), which the app already shows differently | DATA_MODEL §7 #19, ARCHITECTURE §3.3 |
 
-| 2026-11-18 | Phase 9 (toilets + drinking fountains from Berlin open data) added and runs before Phase 8; nextbike undecided; elevator status too detailed for now; other Berlin datasets (bike parking, playgrounds, chargers, trees, Wi-Fi, bathing spots) not now — user decisions after the open-data research | ADR-0010 (proposed) |
-| 2026-11-18 | Sparse layers: features within the radius, filled up to the nearest 3 within 2 km; event-only toilets shown with a note; fountains out of season or out of service shown greyed with the reason — user decisions | ADR-0010 (proposed) |
+| 2026-11-18 | Phase 9 (toilets + drinking fountains from Berlin open data) added and runs before Phase 8; nextbike undecided; elevator status too detailed for now; other Berlin datasets (bike parking, playgrounds, chargers, trees, Wi-Fi, bathing spots) not now — user decisions after the open-data research | ADR-0010 |
+| 2026-11-18 | Sparse layers: features within the radius, filled up to the nearest 3 within 2 km; event-only toilets shown with a note; fountains out of season or out of service shown greyed with the reason — user decisions | ADR-0010 |
 
 ## Open questions
 
@@ -134,7 +134,7 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 ### 2026-11-18 — Berlin open-data research, Phase 9 planned, task 9.0
 - Research (user request): which free Berlin location data fits the app. Checked with real WFS/GBFS requests: toilets (525), drinking fountains (242), nextbike GBFS (1,080 stations, CC0, live), bike parking (2,374, Senate projects only), playgrounds (1,886, no equipment data), chargers (4,960, no live status), street trees (434,765), bathing spots (API not found), Free WiFi (no open dataset), FIS-Broker (retired; gdi.berlin.de serves the WFS). daten.berlin.de's CKAN API is behind a bot challenge.
 - User chose toilets and drinking fountains → PLAN Phase 9, ADR-0010 (proposed), data facts DATA_MODEL §7 #34 (fields, counts, opening-hours formats, season, density vs. radius).
-- Not done: no code; ADR-0010 needs approval before 9.1.
+- ADR-0010 accepted by the user the same day; 9.0 done.
 - New deps: none.
 
 ### 2026-11-17 — alert source research (Phase 8 preparation, open question #2)
