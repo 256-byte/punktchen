@@ -4,8 +4,8 @@
 
 ## Current status
 
-- **Active phase:** Phase 9 — Amenities: public toilets and drinking fountains (added 2026-11-18; Phase 8 alerts on hold)
-- **Next task:** check 9.5 on the iPhone; then Phase 9 is done
+- **Active phase:** none — Phase 9 (toilets and drinking fountains) done 2026-11-18; Phase 8 alerts on hold (API key application paused)
+- **Next task:** to be decided with the user
 - **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
@@ -74,7 +74,7 @@
 | 9 | 9.2 WFS import | done | `internal/amenities`: generic `Importer[R]`, SHA-256 skip, parse + mapping, sanity checks, one-transaction replace; `ImportLog` moved to `internal/platform/importlog`; fixtures `backend/testdata/amenities/` |
 | 9 | 9.3 Scheduler | done | `amenities.Scheduler`: startup when empty (forced), daily 04:15, retry 1 h; dev trigger starts GTFS + amenities; metrics; hash of `features` only (WFS `timeStamp`) |
 | 9 | 9.4 API + providers | done | `ToiletsLayer`, `FountainsLayer` in OpenAPI; `ToiletsProvider`, `FountainsProvider` (version + rows in one REPEATABLE READ tx); registered with transit; contract + ETag tests |
-| 9 | 9.5 Mobile layers | done | `toiletsLayer`, `fountainsLayer`: own icons, greyed when not usable now, below transit; sheets; "WC" / "Water" switches (registry `toggle`); one request for all layers; to check on the iPhone |
+| 9 | 9.5 Mobile layers | done | `toiletsLayer`, `fountainsLayer`: own icons, greyed when not usable now, below transit; sheets; "WC" / "Water" switches (registry `toggle`); one request for all layers; checked on the iPhone (user, 2026-11-18) |
 | 9 | 9.6 Docs | done | README: status, layers, architecture diagram, ADR table (links fixed, 0009 corrected, 0010 added), data licences |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
@@ -130,6 +130,10 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-18 — Phase 9 done
+- iPhone check of 9.5 (user): icons, greying, the WC / Water switches, the sheets and how icons and bubbles share the map — no issues. Phase 9 complete (PR #60).
+- Next: to be decided with the user (Phase 8 waits for the VBB API key application).
 
 ### 2026-11-18 — task 9.6
 - Done: README: status and intro mention toilets and drinking fountains, a "generic layers in practice" point, Geoportal Berlin in the architecture diagram (WFS → amenity importer → PostGIS, registry with three layers), ADR table: six broken links fixed (file names had changed), 0001 and 0009 descriptions corrected (0009 is React Native + Expo, not PostGIS), 0010 added; repository layout; data licences (dl-de/zero-2-0).
