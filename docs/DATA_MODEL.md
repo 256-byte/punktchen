@@ -125,6 +125,30 @@ One row per trip (PK `trip_id`). Kept after the import since task 2.2 (before: a
 ### 3.6 Schedule window (task 2.2, not a table)
 A **departure** is a stop time where riders can board: at an in-scope pole, `pickup_type` ≠ 1, not the trip's last stop, on a service date its service runs. Absolute time = service day's noon − 12 h (Europe/Berlin) + `departure_secs`; on DST switch days this start is 23:00 (spring) or 01:00 (autumn) local time, so night times shift against the wall clock (`departures.ServiceDay`, tests in `serviceday_test.go`).
 
+### 3.7 `amenities` schema (Phase 9, ADR-0010, not swapped)
+Migration `0002_amenities`. An import replaces one table in one transaction (`DeleteX` + `InsertX` via COPY); each run is a `meta.feed_imports` row (`berlin-toilets`, `berlin-fountains`). `geom` is generated from `lat`/`lng` (as `gtfs.stops`), GiST-indexed. Source fields: §7 #34.
+
+| `amenities.toilets` | type | from the WFS |
+|---|---|---|
+| `id` | text PK | feature id (`toiletten.2`) |
+| `lat`, `lng`, `geom` | float8, geography | Point |
+| `address`, `district`, `operator` | text | `standort`, `bezirk`, `betreiber` |
+| `kind` | `toilet` or `urinal` | `symbol` (WC / Pissoir) |
+| `event_only` | bool | events / funerals only (`symbol` or `oeffnungszeiten`) |
+| `opening_hours`, `open_24h` | text, bool | `oeffnungszeiten` as written; `"24h"` |
+| `fee_eur`, `payment` | float8, text | `nutzungsentgelt`, `zahlungsart` |
+| `accessible`, `mostly_accessible`, `changing_table` | bool (NULL = unknown) | `barrierefrei`, `barrierearm`, `wickeltisch` |
+
+| `amenities.fountains` | type | from the WFS |
+|---|---|---|
+| `id` | text PK | feature id (`trinkwasserbrunnen.1`) |
+| `lat`, `lng`, `geom` | float8, geography | Point |
+| `location`, `district`, `model`, `built_year` | text, text, text, smallint | `standort`, `bezirk`, `trinkbrunnenart`, `baujahr` |
+| `season_from_month`, `season_to_month` | smallint 1–12 | parsed from `informationen` ("Mai bis Oktober" → 5, 10) |
+| `out_of_service` | text | `einschraenkungen` (NULL = in service) |
+
+Nearby (`NearbyToilets`, `NearbyFountains`): every row within `radius_m`, plus the nearest within `max_m` until there are `min_results`; nearest first (ADR-0010: 3 within 2 km).
+
 ## 4. Scope
 
 - Import the **full VBB feed**; restrict by `stops.in_scope`.

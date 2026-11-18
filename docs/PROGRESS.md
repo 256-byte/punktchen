@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 9 — Amenities: public toilets and drinking fountains (added 2026-11-18; Phase 8 alerts on hold)
-- **Next task:** 9.1 migration + queries
+- **Next task:** 9.2 WFS import
 - **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
@@ -70,7 +70,7 @@
 | 7 | 7.10 Mode icons in marker header | done | Header with mode icons + station name in every marker, all zoom levels, and in the station sheet title; S/U drawn by us, tram/bus/RE/ferry Material Icons (Apache-2.0); new dep `react-native-svg`; checked on the iPhone (user, 2026-11-17) |
 
 | 9 | 9.0 Data exploration | done | Facts in DATA_MODEL §7 #34; ADR-0010 accepted (user, 2026-11-18) |
-| 9 | 9.1 Migration + queries | todo | |
+| 9 | 9.1 Migration + queries | done | `0002_amenities` (toilets, fountains, generated geom + GiST); sqlc replace (COPY) and nearby with the 3-within-2-km fill; DATA_MODEL §3.7 |
 | 9 | 9.2 WFS import | todo | |
 | 9 | 9.3 Scheduler | todo | |
 | 9 | 9.4 API + providers | todo | |
@@ -130,6 +130,12 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-18 — task 9.1
+- Done: migration `0002_amenities` (schema `amenities`, tables `toilets` and `fountains` with typed columns, `geom` generated from lat/lng, GiST indexes); `db/queries/amenities.sql`: `DeleteX` + `InsertX` (`:copyfrom`) for a one-transaction replace, `CountX`, `NearbyX` (all within the radius plus the nearest `min_results` within `max_m`, KNN `<->`, nearest first). DATA_MODEL §3.7.
+- Tests: `db/amenities_queries_test.go` (Docker): radius with 2 → filled with the 3rd, radius with 1 → 3, radius with 4 → all 4, fill stops at max distance, nothing within max → empty, nearest first, nullable types, distance; fountains with season and out-of-service. `platform/migrate_test.go`: version 2, new tables after up, gone after down. All backend tests and golangci-lint pass.
+- New deps: none.
+- Next: 9.2 WFS import.
 
 ### 2026-11-18 — Berlin open-data research, Phase 9 planned, task 9.0
 - Research (user request): which free Berlin location data fits the app. Checked with real WFS/GBFS requests: toilets (525), drinking fountains (242), nextbike GBFS (1,080 stations, CC0, live), bike parking (2,374, Senate projects only), playgrounds (1,886, no equipment data), chargers (4,960, no live status), street trees (434,765), bathing spots (API not found), Free WiFi (no open dataset), FIS-Broker (retired; gdi.berlin.de serves the WFS). daten.berlin.de's CKAN API is behind a bot challenge.
