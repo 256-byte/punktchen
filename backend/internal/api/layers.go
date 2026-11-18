@@ -133,6 +133,10 @@ func (s *Server) buildNearby(ctx context.Context, cell geo.Cell, radius int32, i
 			switch payload := l.Payload.(type) {
 			case *openapi.TransitLayer:
 				body.Layers.Transit = payload
+			case *openapi.ToiletsLayer:
+				body.Layers.Toilets = payload
+			case *openapi.FountainsLayer:
+				body.Layers.Fountains = payload
 			default:
 				s.log.Error("layer payload of unknown type", "layer", l.Info.ID, "type", fmt.Sprintf("%T", l.Payload))
 				lm.Status = openapi.StatusDown

@@ -128,9 +128,19 @@ func serve(ctx context.Context, log *slog.Logger, cfg config.Config) error {
 		return out, err
 	}
 
-	// Map layers (ADR-0008): only transit for now.
+	// Map layers (ADR-0008): transit, toilets and drinking fountains (ADR-0010).
 	transitLayer := transit.NewProvider(pool, builder, transit.WithRealtime(transit.DefaultRealtimeStaleAfter))
-	layers, err := layer.NewRegistry(transitLayer)
+	toiletsLayer := amenities.NewToiletsProvider(pool)
+	fountainsLayer := amenities.NewFountainsProvider(pool)
+	refreshAmenities := map[string]func(context.Context) error{
+		amenities.SourceToilets: toiletsLayer.Refresh, amenities.SourceFountains: fountainsLayer.Refresh,
+	}
+	for source, refresh := range refreshAmenities {
+		if err := refresh(ctx); err != nil {
+			log.Warn("amenity layer not ready", "source", source, "error", err.Error())
+		}
+	}
+	layers, err := layer.NewRegistry(transitLayer, toiletsLayer, fountainsLayer)
 	if err != nil {
 		return err
 	}
@@ -154,6 +164,11 @@ func serve(ctx context.Context, log *slog.Logger, cfg config.Config) error {
 	}
 	amenityScheduler := amenities.NewScheduler(amenities.SchedulerConfig{
 		Hour: cfg.AmenitiesImportTime.Hour, Minute: cfg.AmenitiesImportTime.Minute, Loc: platform.Berlin,
+		AfterRun: func(ctx context.Context, source string) {
+			if err := refreshAmenities[source](ctx); err != nil {
+				amenityLog.Error("amenity layer refresh failed", "source", source, "error", err.Error())
+			}
+		},
 	}, []amenities.Job{toilets, fountains}, amenities.NewMetrics(metrics), amenityLog)
 
 	apiHandler := api.NewHandler(api.NewServer(api.Config{

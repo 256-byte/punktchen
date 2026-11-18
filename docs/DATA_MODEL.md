@@ -167,7 +167,7 @@ Nearby (`NearbyToilets`, `NearbyFountains`): every row within `radius_m`, plus t
 | GET | `/v1/stations/{stationId}` | one transit station with all poles and more departures (sheet) |
 | POST | `/internal/import` | dev-only: start a GTFS import (`PUNKTCHEN_DEV=true`, else 404); 202 at once, 409 while one runs |
 
-Rules: `radius` 100–1000 (default 500). `layers` comma-separated, default `transit`. Unknown layer → 400. All times ISO-8601 with offset, Europe/Berlin. `/v1/nearby` answers for the centre of the request's geohash cell (precision 7) with `radius` + the cell's half diagonal (~90 m in Berlin; ADR-0006, task 5.1): `meta.cell` names the cell, `distanceMeters` is from its centre.
+Rules: `radius` 100–1000 (default 500). `layers` comma-separated (`transit`, `toilets`, `fountains`), default `transit`. Unknown layer → 400. All times ISO-8601 with offset, Europe/Berlin. `/v1/nearby` answers for the centre of the request's geohash cell (precision 7) with `radius` + the cell's half diagonal (~90 m in Berlin; ADR-0006, task 5.1): `meta.cell` names the cell, `distanceMeters` is from its centre.
 
 ### 5.2 `/v1/nearby` response
 
@@ -228,6 +228,7 @@ Rules: `radius` 100–1000 (default 500). `layers` comma-separated, default `tra
 }
 ```
 
+- `layers.toilets` / `layers.fountains` (Phase 9, ADR-0010; schemas `Toilet`, `Fountain` in `api/openapi.yaml`): every feature within the search radius, filled up to the nearest 3 within 2 km, nearest first, `distanceMeters` from the cell centre. Toilet: `kind` (`toilet` / `urinal`), `address`, `district`, `operator`, `eventOnly`, `openingHours` (source text), `open24h`, `feeEuro`, `payment`, `accessible`, `mostlyAccessible`, `changingTable` (null = unknown). Fountain: `place`, `district`, `model`, `builtYear`, `season {fromMonth, toMonth}`, `outOfService` (reason text or null); the app decides "in season" from the device date. Both: `meta.layers.<id>.version` = id of the last import that changed the data.
 - `predicted` and `delaySeconds` are null when `source = "scheduled"`.
 - Max 3 departures per direction in `/nearby`; max 10 in `/stations/{id}`. Departures start at the snapshot's time (`GeneratedAt`), not the request time, so a response depends only on the snapshot version; the app drops the ones that left since.
 - Which directions a pole lists: §3.2 "API directions of a pole".

@@ -61,9 +61,10 @@ func firstN(t *testing.T, body []byte, n int) []byte {
 }
 
 type importEnv struct {
-	pool *pgxpool.Pool
-	wfs  *fakeWFS
-	im   *Importer[queries.InsertToiletsParams]
+	pool   *pgxpool.Pool
+	wfs    *fakeWFS
+	wfsURL string
+	im     *Importer[queries.InsertToiletsParams]
 }
 
 func newImportEnv(t *testing.T) *importEnv {
@@ -88,7 +89,7 @@ func newImportEnv(t *testing.T) *importEnv {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &importEnv{pool: pool, wfs: wfs, im: im}
+	return &importEnv{pool: pool, wfs: wfs, wfsURL: srv.URL, im: im}
 }
 
 func (e *importEnv) count(t *testing.T) int32 {

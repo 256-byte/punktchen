@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -18,12 +20,15 @@ import (
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/getkin/kin-openapi/routers"
 	legacyrouter "github.com/getkin/kin-openapi/routers/legacy"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/mmcloughlin/geohash"
 
 	"github.com/256-byte/punktchen/backend/gen/openapi"
+	"github.com/256-byte/punktchen/backend/internal/amenities"
 	"github.com/256-byte/punktchen/backend/internal/geo"
 	"github.com/256-byte/punktchen/backend/internal/layer"
 	"github.com/256-byte/punktchen/backend/internal/platform"
+	"github.com/256-byte/punktchen/backend/internal/platform/importlog"
 	"github.com/256-byte/punktchen/backend/internal/transit"
 	"github.com/256-byte/punktchen/backend/internal/transit/departures"
 	"github.com/256-byte/punktchen/backend/internal/transit/static/statictest"
@@ -113,6 +118,42 @@ func (noSnapshot) Current() *departures.Snapshot { return nil }
 // TestContract runs every endpoint on real data (Wedding subset, Tuesday
 // 2026-11-10 17:00) and on an empty departures state, and validates each
 // response against api/openapi.yaml.
+// loadAmenities imports the recorded toilet and fountain answers into pool
+// through the real importer and returns the refreshed layer providers.
+func loadAmenities(t *testing.T, pool *pgxpool.Pool) (*amenities.ToiletsProvider, *amenities.FountainsProvider) {
+	t.Helper()
+	ctx := context.Background()
+	serveFile := func(name string) string {
+		body, err := os.ReadFile(filepath.Join("..", "..", "testdata", "amenities", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(body) }))
+		t.Cleanup(srv.Close)
+		return srv.URL
+	}
+	cfg := amenities.Config{UserAgent: "punktchen-test", Scope: geo.BBox{MinLon: 13.088, MinLat: 52.338, MaxLon: 13.761, MaxLat: 52.675}}
+	il, log := importlog.New(pool), slog.New(slog.DiscardHandler)
+	ti, err := amenities.NewImporter(pool, amenities.Toilets(serveFile("toiletten-20261118.json")), cfg, il, log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fi, err := amenities.NewImporter(pool, amenities.Fountains(serveFile("trinkwasserbrunnen-20261118.json")), cfg, il, log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, run := range []func(context.Context, bool) (amenities.Result, error){ti.Run, fi.Run} {
+		if _, err := run(ctx, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	toilets, fountains := amenities.NewToiletsProvider(pool), amenities.NewFountainsProvider(pool)
+	if err := errors.Join(toilets.Refresh(ctx), fountains.Refresh(ctx)); err != nil {
+		t.Fatal(err)
+	}
+	return toilets, fountains
+}
+
 func TestContract(t *testing.T) {
 	c := loadContract(t)
 	pool := statictest.NewDB(t)
@@ -125,9 +166,11 @@ func TestContract(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	toilets, fountains := loadAmenities(t, pool)
+
 	serve := func(snaps transit.Snapshots) string {
 		p := transit.NewProvider(pool, snaps)
-		reg, err := layer.NewRegistry(p)
+		reg, err := layer.NewRegistry(p, toilets, fountains)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -149,7 +192,39 @@ func TestContract(t *testing.T) {
 		check            func(t *testing.T, body map[string]any)
 	}{
 		{"health", live, "/v1/health", 200, nil},
-		{"layers", live, "/v1/layers", 200, nil},
+		{"layers", live, "/v1/layers", 200, func(t *testing.T, body map[string]any) {
+			if n := len(body["layers"].([]any)); n != 3 {
+				t.Errorf("%d layers, want transit, toilets, fountains", n)
+			}
+		}},
+		{"nearby all layers", live, "/v1/nearby?lat=52.5427&lng=13.366&layers=transit,toilets,fountains", 200, func(t *testing.T, body map[string]any) {
+			layers := body["layers"].(map[string]any)
+			for id, want := range map[string]int{"transit": 8, "toilets": 3, "fountains": 3} {
+				payload, ok := layers[id].(map[string]any)
+				if !ok {
+					t.Fatalf("no %s payload", id)
+				}
+				if n := len(payload["features"].([]any)); n < want {
+					t.Errorf("%s: %d features, want at least %d", id, n, want)
+				}
+			}
+			meta := body["meta"].(map[string]any)
+			if n := len(meta["layers"].(map[string]any)); n != 3 {
+				t.Errorf("meta.layers has %d entries", n)
+			}
+			if lm := meta["layers"].(map[string]any)["toilets"].(map[string]any); lm["version"] != float64(toilets.Version()) || lm["status"] != "ok" {
+				t.Errorf("toilets meta %v, provider version %d", lm, toilets.Version())
+			}
+			if n := len(meta["attribution"].([]any)); n != 2 {
+				t.Errorf("%d attribution texts, want VBB and Geoportal Berlin", n)
+			}
+		}},
+		{"nearby toilets far out: filled up to 3", live, "/v1/nearby?lat=52.62&lng=13.25&radius=100&layers=toilets", 200, func(t *testing.T, body map[string]any) {
+			features := body["layers"].(map[string]any)["toilets"].(map[string]any)["features"].([]any)
+			if len(features) > 3 {
+				t.Errorf("%d toilets, want at most the 3 nearest", len(features))
+			}
+		}},
 		{"nearby Wedding", live, "/v1/nearby?lat=52.5427&lng=13.366", 200, func(t *testing.T, body map[string]any) {
 			features := body["layers"].(map[string]any)["transit"].(map[string]any)["features"].([]any)
 			// The 6 stations within 500 m of the point (transit golden file)
@@ -172,7 +247,7 @@ func TestContract(t *testing.T) {
 		}},
 		{"unknown station", live, "/v1/stations/de:11000:000000000", 404, nil},
 		{"bad radius", live, "/v1/nearby?lat=52.5&lng=13.4&radius=5000", 400, nil},
-		{"unknown layer", live, "/v1/nearby?lat=52.5&lng=13.4&layers=toilets", 400, nil},
+		{"unknown layer", live, "/v1/nearby?lat=52.5&lng=13.4&layers=elevators", 400, nil},
 		{"missing lat", live, "/v1/nearby?lng=13.4", 400, nil},
 		{"nearby without departures", empty, "/v1/nearby?lat=52.5427&lng=13.366", 200, func(t *testing.T, body map[string]any) {
 			if _, ok := body["layers"].(map[string]any)["transit"]; ok {
@@ -247,7 +322,10 @@ func TestContract(t *testing.T) {
 	// Task 5.3's acceptance on real data: the ETag of a 200 brings a 304
 	// with an empty body (both validated against the contract), for the map
 	// and the station sheet.
-	for _, path := range []string{"/v1/nearby?lat=52.5427&lng=13.366", "/v1/stations/de:11000:900009104"} {
+	for _, path := range []string{
+		"/v1/nearby?lat=52.5427&lng=13.366", "/v1/stations/de:11000:900009104",
+		"/v1/nearby?lat=52.5427&lng=13.366&layers=toilets,fountains",
+	} {
 		t.Run("revalidate "+path, func(t *testing.T) {
 			status, h, _ := c.getWith(t, live, path, nil)
 			etag := h.Get("ETag")
@@ -263,6 +341,30 @@ func TestContract(t *testing.T) {
 			}
 		})
 	}
+
+	// An amenity layer's ETag changes only with a new import (its version),
+	// task 9.4: a new succeeded import of the toilets → old ETag no longer matches.
+	t.Run("toilets ETag follows the import", func(t *testing.T) {
+		const path = "/v1/nearby?lat=52.5215&lng=13.4113&layers=toilets"
+		_, h, _ := c.getWith(t, live, path, nil)
+		old := h.Get("ETag")
+		if status, _, _ := c.getWith(t, live, path, http.Header{"If-None-Match": {old}}); status != http.StatusNotModified {
+			t.Fatalf("same data: status %d, want 304", status)
+		}
+		ctx := context.Background()
+		il := importlog.New(pool)
+		id, err := il.Start(ctx, amenities.SourceToilets, "test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := errors.Join(il.Succeed(ctx, id, map[string]int64{"rows": 525}), toilets.Refresh(ctx)); err != nil {
+			t.Fatal(err)
+		}
+		status, h, _ := c.getWith(t, live, path, http.Header{"If-None-Match": {old}})
+		if status != http.StatusOK || h.Get("ETag") == old {
+			t.Fatalf("after a new import: status %d, ETag %q (old %q)", status, h.Get("ETag"), old)
+		}
+	})
 
 	t.Run("the contract test catches violations", func(t *testing.T) {
 		// A response missing a required field must fail validation.

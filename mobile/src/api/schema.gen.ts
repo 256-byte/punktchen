@@ -178,7 +178,7 @@ export interface components {
          * @description Identifier of a map layer. More values are added with new layers.
          * @enum {string}
          */
-        LayerId: "transit";
+        LayerId: "transit" | "toilets" | "fountains";
         LayerInfo: {
             id: components["schemas"]["LayerId"];
             /**
@@ -249,6 +249,96 @@ export interface components {
          */
         NearbyLayers: {
             transit?: components["schemas"]["TransitLayer"];
+            toilets?: components["schemas"]["ToiletsLayer"];
+            fountains?: components["schemas"]["FountainsLayer"];
+        };
+        ToiletsLayer: {
+            /** @enum {string} */
+            layer: "toilets";
+            features: components["schemas"]["Toilet"][];
+        };
+        /**
+         * @description A public toilet. Texts are German, as the source writes them. Null
+         *     means unknown, not "no".
+         */
+        Toilet: {
+            /** @example toiletten.2 */
+            id: string;
+            /** @enum {string} */
+            kind: "toilet" | "urinal";
+            location: components["schemas"]["LatLng"];
+            /**
+             * Format: int32
+             * @description Distance from the centre of the cache cell (`meta.cell`, ADR-0006).
+             */
+            distanceMeters: number;
+            /** @example WC-Center Alexanderplatz 1 */
+            address: string;
+            /** @example Mitte */
+            district: string | null;
+            /** @example Wall GmbH */
+            operator: string | null;
+            /** @description Open only at events or funerals (e.g. Olympiastadion, cemeteries). */
+            eventOnly: boolean;
+            /**
+             * @description Free text as the source writes it; lines are separated by a newline character.
+             * @example Mo-Sa 07:00-22:00
+             *     So 10:00-22:00
+             */
+            openingHours: string | null;
+            open24h: boolean;
+            /**
+             * Format: double
+             * @description Fee in euro; 0 = free.
+             * @example 0.5
+             */
+            feeEuro: number | null;
+            /** @description How to pay, e.g. "Karte/App" (no cash) or "Bar". */
+            payment: string | null;
+            /** @description Barrier-free (DIN 18040-1). */
+            accessible: boolean | null;
+            /** @description Mostly barrier-free, not every DIN 18040-1 measure in place. */
+            mostlyAccessible: boolean | null;
+            changingTable: boolean | null;
+        };
+        FountainsLayer: {
+            /** @enum {string} */
+            layer: "fountains";
+            features: components["schemas"]["Fountain"][];
+        };
+        /**
+         * @description A drinking fountain of the Berliner Wasserbetriebe. It runs only in
+         *     its season; the app decides "in season" from the device date.
+         */
+        Fountain: {
+            /** @example trinkwasserbrunnen.1 */
+            id: string;
+            location: components["schemas"]["LatLng"];
+            /**
+             * Format: int32
+             * @description Distance from the centre of the cache cell (`meta.cell`, ADR-0006).
+             */
+            distanceMeters: number;
+            /**
+             * @description Where it stands, as the source writes it.
+             * @example Kurfürstendamm/ Fasanenstr.
+             */
+            place: string;
+            district: string | null;
+            /** @example Kaiser */
+            model: string | null;
+            /** Format: int32 */
+            builtYear: number | null;
+            season: components["schemas"]["Season"];
+            /** @description Why it is out of service (e.g. "zur Zeit wegen Reparatur außer Betrieb"); null when in service. */
+            outOfService: string | null;
+        };
+        /** @description Operating months, inclusive (today every fountain runs May–October). */
+        Season: {
+            /** Format: int32 */
+            fromMonth: number;
+            /** Format: int32 */
+            toMonth: number;
         };
         TransitLayer: {
             /** @enum {string} */

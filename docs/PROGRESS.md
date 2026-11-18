@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 9 — Amenities: public toilets and drinking fountains (added 2026-11-18; Phase 8 alerts on hold)
-- **Next task:** 9.4 API + providers
+- **Next task:** 9.5 mobile layers
 - **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
@@ -73,7 +73,7 @@
 | 9 | 9.1 Migration + queries | done | `0002_amenities` (toilets, fountains, generated geom + GiST); sqlc replace (COPY) and nearby with the 3-within-2-km fill; DATA_MODEL §3.7 |
 | 9 | 9.2 WFS import | done | `internal/amenities`: generic `Importer[R]`, SHA-256 skip, parse + mapping, sanity checks, one-transaction replace; `ImportLog` moved to `internal/platform/importlog`; fixtures `backend/testdata/amenities/` |
 | 9 | 9.3 Scheduler | done | `amenities.Scheduler`: startup when empty (forced), daily 04:15, retry 1 h; dev trigger starts GTFS + amenities; metrics; hash of `features` only (WFS `timeStamp`) |
-| 9 | 9.4 API + providers | todo | |
+| 9 | 9.4 API + providers | done | `ToiletsLayer`, `FountainsLayer` in OpenAPI; `ToiletsProvider`, `FountainsProvider` (version + rows in one REPEATABLE READ tx); registered with transit; contract + ETag tests |
 | 9 | 9.5 Mobile layers | todo | |
 | 9 | 9.6 Docs | todo | |
 
@@ -130,6 +130,12 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-18 — task 9.4
+- Done: contract first: `LayerId` + `toilets`, `fountains`; schemas `ToiletsLayer` / `Toilet`, `FountainsLayer` / `Fountain` / `Season` (`feeEuro` as double); Go and TypeScript regenerated. `amenities.ToiletsProvider` / `FountainsProvider`: `Nearby` reads version + rows in one read-only REPEATABLE READ transaction; `Refresh` (startup, and after every scheduler run through the new `SchedulerConfig.AfterRun`) loads version and last confirmation; health down / degraded (72 h) / ok. Registered in `cmd/server` after transit; `/v1/nearby` maps the payloads. ARCHITECTURE §3.5, §3.8; DATA_MODEL §5.1, §5.2.
+- Tests: `provider_test.go` (Docker): down before data, version = import id, unchanged run keeps it, changed run changes it, nearest first (Alexanderplatz: Bahnhof Alexanderplatz 16 m; WC-Center fields), health ok → degraded after 73 h; fountains at Wedding with season. `contract_test.go`: the recorded answers imported through the real importer; `/v1/layers` lists 3; `/v1/nearby?layers=transit,toilets,fountains` valid against the contract, 8 / ≥3 / ≥3 features, 3 meta entries, 2 attribution texts; far out with radius 100 → at most 3; revalidation (304) for amenity layers; a new toilets import → old ETag no longer matches. Manual (Compose): `/v1/layers` lists 3; Alexanderplatz 4 toilets (71–400 m), 3 fountains (555–767 m, two filled in beyond the radius). All backend tests, golangci-lint, mobile typecheck pass.
+- New deps: none.
+- Next: 9.5 mobile layers.
 
 ### 2026-11-18 — task 9.3
 - Done: `amenities.Scheduler` (jobs = the two importers): startup run for datasets without rows (forced), daily at `PUNKTCHEN_AMENITIES_IMPORT_TIME` (04:15), retry after 1 h on failure, manual trigger; metrics `punktchen_amenities_import_runs_total{source,trigger,result}`, `…_last_success_timestamp_seconds{source}`, `punktchen_amenities_rows{source}`. Config `PUNKTCHEN_AMENITIES_IMPORT_TIME`, `PUNKTCHEN_TOILETS_URL`, `PUNKTCHEN_FOUNTAINS_URL` (defaults now live in `internal/config`), `.env.example`. `platform.NextDaily` shared with the GTFS scheduler. `POST /internal/import` starts both imports (OpenAPI description updated, code regenerated).

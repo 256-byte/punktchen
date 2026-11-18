@@ -333,7 +333,7 @@ components:
     LayerId:
       type: string
       description: Identifier of a map layer. More values are added with new layers.
-      enum: [transit]
+      enum: [transit, toilets, fountains]
 
     LayerInfo:
       type: object
@@ -425,6 +425,143 @@ components:
       properties:
         transit:
           $ref: "#/components/schemas/TransitLayer"
+        toilets:
+          $ref: "#/components/schemas/ToiletsLayer"
+        fountains:
+          $ref: "#/components/schemas/FountainsLayer"
+
+    # ------------------------------------------------------------- amenities
+    # Public toilets and drinking fountains from the Geoportal Berlin
+    # (ADR-0010, DATA_MODEL §3.7). Sparse layers: every feature within the
+    # search radius, filled up to the nearest 3 within 2 km; nearest first.
+    ToiletsLayer:
+      type: object
+      required: [layer, features]
+      properties:
+        layer:
+          type: string
+          enum: [toilets]
+        features:
+          type: array
+          items:
+            $ref: "#/components/schemas/Toilet"
+
+    Toilet:
+      type: object
+      description: |
+        A public toilet. Texts are German, as the source writes them. Null
+        means unknown, not "no".
+      required: [id, kind, location, distanceMeters, address, district, operator, eventOnly,
+                 openingHours, open24h, feeEuro, payment, accessible, mostlyAccessible, changingTable]
+      properties:
+        id:
+          type: string
+          examples: ["toiletten.2"]
+        kind:
+          type: string
+          enum: [toilet, urinal]
+        location:
+          $ref: "#/components/schemas/LatLng"
+        distanceMeters:
+          type: integer
+          format: int32
+          description: Distance from the centre of the cache cell (`meta.cell`, ADR-0006).
+        address:
+          type: string
+          examples: ["WC-Center Alexanderplatz 1"]
+        district:
+          type: [string, "null"]
+          examples: ["Mitte"]
+        operator:
+          type: [string, "null"]
+          examples: ["Wall GmbH"]
+        eventOnly:
+          type: boolean
+          description: Open only at events or funerals (e.g. Olympiastadion, cemeteries).
+        openingHours:
+          type: [string, "null"]
+          description: Free text as the source writes it; lines are separated by a newline character.
+          examples: ["Mo-Sa 07:00-22:00\nSo 10:00-22:00"]
+        open24h:
+          type: boolean
+        feeEuro:
+          type: [number, "null"]
+          format: double
+          description: Fee in euro; 0 = free.
+          examples: [0.5]
+        payment:
+          type: [string, "null"]
+          description: How to pay, e.g. "Karte/App" (no cash) or "Bar".
+        accessible:
+          type: [boolean, "null"]
+          description: Barrier-free (DIN 18040-1).
+        mostlyAccessible:
+          type: [boolean, "null"]
+          description: Mostly barrier-free, not every DIN 18040-1 measure in place.
+        changingTable:
+          type: [boolean, "null"]
+
+    FountainsLayer:
+      type: object
+      required: [layer, features]
+      properties:
+        layer:
+          type: string
+          enum: [fountains]
+        features:
+          type: array
+          items:
+            $ref: "#/components/schemas/Fountain"
+
+    Fountain:
+      type: object
+      description: |
+        A drinking fountain of the Berliner Wasserbetriebe. It runs only in
+        its season; the app decides "in season" from the device date.
+      required: [id, location, distanceMeters, place, district, model, builtYear, season, outOfService]
+      properties:
+        id:
+          type: string
+          examples: ["trinkwasserbrunnen.1"]
+        location:
+          $ref: "#/components/schemas/LatLng"
+        distanceMeters:
+          type: integer
+          format: int32
+          description: Distance from the centre of the cache cell (`meta.cell`, ADR-0006).
+        place:
+          type: string
+          description: Where it stands, as the source writes it.
+          examples: ["Kurfürstendamm/ Fasanenstr."]
+        district:
+          type: [string, "null"]
+        model:
+          type: [string, "null"]
+          examples: ["Kaiser"]
+        builtYear:
+          type: [integer, "null"]
+          format: int32
+        season:
+          $ref: "#/components/schemas/Season"
+        outOfService:
+          type: [string, "null"]
+          description: Why it is out of service (e.g. "zur Zeit wegen Reparatur außer Betrieb"); null when in service.
+
+    Season:
+      type: object
+      description: Operating months, inclusive (today every fountain runs May–October).
+      required: [fromMonth, toMonth]
+      properties:
+        fromMonth:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 12
+        toMonth:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 12
 
     # --------------------------------------------------------------- transit
     TransitLayer:

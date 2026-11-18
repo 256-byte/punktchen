@@ -44,6 +44,9 @@ type SchedulerConfig struct {
 	Hour, Minute int
 	Loc          *time.Location
 	RetryAfter   time.Duration // default DefaultRetryAfter
+	// AfterRun is called after every dataset run, whatever the result
+	// (e.g. the layer providers re-read their version). Optional.
+	AfterRun func(ctx context.Context, source string)
 }
 
 // Scheduler imports every dataset at startup when it has no rows, daily at
@@ -145,6 +148,9 @@ func (s *Scheduler) runAll(ctx context.Context, why Trigger, onlyEmpty bool) boo
 			result = resultSucceeded
 		}
 		s.metrics.observe(j.Source(), why, result, res.Rows, s.now())
+		if s.cfg.AfterRun != nil {
+			s.cfg.AfterRun(ctx, j.Source())
+		}
 	}
 	return ok
 }

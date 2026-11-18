@@ -36,6 +36,21 @@ func (e DepartureSource) Valid() bool {
 	}
 }
 
+// Defines values for FountainsLayerLayer.
+const (
+	FountainsLayerLayerFountains FountainsLayerLayer = "fountains"
+)
+
+// Valid indicates whether the value is a known member of the FountainsLayerLayer enum.
+func (e FountainsLayerLayer) Valid() bool {
+	switch e {
+	case FountainsLayerLayerFountains:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ImportStartedStatus.
 const (
 	ImportStartedStatusStarted ImportStartedStatus = "started"
@@ -53,12 +68,18 @@ func (e ImportStartedStatus) Valid() bool {
 
 // Defines values for LayerId.
 const (
-	LayerIdTransit LayerId = "transit"
+	LayerIdFountains LayerId = "fountains"
+	LayerIdToilets   LayerId = "toilets"
+	LayerIdTransit   LayerId = "transit"
 )
 
 // Valid indicates whether the value is a known member of the LayerId enum.
 func (e LayerId) Valid() bool {
 	switch e {
+	case LayerIdFountains:
+		return true
+	case LayerIdToilets:
+		return true
 	case LayerIdTransit:
 		return true
 	default:
@@ -129,6 +150,39 @@ func (e Status) Valid() bool {
 	case StatusDown:
 		return true
 	case StatusOk:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ToiletKind.
+const (
+	ToiletKindToilet ToiletKind = "toilet"
+	ToiletKindUrinal ToiletKind = "urinal"
+)
+
+// Valid indicates whether the value is a known member of the ToiletKind enum.
+func (e ToiletKind) Valid() bool {
+	switch e {
+	case ToiletKindToilet:
+		return true
+	case ToiletKindUrinal:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ToiletsLayerLayer.
+const (
+	ToiletsLayerLayerToilets ToiletsLayerLayer = "toilets"
+)
+
+// Valid indicates whether the value is a known member of the ToiletsLayerLayer enum.
+func (e ToiletsLayerLayer) Valid() bool {
+	switch e {
+	case ToiletsLayerLayerToilets:
 		return true
 	default:
 		return false
@@ -227,6 +281,43 @@ type Error struct {
 	} `json:"error"`
 }
 
+// Fountain A drinking fountain of the Berliner Wasserbetriebe. It runs only in
+// its season; the app decides "in season" from the device date.
+type Fountain struct {
+	BuiltYear *int32 `json:"builtYear"`
+
+	// DistanceMeters Distance from the centre of the cache cell (`meta.cell`, ADR-0006).
+	DistanceMeters int32   `json:"distanceMeters"`
+	District       *string `json:"district"`
+
+	// Id Examples: trinkwasserbrunnen.1
+	Id       string `json:"id"`
+	Location LatLng `json:"location"`
+
+	// Model Examples: Kaiser
+	Model *string `json:"model"`
+
+	// OutOfService Why it is out of service (e.g. "zur Zeit wegen Reparatur außer Betrieb"); null when in service.
+	OutOfService *string `json:"outOfService"`
+
+	// Place Where it stands, as the source writes it.
+	//
+	// Examples: Kurfürstendamm/ Fasanenstr.
+	Place string `json:"place"`
+
+	// Season Operating months, inclusive (today every fountain runs May–October).
+	Season Season `json:"season"`
+}
+
+// FountainsLayer defines model for FountainsLayer.
+type FountainsLayer struct {
+	Features []Fountain          `json:"features"`
+	Layer    FountainsLayerLayer `json:"layer"`
+}
+
+// FountainsLayerLayer defines model for FountainsLayer.Layer.
+type FountainsLayerLayer string
+
 // Health defines model for Health.
 type Health struct {
 	// ScheduleCheckedAt When the schedule was last confirmed current (an import succeeded or
@@ -312,7 +403,9 @@ type Mode string
 // NearbyLayers One typed payload per requested layer (ADR-0008). Each payload carries
 // its id in `layer`. New layers are added as new optional properties.
 type NearbyLayers struct {
-	Transit *TransitLayer `json:"transit,omitempty"`
+	Fountains *FountainsLayer `json:"fountains,omitempty"`
+	Toilets   *ToiletsLayer   `json:"toilets,omitempty"`
+	Transit   *TransitLayer   `json:"transit,omitempty"`
 }
 
 // NearbyResponse defines model for NearbyResponse.
@@ -375,6 +468,12 @@ type ResponseMeta struct {
 	Layers map[string]LayerMeta `json:"layers"`
 }
 
+// Season Operating months, inclusive (today every fountain runs May–October).
+type Season struct {
+	FromMonth int32 `json:"fromMonth"`
+	ToMonth   int32 `json:"toMonth"`
+}
+
 // Station A parent stop with its poles. A pole without parent is its own station.
 type Station struct {
 	// DistanceMeters Distance from the centre of the cache cell the request was snapped to (`meta.cell`, ADR-0006), not from the exact point. Only on /v1/nearby.
@@ -413,6 +512,64 @@ type Status string
 //
 // Examples: 2026-11-05T14:32:00+01:00
 type Timestamp = time.Time
+
+// Toilet A public toilet. Texts are German, as the source writes them. Null
+// means unknown, not "no".
+type Toilet struct {
+	// Accessible Barrier-free (DIN 18040-1).
+	Accessible *bool `json:"accessible"`
+
+	// Address Examples: WC-Center Alexanderplatz 1
+	Address       string `json:"address"`
+	ChangingTable *bool  `json:"changingTable"`
+
+	// DistanceMeters Distance from the centre of the cache cell (`meta.cell`, ADR-0006).
+	DistanceMeters int32 `json:"distanceMeters"`
+
+	// District Examples: Mitte
+	District *string `json:"district"`
+
+	// EventOnly Open only at events or funerals (e.g. Olympiastadion, cemeteries).
+	EventOnly bool `json:"eventOnly"`
+
+	// FeeEuro Fee in euro; 0 = free.
+	//
+	// Examples: 0.5
+	FeeEuro *float64 `json:"feeEuro"`
+
+	// Id Examples: toiletten.2
+	Id       string     `json:"id"`
+	Kind     ToiletKind `json:"kind"`
+	Location LatLng     `json:"location"`
+
+	// MostlyAccessible Mostly barrier-free, not every DIN 18040-1 measure in place.
+	MostlyAccessible *bool `json:"mostlyAccessible"`
+	Open24h          bool  `json:"open24h"`
+
+	// OpeningHours Free text as the source writes it; lines are separated by a newline character.
+	//
+	// Examples: Mo-Sa 07:00-22:00
+	// So 10:00-22:00
+	OpeningHours *string `json:"openingHours"`
+
+	// Operator Examples: Wall GmbH
+	Operator *string `json:"operator"`
+
+	// Payment How to pay, e.g. "Karte/App" (no cash) or "Bar".
+	Payment *string `json:"payment"`
+}
+
+// ToiletKind defines model for Toilet.Kind.
+type ToiletKind string
+
+// ToiletsLayer defines model for ToiletsLayer.
+type ToiletsLayer struct {
+	Features []Toilet          `json:"features"`
+	Layer    ToiletsLayerLayer `json:"layer"`
+}
+
+// ToiletsLayerLayer defines model for ToiletsLayer.Layer.
+type ToiletsLayerLayer string
 
 // TransitLayer defines model for TransitLayer.
 type TransitLayer struct {
