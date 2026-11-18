@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 9 — Amenities: public toilets and drinking fountains (added 2026-11-18; Phase 8 alerts on hold)
-- **Next task:** 9.6 docs (README); 9.5 to check on the iPhone
+- **Next task:** check 9.5 on the iPhone; then Phase 9 is done
 - **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
@@ -75,7 +75,7 @@
 | 9 | 9.3 Scheduler | done | `amenities.Scheduler`: startup when empty (forced), daily 04:15, retry 1 h; dev trigger starts GTFS + amenities; metrics; hash of `features` only (WFS `timeStamp`) |
 | 9 | 9.4 API + providers | done | `ToiletsLayer`, `FountainsLayer` in OpenAPI; `ToiletsProvider`, `FountainsProvider` (version + rows in one REPEATABLE READ tx); registered with transit; contract + ETag tests |
 | 9 | 9.5 Mobile layers | done | `toiletsLayer`, `fountainsLayer`: own icons, greyed when not usable now, below transit; sheets; "WC" / "Water" switches (registry `toggle`); one request for all layers; to check on the iPhone |
-| 9 | 9.6 Docs | todo | |
+| 9 | 9.6 Docs | done | README: status, layers, architecture diagram, ADR table (links fixed, 0009 corrected, 0010 added), data licences |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
 
@@ -131,12 +131,18 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Next:
 -->
 
+### 2026-11-18 — task 9.6
+- Done: README: status and intro mention toilets and drinking fountains, a "generic layers in practice" point, Geoportal Berlin in the architecture diagram (WFS → amenity importer → PostGIS, registry with three layers), ADR table: six broken links fixed (file names had changed), 0001 and 0009 descriptions corrected (0009 is React Native + Expo, not PostGIS), 0010 added; repository layout; data licences (dl-de/zero-2-0).
+- Docs checked for Phase 9: ARCHITECTURE §3.5, §3.7, §3.8, §4.4, §6; DATA_MODEL §3.7, §5, §7 #34; PLAN Phase 9; ADR-0010.
+- Note: ADR-0010 still says "SHA-256 of the body"; since 9.3 the hash covers the `features` array (the WFS adds a `timeStamp` to every answer). Documented in ARCHITECTURE §3.8 and DATA_MODEL §7 #34; the ADR text is unchanged (changing an ADR needs the user).
+- Next: 9.5 on the iPhone.
+
 ### 2026-11-18 — task 9.5
 - Done:
   - `src/core/amenities.ts` (pure TS): `inSeason` (also across the new year), `seasonText`, `fountainStatus` (running / off season / out of service with the reason), `toiletNote` (events / funerals), `openingText`, `feeText`, `paymentText` ("Karte/App" → "Card or app only"), `accessibleText`, `changingTableText`, `distanceText` (rounded: distances are from the cell centre), `toiletLabel`, `fountainLabel`.
   - `src/layers/amenities`: `AmenityIcon` (own drawings: "WC" on teal, drop on blue), `AmenityMarker` (round icon, greyed when not usable now, size report for 7.9, `zIndex` below transit), `ToiletSheet` / `FountainSheet`, `toiletsLayer` / `fountainsLayer` with a registry `toggle`.
   - Registry: optional `toggle` per layer; `mapLayers` = transit, toilets, fountains (transit first: it wins in the overlap layout). `MapScreen`: one `/v1/nearby` request for all layers, a switch per toggled layer (hides without a request), `PoleMarker` gets `TRANSIT_Z_INDEX`.
-- Tests: Vitest `amenities.test.ts` (10; core coverage stays > 99 %); Jest `amenity-layers.test.tsx` (8): request with `layers=transit,toilets,fountains`, one marker each, in season in July, greyed in November and for event-only toilets, screen reader labels, switches hide/show without a request, tap opens the toilet sheet, sheet rows and notes (funeral note, unknown fields left out), fountain off season / out of service / running. All mobile tests (Vitest 290, Jest 132), typecheck, lint pass.
+- Tests: Vitest `amenities.test.ts` (10; core coverage stays > 99 %); Jest `amenity-layers.test.tsx` (8): request with `layers=transit,toilets,fountains`, one marker each, in season in July, greyed in November and for event-only toilets, screen reader labels, switches hide/show without a request, tap opens the toilet sheet, sheet rows and notes (funeral note, unknown fields left out), fountain off season / out of service / running. All mobile tests (Vitest 280, Jest 132), typecheck, lint pass.
 - Found while testing: the app's clock follows `generatedAt` (ADR-0007), so a test on a fake date must build its answer on that date.
 - New deps: none.
 - Not verified yet: on the iPhone (icons, greying, switches, sheets, how icons and bubbles share the map).

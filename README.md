@@ -1,10 +1,8 @@
 # punktchen
 
-> Working name. Repository: `punktchen`.
+A map-first mobile app that shows **live departures** (regional rail, S-Bahn, U-Bahn, tram, bus, ferry) directly on the stops around you in Berlin and Brandenburg. Open the app, see the stops within ~500 m, each with its next departures per direction counting down live on the map, plus the nearest **public toilets** and **drinking fountains**.
 
-A map-first mobile app that shows **live departures** (regional rail, S-Bahn, U-Bahn, tram, bus, ferry) directly on the stops around you in Berlin and Brandenburg. Open the app, see the stops within ~500 m, each with its next departures per direction counting down live on the map.
-
-**Status:** MVP complete (Phases 0–7). The Go backend imports the full VBB static GTFS feed into PostgreSQL/PostGIS, merges live GTFS-RT delays every 15 s into an immutable in-memory snapshot, and serves geohash-cached responses with ETags. The React Native (Expo) app renders zoom-clustered live markers, Ringbahn (`⟳`/`⟲`) and terminal-filtered directions, a 3D building pitch toggle, full light/dark themes, VoiceOver labels, and offline countdown resilience. See [`docs/PROGRESS.md`](docs/PROGRESS.md).
+**Status:** MVP complete (Phases 0–7); Phase 9 adds public toilets and drinking fountains from Berlin open data as two more map layers. The Go backend imports the full VBB static GTFS feed into PostgreSQL/PostGIS, merges live GTFS-RT delays every 15 s into an immutable in-memory snapshot, and serves geohash-cached responses with ETags. The React Native (Expo) app renders zoom-clustered live markers, Ringbahn (`⟳`/`⟲`) and terminal-filtered directions, a 3D building pitch toggle, full light/dark themes, VoiceOver labels, and offline countdown resilience. See [`docs/PROGRESS.md`](docs/PROGRESS.md).
 
 ## Preview
 
@@ -19,11 +17,12 @@ Departure boards are usually one stop at a time, behind a search. punktchen puts
 It is also an engineering portfolio project focused on **backend scalability** and **resilient mobile state**:
 
 - **Constant upstream load:** one shared poller per upstream feed (`≤ 6 req/min` for GTFS-RT, daily SHA-256 check for static GTFS), so upstream traffic never grows with connected users.
-- **Lock-free reads:** an immutable, versioned in-memory snapshot of the 2-hour schedule + realtime window swapped via `atomic.Pointer` ([ADR-0005](docs/adr/0005-in-memory-snapshot.md)).
-- **Zero-downtime daily imports:** streaming CSV import (~18 MB peak Go heap) into a staging schema followed by sanity checks and an atomic schema rename inside one transaction ([ADR-0004](docs/adr/0004-staging-schema-swap.md)).
+- **Lock-free reads:** an immutable, versioned in-memory snapshot of the 2-hour schedule + realtime window swapped via `atomic.Pointer` ([ADR-0005](docs/adr/0005-immutable-snapshot.md)).
+- **Zero-downtime daily imports:** streaming CSV import (~18 MB peak Go heap) into a staging schema followed by sanity checks and an atomic schema rename inside one transaction ([ADR-0004](docs/adr/0004-import-staging-schema-swap.md)).
 - **Spatial coalescing & caching:** requests snap to precision-7 geohash cells (~153 m × 153 m) with singleflight build coalescing, a 1024-entry LRU cache, weak ETags (`304 Not Modified`), and gzip ([ADR-0006](docs/adr/0006-geohash-cell-cache.md)).
-- **Offline-capable countdowns:** the API sends absolute ISO-8601 timestamps (`scheduled`, `predicted`) and `generatedAt`; the device computes countdowns against a server-corrected clock, persists the latest response in `AsyncStorage`, drops departed trips locally, and dims stale live times after 5 minutes ([ADR-0007](docs/adr/0007-countdown-on-device.md)).
-- **Contract-first API & generic layers:** `api/openapi.yaml` drives generated Go server types (`oapi-codegen`), TypeScript client types (`openapi-typescript`), and runtime contract tests (`kin-openapi`) behind a layer-agnostic `Provider` interface ([ADR-0003](docs/adr/0003-openapi-contract-first.md), [ADR-0008](docs/adr/0008-provider-layer-system.md)).
+- **Offline-capable countdowns:** the API sends absolute ISO-8601 timestamps (`scheduled`, `predicted`) and `generatedAt`; the device computes countdowns against a server-corrected clock, persists the latest response in `AsyncStorage`, drops departed trips locally, and dims stale live times after 5 minutes ([ADR-0007](docs/adr/0007-absolute-times-client-countdown.md)).
+- **Generic layers in practice:** toilets and drinking fountains come from the Geoportal Berlin WFS through one generic importer (change detection on the features, sanity checks, one-transaction replace) and plug into the same `Provider` registry, cell cache and ETags as transit; the app asks for all layers in one request and switches them on the map without a new one ([ADR-0010](docs/adr/0010-amenity-layers.md)).
+- **Contract-first API & generic layers:** `api/openapi.yaml` drives generated Go server types (`oapi-codegen`), TypeScript client types (`openapi-typescript`), and runtime contract tests (`kin-openapi`) behind a layer-agnostic `Provider` interface ([ADR-0003](docs/adr/0003-openapi-contract-first.md), [ADR-0008](docs/adr/0008-generic-layers.md)).
 
 ## Architecture
 
@@ -34,12 +33,17 @@ flowchart LR
     RT["GTFS-RT Protobuf<br/>(15 s poller, ETag + gzip)"]
   end
 
+  subgraph Geoportal["Geoportal Berlin (dl-de/zero-2-0)"]
+    WFS["WFS GeoJSON<br/>toilets · drinking fountains"]
+  end
+
   subgraph Backend["Go Modular Monolith (cmd/server)"]
     Importer["Streaming Importer<br/>gtfs_staging → sanity checks → atomic swap"]
     DB[("PostgreSQL 16 + PostGIS<br/>poles, stations, stop_times,<br/>service_dates, trip_info")]
     RTStore["Realtime Store<br/>trip-instance state<br/>(trip_id, start_date)"]
     Builder["Snapshot Builder<br/>2 h schedule window + RT merge<br/>atomic.Pointer&lt;Snapshot&gt;"]
-    Registry["Layer Registry<br/>TransitProvider"]
+    Amenities["Amenity Importer<br/>daily, hash of features<br/>one-transaction replace"]
+    Registry["Layer Registry<br/>transit · toilets · fountains"]
     Cache["Geohash-7 Cell Cache<br/>singleflight + 1024 LRU<br/>Weak ETag + gzip"]
     API["HTTP API (:8080)<br/>/v1/nearby · /v1/stations/{id}<br/>/v1/layers · /v1/health"]
   end
@@ -49,10 +53,11 @@ flowchart LR
     Storage[("AsyncStorage<br/>persisted cache")]
     Clock["1 Hz Clock Store<br/>server offset correction"]
     Core["Pure TS Core (≥ 90% cov)<br/>clustering · directions (⟳/⟲)<br/>realtime · staleness · sheet"]
-    UI["MapView (2D/3D, Light/Dark)<br/>PoleMarker + StationSheet"]
+    UI["MapView (2D/3D, Light/Dark)<br/>PoleMarker + StationSheet<br/>toilet / fountain icons + sheets"]
   end
 
   GTFS --> Importer --> DB
+  WFS --> Amenities --> DB
   DB --> Builder
   RT --> RTStore --> Builder
   Builder --> Registry
@@ -74,15 +79,16 @@ VBB GTFS-RT (15 s) ──► trip-instance store ──────────�
 
 | ADR | Decision | Summary |
 |---|---|---|
-| [0001](docs/adr/0001-tech-stack-and-monorepo.md) | Tech stack & monorepo | Go 1.24, PostgreSQL 16 + PostGIS, React Native + Expo (TypeScript) in one repository |
+| [0001](docs/adr/0001-monorepo-and-stack.md) | Monorepo & core stack | Go backend, PostgreSQL + PostGIS, React Native + Expo app and the OpenAPI contract in one repository; server side in Docker Compose |
 | [0002](docs/adr/0002-modular-monolith.md) | Modular monolith | One Go binary (`cmd/server`) runs the importer, GTFS-RT poller, snapshot builder, and HTTP server |
 | [0003](docs/adr/0003-openapi-contract-first.md) | Contract-first OpenAPI | `api/openapi.yaml` is the single source of truth; Go and TS types are generated and checked in CI |
-| [0004](docs/adr/0004-staging-schema-swap.md) | Staging schema swap | Static GTFS imports into `gtfs_staging`, validates row counts, and swaps schemas atomically |
-| [0005](docs/adr/0005-in-memory-snapshot.md) | Immutable snapshot | Readers load `atomic.Pointer[Snapshot]` with zero locks; builders publish a fresh copy per tick/feed |
+| [0004](docs/adr/0004-import-staging-schema-swap.md) | Staging schema swap | Static GTFS imports into `gtfs_staging`, validates row counts, and swaps schemas atomically |
+| [0005](docs/adr/0005-immutable-snapshot.md) | Immutable snapshot | Readers load `atomic.Pointer[Snapshot]` with zero locks; builders publish a fresh copy per tick/feed |
 | [0006](docs/adr/0006-geohash-cell-cache.md) | Geohash cell cache | Coordinates snap to precision-7 geohash cells expanded by ~90 m; `If-None-Match` returns `304` |
-| [0007](docs/adr/0007-countdown-on-device.md) | Countdowns on device | Server sends absolute timestamps; device ticks at 1 Hz and re-renders markers only when a label changes |
-| [0008](docs/adr/0008-provider-layer-system.md) | Generic layer system | Backend `Provider` and mobile `MapLayer<T>` registries decouple the map from transit-specific logic |
-| [0009](docs/adr/0009-postgis-for-spatial.md) | PostGIS spatial queries | `ST_DWithin` on `GEOGRAPHY(Point, 4326)` with a GIST index (~2.8 ms median for 500 m at Wedding) |
+| [0007](docs/adr/0007-absolute-times-client-countdown.md) | Countdowns on device | Server sends absolute timestamps; device ticks at 1 Hz and re-renders markers only when a label changes |
+| [0008](docs/adr/0008-generic-layers.md) | Generic layer system | Backend `Provider` and mobile `MapLayer<T>` registries decouple the map from transit-specific logic |
+| [0009](docs/adr/0009-react-native-expo.md) | React Native + Expo | TypeScript strict, Expo Router, `react-native-maps` (Apple Maps / Google Maps); daily development in Expo Go |
+| [0010](docs/adr/0010-amenity-layers.md) | Toilet and fountain layers | Geoportal Berlin WFS imported daily into PostGIS; every feature within the radius, filled up to the nearest 3 within 2 km |
 
 Full specifications: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md), [`docs/PLAN.md`](docs/PLAN.md), [`docs/PROGRESS.md`](docs/PROGRESS.md).
 
@@ -133,7 +139,7 @@ go -C backend run ./internal/tools/nearbyload -users 1000 -spread 3000
 | Path | Content |
 |---|---|
 | `api/` | `openapi.yaml` — the OpenAPI 3.0 contract |
-| `backend/` | Go server (`cmd/server`, `internal/{api,cache,layer,platform,transit}`, `db/{migrations,queries}`, `gen/`) |
+| `backend/` | Go server (`cmd/server`, `internal/{amenities,api,config,geo,layer,platform,transit}`, `db/{migrations,queries}`, `gen/`) |
 | `mobile/` | Expo app (`app/` routes, `src/core/` pure TS domain logic, `src/layers/` map layers, `src/ui/` screens & tokens) |
 | `docs/` | `PLAN.md`, `ARCHITECTURE.md`, `DATA_MODEL.md`, `PROGRESS.md`, `adr/`, `assets/` |
 
@@ -201,4 +207,5 @@ What the app does without a connection ([ARCHITECTURE §4.3](docs/ARCHITECTURE.m
 ## Data & licence
 
 - Transit data: [VBB](https://www.vbb.de/) GTFS and GTFS-RT, licensed **CC BY 4.0**. Data: VBB (CC BY 4.0).
+- Public toilets and drinking fountains: [Geoportal Berlin](https://gdi.berlin.de/) WFS, licensed **Datenlizenz Deutschland – Zero – Version 2.0** (no attribution required; the app names the source anyway).
 - Code: [MIT](LICENSE).
