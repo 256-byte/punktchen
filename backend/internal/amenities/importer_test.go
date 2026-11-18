@@ -139,6 +139,16 @@ func TestImporter(t *testing.T) {
 		t.Fatalf("same body status %s", st)
 	}
 
+	// Same features, new "timeStamp" (every real answer has its own): skipped.
+	restamped := strings.Replace(string(recorded), "\"timeStamp\":\"", "\"timeStamp\":\"1", 1)
+	if restamped == string(recorded) {
+		t.Fatal("fixture has no timeStamp")
+	}
+	e.wfs.set(http.StatusOK, []byte(restamped))
+	if res, err = e.im.Run(ctx, false); err != nil || res.Changed {
+		t.Fatalf("new timeStamp only: %+v, %v (want skipped)", res, err)
+	}
+
 	// Forced: replaced although the hash is the same.
 	if res, err = e.im.Run(ctx, true); err != nil || !res.Changed || e.count(t) != 525 {
 		t.Fatalf("forced: %+v, %v", res, err)

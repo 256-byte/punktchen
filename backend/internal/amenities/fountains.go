@@ -13,11 +13,6 @@ import (
 // SourceFountains is the meta.feed_imports source of the fountain dataset.
 const SourceFountains = "berlin-fountains"
 
-// DefaultFountainsURL is the Geoportal Berlin WFS for drinking fountains as
-// GeoJSON in WGS84 (DATA_MODEL §7 #34).
-const DefaultFountainsURL = "https://gdi.berlin.de/services/wfs/trinkwasserbrunnen?service=WFS&version=2.0.0&request=GetFeature" +
-	"&typeNames=trinkwasserbrunnen:trinkwasserbrunnen&outputFormat=application/json&srsName=EPSG:4326"
-
 // seasonPattern finds "Betriebszeit: Mai bis Oktober" in "informationen".
 var seasonPattern = regexp.MustCompile(`(?i)Betriebszeit:\s*(\p{L}+)\s+bis\s+(\p{L}+)`)
 

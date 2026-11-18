@@ -99,11 +99,14 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Start a GTFS import now (development only)
+         * Start the GTFS and amenity imports now (development only)
          * @description Only enabled when the server runs with `PUNKTCHEN_DEV=true`; otherwise
-         *     it answers 404. Starts the import in the background and returns at
-         *     once: a full import takes minutes. The outcome is in the logs, in the
-         *     `punktchen_import_*` metrics and in `meta.feed_imports`. Not for apps.
+         *     it answers 404. Starts the imports in the background and returns at
+         *     once: a full GTFS import takes minutes, the amenity datasets (toilets,
+         *     drinking fountains) about a second. The outcome is in the logs, in the
+         *     `punktchen_import_*` and `punktchen_amenities_import_*` metrics and in
+         *     `meta.feed_imports`. 409 while a GTFS import runs (the amenity
+         *     imports are queued anyway). Not for apps.
          */
         post: operations["triggerImport"];
         delete?: never;
@@ -541,7 +544,7 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
-            /** @description An import is already running. */
+            /** @description A GTFS import is already running. */
             409: {
                 headers: {
                     [name: string]: unknown;

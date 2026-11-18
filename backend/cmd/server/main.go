@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/256-byte/punktchen/backend/db"
+	"github.com/256-byte/punktchen/backend/internal/amenities"
 	"github.com/256-byte/punktchen/backend/internal/api"
 	"github.com/256-byte/punktchen/backend/internal/config"
 	"github.com/256-byte/punktchen/backend/internal/layer"
@@ -139,9 +140,25 @@ func serve(ctx context.Context, log *slog.Logger, cfg config.Config) error {
 		Hour: cfg.GTFSImportTime.Hour, Minute: cfg.GTFSImportTime.Minute, Loc: platform.Berlin,
 	}, runImport, status.Current, static.NewMetrics(metrics), importLog)
 
+	// Amenity layers (ADR-0010): toilets and drinking fountains from the
+	// Geoportal Berlin WFS, imported at startup when empty and daily.
+	amenityLog := log.With("component", "amenities")
+	amenityCfg := amenities.Config{UserAgent: userAgent(), Scope: cfg.ScopeBBox}
+	toilets, err := amenities.NewImporter(pool, amenities.Toilets(cfg.ToiletsURL), amenityCfg, il, amenityLog)
+	if err != nil {
+		return err
+	}
+	fountains, err := amenities.NewImporter(pool, amenities.Fountains(cfg.FountainsURL), amenityCfg, il, amenityLog)
+	if err != nil {
+		return err
+	}
+	amenityScheduler := amenities.NewScheduler(amenities.SchedulerConfig{
+		Hour: cfg.AmenitiesImportTime.Hour, Minute: cfg.AmenitiesImportTime.Minute, Loc: platform.Berlin,
+	}, []amenities.Job{toilets, fountains}, amenities.NewMetrics(metrics), amenityLog)
+
 	apiHandler := api.NewHandler(api.NewServer(api.Config{
 		Version: version, DB: pool, Schedule: status, Layers: layers, Transit: transitLayer,
-		Imports: scheduler, Dev: cfg.Dev, Metrics: metrics,
+		Imports: devImports{gtfs: scheduler, amenities: amenityScheduler}, Dev: cfg.Dev, Metrics: metrics,
 		Log: log.With("component", "api"),
 	}))
 	apiSrv, err := platform.Listen("api", cfg.HTTPAddr, apiHandler)
@@ -156,10 +173,24 @@ func serve(ctx context.Context, log *slog.Logger, cfg config.Config) error {
 	// Background loops stop with ctx; wait for them before the pool closes,
 	// so a running import can record its outcome.
 	defer runBackground(ctx, scheduler.Run)()
+	defer runBackground(ctx, amenityScheduler.Run)()
 	defer runBackground(ctx, builder.Run)()
 	defer runBackground(ctx, func(ctx context.Context) { _ = poller.Run(ctx) })()
 
 	return platform.Serve(ctx, log, shutdownTimeout, apiSrv, metricsSrv)
+}
+
+// devImports is what POST /internal/import starts (dev only): the GTFS
+// import and the amenity imports. A running GTFS import answers 409; the
+// amenity run is queued either way (it takes about a second).
+type devImports struct {
+	gtfs      *static.Scheduler
+	amenities *amenities.Scheduler
+}
+
+func (d devImports) Trigger() error {
+	d.amenities.Trigger()
+	return d.gtfs.Trigger()
 }
 
 // runBackground runs fn in a goroutine. The returned stop cancels fn's

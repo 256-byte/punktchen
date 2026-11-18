@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 9 — Amenities: public toilets and drinking fountains (added 2026-11-18; Phase 8 alerts on hold)
-- **Next task:** 9.3 scheduler
+- **Next task:** 9.4 API + providers
 - **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
@@ -72,7 +72,7 @@
 | 9 | 9.0 Data exploration | done | Facts in DATA_MODEL §7 #34; ADR-0010 accepted (user, 2026-11-18) |
 | 9 | 9.1 Migration + queries | done | `0002_amenities` (toilets, fountains, generated geom + GiST); sqlc replace (COPY) and nearby with the 3-within-2-km fill; DATA_MODEL §3.7 |
 | 9 | 9.2 WFS import | done | `internal/amenities`: generic `Importer[R]`, SHA-256 skip, parse + mapping, sanity checks, one-transaction replace; `ImportLog` moved to `internal/platform/importlog`; fixtures `backend/testdata/amenities/` |
-| 9 | 9.3 Scheduler | todo | |
+| 9 | 9.3 Scheduler | done | `amenities.Scheduler`: startup when empty (forced), daily 04:15, retry 1 h; dev trigger starts GTFS + amenities; metrics; hash of `features` only (WFS `timeStamp`) |
 | 9 | 9.4 API + providers | todo | |
 | 9 | 9.5 Mobile layers | todo | |
 | 9 | 9.6 Docs | todo | |
@@ -130,6 +130,13 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-18 — task 9.3
+- Done: `amenities.Scheduler` (jobs = the two importers): startup run for datasets without rows (forced), daily at `PUNKTCHEN_AMENITIES_IMPORT_TIME` (04:15), retry after 1 h on failure, manual trigger; metrics `punktchen_amenities_import_runs_total{source,trigger,result}`, `…_last_success_timestamp_seconds{source}`, `punktchen_amenities_rows{source}`. Config `PUNKTCHEN_AMENITIES_IMPORT_TIME`, `PUNKTCHEN_TOILETS_URL`, `PUNKTCHEN_FOUNTAINS_URL` (defaults now live in `internal/config`), `.env.example`. `platform.NextDaily` shared with the GTFS scheduler. `POST /internal/import` starts both imports (OpenAPI description updated, code regenerated).
+- Found on the live stack: every WFS answer carries its own top-level `timeStamp`, so the SHA-256 of the body never repeated and every run "succeeded". Now the hash covers the `features` array only (DATA_MODEL §7 #34). Checked again: first run after the change succeeded, the next one `skipped`.
+- Tests: `scheduler_test.go` (fake clock and jobs): startup imports only the empty dataset (forced), daily runs both unforced, a failed dataset does not stop the other and schedules a retry in 1 h (still forced while empty), manual trigger, stop on cancel, metrics; `importer_test.go` (+ answer with a new `timeStamp` only → skipped); config defaults / all set / invalid. Manual (Compose): startup import 525 + 242 rows in 0.2 s, metrics present, `/internal/import` → manual runs (succeeded, then skipped). All backend tests and golangci-lint pass.
+- New deps: none.
+- Next: 9.4 API + providers.
 
 ### 2026-11-18 — task 9.2
 - Done:

@@ -5,8 +5,8 @@ Data: Geoportal Berlin, Datenlizenz Deutschland – Zero – Version 2.0 (`https
 
 | File | Content |
 |---|---|
-| `toiletten-20261118.json` | Public toilets, 525 features, 290 KB: `DefaultToiletsURL` in `internal/amenities/toilets.go` |
-| `trinkwasserbrunnen-20261118.json` | Drinking fountains, 242 features, 116 KB: `DefaultFountainsURL` in `internal/amenities/fountains.go` |
+| `toiletten-20261118.json` | Public toilets, 525 features, 290 KB: `DefaultToiletsURL` in `internal/config/config.go` |
+| `trinkwasserbrunnen-20261118.json` | Drinking fountains, 242 features, 116 KB: `DefaultFountainsURL` in `internal/config/config.go` |
 
 Recorded unchanged (one line each) with:
 

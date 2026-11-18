@@ -30,6 +30,9 @@ const (
 	EnvScopeBBox          = "PUNKTCHEN_SCOPE_BBOX"
 	EnvGTFSRTURL          = "PUNKTCHEN_GTFSRT_URL"
 	EnvGTFSRTPollInterval = "PUNKTCHEN_GTFSRT_POLL_INTERVAL"
+	EnvToiletsURL         = "PUNKTCHEN_TOILETS_URL"
+	EnvFountainsURL       = "PUNKTCHEN_FOUNTAINS_URL"
+	EnvAmenitiesImport    = "PUNKTCHEN_AMENITIES_IMPORT_TIME"
 )
 
 // Defaults. They match .env.example.
@@ -41,6 +44,13 @@ const (
 	DefaultScopeBBox          = "13.088,52.338,13.761,52.675"
 	DefaultGTFSRTURL          = "https://production.gtfsrt.vbb.de/data"
 	DefaultGTFSRTPollInterval = 15 * time.Second
+
+	// Geoportal Berlin WFS as GeoJSON in WGS84 (ADR-0010, DATA_MODEL §7 #34).
+	DefaultToiletsURL = "https://gdi.berlin.de/services/wfs/toiletten?service=WFS&version=2.0.0&request=GetFeature" +
+		"&typeNames=toiletten:toiletten&outputFormat=application/json&srsName=EPSG:4326"
+	DefaultFountainsURL = "https://gdi.berlin.de/services/wfs/trinkwasserbrunnen?service=WFS&version=2.0.0&request=GetFeature" +
+		"&typeNames=trinkwasserbrunnen:trinkwasserbrunnen&outputFormat=application/json&srsName=EPSG:4326"
+	DefaultAmenitiesImportTime = "04:15" // after the GTFS import
 )
 
 // MinGTFSRTPollInterval is the lowest accepted poll interval.
@@ -62,6 +72,10 @@ type Config struct {
 
 	GTFSRTURL          string
 	GTFSRTPollInterval time.Duration
+
+	ToiletsURL          string
+	FountainsURL        string
+	AmenitiesImportTime ClockTime // daily, Europe/Berlin
 }
 
 // LookupFunc returns the value of an environment variable. os.LookupEnv fits.
@@ -84,6 +98,10 @@ func Load(lookup LookupFunc) (Config, error) {
 
 		GTFSRTURL:          p.httpURL(EnvGTFSRTURL, DefaultGTFSRTURL),
 		GTFSRTPollInterval: p.duration(EnvGTFSRTPollInterval, DefaultGTFSRTPollInterval, MinGTFSRTPollInterval),
+
+		ToiletsURL:          p.httpURL(EnvToiletsURL, DefaultToiletsURL),
+		FountainsURL:        p.httpURL(EnvFountainsURL, DefaultFountainsURL),
+		AmenitiesImportTime: p.clockTime(EnvAmenitiesImport, DefaultAmenitiesImportTime),
 	}
 	if cfg.HTTPAddr != "" && cfg.HTTPAddr == cfg.MetricsAddr {
 		p.fail(EnvMetricsAddr, "must differ from %s", EnvHTTPAddr)
@@ -107,6 +125,9 @@ func (c Config) LogValue() slog.Value {
 		slog.String("scope_bbox", c.ScopeBBox.String()),
 		slog.String("gtfsrt_url", c.GTFSRTURL),
 		slog.String("gtfsrt_poll_interval", c.GTFSRTPollInterval.String()),
+		slog.String("toilets_url", c.ToiletsURL),
+		slog.String("fountains_url", c.FountainsURL),
+		slog.String("amenities_import_time", c.AmenitiesImportTime.String()),
 	)
 }
 

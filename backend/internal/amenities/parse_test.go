@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/256-byte/punktchen/backend/gen/queries"
+	"github.com/256-byte/punktchen/backend/internal/config"
 	"github.com/256-byte/punktchen/backend/internal/geo"
 )
 
@@ -223,11 +224,11 @@ func TestLiveWFS(t *testing.T) {
 		}
 		return body
 	}
-	toilets, err := ParseToilets(get(DefaultToiletsURL), berlin)
+	toilets, err := ParseToilets(get(config.DefaultToiletsURL), berlin)
 	if err != nil || len(toilets) < Toilets("").Limits.MinRows {
 		t.Fatalf("toilets: %d rows, %v", len(toilets), err)
 	}
-	fountains, err := ParseFountains(get(DefaultFountainsURL), berlin)
+	fountains, err := ParseFountains(get(config.DefaultFountainsURL), berlin)
 	if err != nil || len(fountains) < Fountains("").Limits.MinRows {
 		t.Fatalf("fountains: %d rows, %v", len(fountains), err)
 	}

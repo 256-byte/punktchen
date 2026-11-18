@@ -43,6 +43,7 @@ type Dataset[R any] struct {
 	Limits  SanityLimits
 	Parse   func(body []byte, scope geo.BBox) ([]R, error)
 	Replace func(ctx context.Context, q *queries.Queries, rows []R) error
+	Count   func(q *queries.Queries, ctx context.Context) (int32, error) // e.g. (*queries.Queries).CountToilets
 }
 
 // Toilets is the public toilet dataset (525 rows on 2026-11-18).
@@ -50,6 +51,7 @@ func Toilets(url string) Dataset[queries.InsertToiletsParams] {
 	return Dataset[queries.InsertToiletsParams]{
 		Source: SourceToilets, URL: url, Parse: ParseToilets,
 		Limits: SanityLimits{MinRows: 200, MaxDrop: 0.3},
+		Count:  (*queries.Queries).CountToilets,
 		Replace: func(ctx context.Context, q *queries.Queries, rows []queries.InsertToiletsParams) error {
 			if err := q.DeleteToilets(ctx); err != nil {
 				return err
@@ -65,6 +67,7 @@ func Fountains(url string) Dataset[queries.InsertFountainsParams] {
 	return Dataset[queries.InsertFountainsParams]{
 		Source: SourceFountains, URL: url, Parse: ParseFountains,
 		Limits: SanityLimits{MinRows: 100, MaxDrop: 0.3},
+		Count:  (*queries.Queries).CountFountains,
 		Replace: func(ctx context.Context, q *queries.Queries, rows []queries.InsertFountainsParams) error {
 			if err := q.DeleteFountains(ctx); err != nil {
 				return err
@@ -95,8 +98,8 @@ type Importer[R any] struct {
 // NewImporter returns an Importer for ds that logs attempts in il.
 func NewImporter[R any](pool *pgxpool.Pool, ds Dataset[R], cfg Config, il *importlog.Log, log *slog.Logger) (*Importer[R], error) {
 	switch {
-	case ds.Source == "" || ds.URL == "" || ds.Parse == nil || ds.Replace == nil:
-		return nil, errors.New("amenities: dataset needs source, URL, Parse and Replace")
+	case ds.Source == "" || ds.URL == "" || ds.Parse == nil || ds.Replace == nil || ds.Count == nil:
+		return nil, errors.New("amenities: dataset needs source, URL, Parse, Replace and Count")
 	case cfg.UserAgent == "":
 		return nil, errors.New("amenities: UserAgent is required")
 	}
@@ -115,6 +118,13 @@ func NewImporter[R any](pool *pgxpool.Pool, ds Dataset[R], cfg Config, il *impor
 // Source is the dataset's meta.feed_imports source.
 func (im *Importer[R]) Source() string { return im.ds.Source }
 
+// Empty reports whether the dataset has no stored rows (then the scheduler
+// imports at startup with force).
+func (im *Importer[R]) Empty(ctx context.Context) (bool, error) {
+	n, err := im.ds.Count(queries.New(im.pool), ctx)
+	return n == 0, err
+}
+
 // Result of one Run.
 type Result struct {
 	ImportID int64
@@ -124,7 +134,7 @@ type Result struct {
 
 // Run downloads the dataset and replaces the rows if the answer changed.
 // Upstream sends no ETag or Last-Modified (DATA_MODEL §7 #34), so the
-// SHA-256 of the body is compared with the last successful import. With
+// SHA-256 of the features (contentHash) is compared with the last successful import. With
 // force the rows are replaced even if the hash is the same (e.g. the table
 // is empty). Parse errors and failed sanity checks keep the old rows; the
 // attempt is then "failed" in meta.feed_imports.
@@ -150,8 +160,7 @@ func (im *Importer[R]) run(ctx context.Context, id int64, last *queries.MetaFeed
 	if err != nil {
 		return Result{}, err
 	}
-	sum := sha256.Sum256(body)
-	hash := hex.EncodeToString(sum[:])
+	hash := contentHash(body)
 	if err := im.il.RecordDownload(ctx, id, etag, lastModified, hash); err != nil {
 		return Result{}, err
 	}
@@ -184,6 +193,23 @@ func (im *Importer[R]) run(ctx context.Context, id int64, last *queries.MetaFeed
 	im.log.Info("amenities imported", "import_id", id, "rows", len(rows), "bytes", len(body),
 		"sha256", hash, "duration", time.Since(start).Round(time.Millisecond))
 	return Result{ImportID: id, Changed: true, Rows: len(rows)}, nil
+}
+
+// contentHash is the SHA-256 of the answer's "features" array. The WFS adds
+// a "timeStamp" of the request to every answer (DATA_MODEL §7 #34), so the
+// whole body never repeats; the features do while the data is unchanged.
+// A body without a readable "features" member is hashed whole (Parse rejects
+// it anyway).
+func contentHash(body []byte) string {
+	var fc struct {
+		Features json.RawMessage `json:"features"`
+	}
+	content := body
+	if json.Unmarshal(body, &fc) == nil && len(fc.Features) > 0 {
+		content = fc.Features
+	}
+	sum := sha256.Sum256(content)
+	return hex.EncodeToString(sum[:])
 }
 
 // rowsKey is the row_counts key of an amenity import.

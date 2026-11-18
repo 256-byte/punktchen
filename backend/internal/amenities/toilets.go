@@ -11,11 +11,6 @@ import (
 // SourceToilets is the meta.feed_imports source of the toilet dataset.
 const SourceToilets = "berlin-toilets"
 
-// DefaultToiletsURL is the Geoportal Berlin WFS for public toilets as GeoJSON
-// in WGS84 (DATA_MODEL §7 #34).
-const DefaultToiletsURL = "https://gdi.berlin.de/services/wfs/toiletten?service=WFS&version=2.0.0&request=GetFeature" +
-	"&typeNames=toiletten:toiletten&outputFormat=application/json&srsName=EPSG:4326"
-
 // ParseToilets maps the WFS answer to table rows (DATA_MODEL §3.7):
 //   - kind: "Pissoir" → urinal, every other symbol → toilet;
 //   - eventOnly: the symbol or the opening hours say "bei Veranstaltungen",

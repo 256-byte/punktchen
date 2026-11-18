@@ -455,7 +455,7 @@ type GetStationParams struct {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// TriggerImport Start a GTFS import now (development only)
+	// TriggerImport Start the GTFS and amenity imports now (development only)
 	// (POST /internal/import)
 	TriggerImport(w http.ResponseWriter, r *http.Request)
 	// GetHealth Service status and freshness
@@ -1107,7 +1107,7 @@ func (response GetStationdefaultJSONResponse) VisitGetStationResponse(w http.Res
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
-	// TriggerImport Start a GTFS import now (development only)
+	// TriggerImport Start the GTFS and amenity imports now (development only)
 	// (POST /internal/import)
 	TriggerImport(ctx context.Context, request TriggerImportRequestObject) (TriggerImportResponseObject, error)
 	// GetHealth Service status and freshness

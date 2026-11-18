@@ -136,7 +136,7 @@ npm --prefix mobile start -- --clear         # after npm install or a mobile/.en
 cd mobile; npx expo install <package>; cd .. # add an Expo/RN dependency with the SDK-matched version
 
 # --- dev-only (needs PUNKTCHEN_DEV=true in .env) ---
-curl.exe -X POST http://localhost:8080/internal/import   # start a GTFS import now (202); follow it with: docker compose logs -f backend
+curl.exe -X POST http://localhost:8080/internal/import   # start the GTFS + amenity imports now (202); follow them with: docker compose logs -f backend
 ```
 
 Notes:
