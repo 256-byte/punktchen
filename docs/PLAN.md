@@ -107,11 +107,24 @@ Goal: see live-counting pins around you on the iPhone.
 | 7.9 | Markers never overlap: pushed aside when zoomed out, back in place when zoomed in (added 2026-11-10) | No overlapping bubbles at Alexanderplatz density at any zoom; each displaced bubble still points to its stop |
 | 7.10 | Mode icons (S, U, tram, bus) next to the stop name in every marker, own drawings (added 2026-11-10) | Correct icons at every zoom level, cluster headers list all modes of the merged stops |
 
+## Phase 9 — Amenities: public toilets and drinking fountains (added 2026-11-18, ADR-0010)
+
+Goal: toilets and drinking fountains near the user on the map, from Berlin open data. Runs before Phase 8 (alerts wait for VBB's API switch on 2026-11-30 and an API key; user decision 2026-11-18).
+
+| ID | Task | Acceptance criteria |
+|---|---|---|
+| 9.0 | **Data exploration.** Both WFS datasets: field values, counts, coordinates, density vs. the nearby radius, opening-hours formats, season text | Findings in DATA_MODEL §7 #34; ADR-0010 accepted by the user |
+| 9.1 | Migration: schema `amenities` (`toilets`, `fountains`: typed columns + `geography(Point)` + GiST); sqlc queries (replace a dataset in one transaction, nearby with the min-results rule) | Migrations idempotent; query test: within radius, filled up to 3 within 2 km, nearest first |
+| 9.2 | `internal/amenities`: WFS download (User-Agent, gzip, SHA-256 skip, `meta.feed_imports`), parse GeoJSON → rows (mapping incl. `eventOnly`, `open24h`, `kind`, season, `outOfService`), sanity checks, atomic replace; recorded fixtures in `backend/testdata/amenities/` | Tests with a fake server: changed → replaced, same SHA-256 → skipped, failed check / bad JSON → old rows kept; mapping tests on the real fixtures |
+| 9.3 | Scheduler: import at startup when empty + daily (config `PUNKTCHEN_AMENITIES_IMPORT_TIME`, default 04:15); dev endpoint triggers it too; metrics | Manual trigger works; logs + metrics |
+| 9.4 | Contract-first: `ToiletsLayer`, `FountainsLayer` in `api/openapi.yaml`; two providers registered; `/v1/layers` lists them; attribution | Contract tests validate `/v1/nearby?layers=transit,toilets,fountains`; version changes only on a new import; cache/ETag tests per layer |
+| 9.5 | Mobile: layer switches (toilets, fountains), icon markers in the overlap layout, detail sheet (hours, fee, payment, accessible, changing table; event-only note; fountain season / out-of-service greyed with the reason), light/dark | Jest tests for markers and sheets; checked on the iPhone |
+| 9.6 | Docs: README, ARCHITECTURE (§3.5, §4.4), DATA_MODEL §5 | Present |
+
 ## Later (not scheduled — needs user approval + ADR before starting)
 
 - **Phase 8 — Alerts layer:** research VBB Verkehrsmeldungen open data (format/terms) → first adapter → normalized `Alert` → de-dup across sources (HAFAS remarks, DB RIS) → ⚠︎ in UI.
 - Elevator status layer (BVG, DB FaSta).
-- Public toilets layer (Berlin open data).
 - SSE `/v1/stream` for pushing only changes.
 - Widgets & Live Activities (`expo-widgets`, needs development build).
 - Server deployment (same compose file), TLS.
