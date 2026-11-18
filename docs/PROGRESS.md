@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 9 — Amenities: public toilets and drinking fountains (added 2026-11-18; Phase 8 alerts on hold)
-- **Next task:** 9.5 mobile layers
+- **Next task:** 9.6 docs (README); 9.5 to check on the iPhone
 - **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
@@ -74,7 +74,7 @@
 | 9 | 9.2 WFS import | done | `internal/amenities`: generic `Importer[R]`, SHA-256 skip, parse + mapping, sanity checks, one-transaction replace; `ImportLog` moved to `internal/platform/importlog`; fixtures `backend/testdata/amenities/` |
 | 9 | 9.3 Scheduler | done | `amenities.Scheduler`: startup when empty (forced), daily 04:15, retry 1 h; dev trigger starts GTFS + amenities; metrics; hash of `features` only (WFS `timeStamp`) |
 | 9 | 9.4 API + providers | done | `ToiletsLayer`, `FountainsLayer` in OpenAPI; `ToiletsProvider`, `FountainsProvider` (version + rows in one REPEATABLE READ tx); registered with transit; contract + ETag tests |
-| 9 | 9.5 Mobile layers | todo | |
+| 9 | 9.5 Mobile layers | done | `toiletsLayer`, `fountainsLayer`: own icons, greyed when not usable now, below transit; sheets; "WC" / "Water" switches (registry `toggle`); one request for all layers; to check on the iPhone |
 | 9 | 9.6 Docs | todo | |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
@@ -130,6 +130,17 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-18 — task 9.5
+- Done:
+  - `src/core/amenities.ts` (pure TS): `inSeason` (also across the new year), `seasonText`, `fountainStatus` (running / off season / out of service with the reason), `toiletNote` (events / funerals), `openingText`, `feeText`, `paymentText` ("Karte/App" → "Card or app only"), `accessibleText`, `changingTableText`, `distanceText` (rounded: distances are from the cell centre), `toiletLabel`, `fountainLabel`.
+  - `src/layers/amenities`: `AmenityIcon` (own drawings: "WC" on teal, drop on blue), `AmenityMarker` (round icon, greyed when not usable now, size report for 7.9, `zIndex` below transit), `ToiletSheet` / `FountainSheet`, `toiletsLayer` / `fountainsLayer` with a registry `toggle`.
+  - Registry: optional `toggle` per layer; `mapLayers` = transit, toilets, fountains (transit first: it wins in the overlap layout). `MapScreen`: one `/v1/nearby` request for all layers, a switch per toggled layer (hides without a request), `PoleMarker` gets `TRANSIT_Z_INDEX`.
+- Tests: Vitest `amenities.test.ts` (10; core coverage stays > 99 %); Jest `amenity-layers.test.tsx` (8): request with `layers=transit,toilets,fountains`, one marker each, in season in July, greyed in November and for event-only toilets, screen reader labels, switches hide/show without a request, tap opens the toilet sheet, sheet rows and notes (funeral note, unknown fields left out), fountain off season / out of service / running. All mobile tests (Vitest 290, Jest 132), typecheck, lint pass.
+- Found while testing: the app's clock follows `generatedAt` (ADR-0007), so a test on a fake date must build its answer on that date.
+- New deps: none.
+- Not verified yet: on the iPhone (icons, greying, switches, sheets, how icons and bubbles share the map).
+- Next: 9.6 README.
 
 ### 2026-11-18 — task 9.4
 - Done: contract first: `LayerId` + `toilets`, `fountains`; schemas `ToiletsLayer` / `Toilet`, `FountainsLayer` / `Fountain` / `Season` (`feeEuro` as double); Go and TypeScript regenerated. `amenities.ToiletsProvider` / `FountainsProvider`: `Nearby` reads version + rows in one read-only REPEATABLE READ transaction; `Refresh` (startup, and after every scheduler run through the new `SchedulerConfig.AfterRun`) loads version and last confirmation; health down / degraded (72 h) / ok. Registered in `cmd/server` after transit; `/v1/nearby` maps the payloads. ARCHITECTURE §3.5, §3.8; DATA_MODEL §5.1, §5.2.

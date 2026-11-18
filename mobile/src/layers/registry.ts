@@ -23,6 +23,11 @@ export interface MapViewOptions {
 export interface MapLayer<TFeature> {
   id: LayerId;
   /**
+   * A switch on the map that shows or hides this layer (Phase 9); none for
+   * layers that are always shown (transit). Shown by default.
+   */
+  toggle?: { label: string; accessibilityLabel: string };
+  /**
    * This layer's features in a /v1/nearby response (none if the layer is
    * down), clustered or filtered for the map's visible vertical span
    * (`latitudeDelta` in degrees; task 7.2) and the view options.

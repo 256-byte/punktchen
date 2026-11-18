@@ -15,7 +15,7 @@ import type { Size } from '@/core/labelLayout';
 import type { LocationView } from '@/core/location';
 import { freshness } from '@/core/staleness';
 import { mapLayers } from '@/layers';
-import type { AnyMapLayer } from '@/layers/registry';
+import type { AnyMapLayer, LayerId } from '@/layers/registry';
 import { hapticLight, hapticSelection } from '@/lib/haptics';
 import { type ClockStore, clockStore, useClockTicker, useDeviceNow } from '@/state/clock';
 import { locationStore, type LocationStore } from '@/state/location';
@@ -67,6 +67,8 @@ export function MapScreen({
   const [latitudeDelta, setLatitudeDelta] = useState(initialRegion.latitudeDelta);
   const [pitched, setPitched] = useState(false);
   const [combineStops, setCombineStops] = useState(COMBINE_STOPS_DEFAULT);
+  // Layers switched off on the map (Phase 9); not saved across app starts.
+  const [hidden, setHidden] = useState<ReadonlySet<LayerId>>(() => new Set());
   const pitchedRef = useRef(false);
   const deltaRef = useRef(initialRegion.latitudeDelta);
   const following = useRef(true);
@@ -121,6 +123,15 @@ export function MapScreen({
     setCombineStops((on) => !on);
   };
 
+  const toggleLayer = (id: LayerId) => {
+    hapticLight();
+    setHidden((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  };
+
   const selectFeature = (next: Selected) => {
     hapticSelection();
     setSelected(next);
@@ -132,7 +143,10 @@ export function MapScreen({
   };
 
   const center = useRequestCenter(position);
-  const nearby = useNearby(client, { lat: center.lat, lng: center.lng });
+  // Every layer in one request; the switches only change what is drawn, so
+  // turning one on or off needs no request and keeps the ETag.
+  const layerIds = useMemo(() => layers.map((l) => l.id), [layers]);
+  const nearby = useNearby(client, { lat: center.lat, lng: center.lng, layers: layerIds });
   const [selected, setSelected] = useState<Selected | null>(null);
 
   // Countdowns: one global ticker, corrected by the server clock.
@@ -159,16 +173,18 @@ export function MapScreen({
   const drawn = useMemo(
     () =>
       response
-        ? layers.flatMap((layer) =>
-            layer.select(response, latitudeDelta, { combineStops }).map((feature) => ({
-              layer,
-              feature,
-              key: `${layer.id}:${layer.key(feature)}`,
-              location: layer.location(feature),
-            })),
-          )
+        ? layers
+            .filter((layer) => !hidden.has(layer.id))
+            .flatMap((layer) =>
+              layer.select(response, latitudeDelta, { combineStops }).map((feature) => ({
+                layer,
+                feature,
+                key: `${layer.id}:${layer.key(feature)}`,
+                location: layer.location(feature),
+              })),
+            )
         : [],
-    [layers, response, latitudeDelta, combineStops],
+    [layers, hidden, response, latitudeDelta, combineStops],
   );
   const { displaced, relayout, reportSize } = useMarkerLayout(map, drawn);
 
@@ -206,6 +222,17 @@ export function MapScreen({
       <MapAttribution lines={nearby.data?.response.meta.attribution ?? []} />
       <PitchToggle pitched={pitched} onToggle={togglePitch} />
       <CombineStopsToggle on={combineStops} onToggle={toggleCombineStops} />
+      {layers
+        .filter((layer) => layer.toggle)
+        .map((layer, i) => (
+          <LayerToggle
+            key={layer.id}
+            toggle={layer.toggle!}
+            on={!hidden.has(layer.id)}
+            top={LAYER_TOGGLE_TOP + i * TOGGLE_STEP}
+            onToggle={() => toggleLayer(layer.id)}
+          />
+        ))}
       {devTools ? <DevPlacePicker store={store} /> : null}
       {client === null ? (
         <View style={styles.status}>
@@ -380,6 +407,42 @@ function CombineStopsToggle({ on, onToggle }: { on: boolean; onToggle: () => voi
       ]}
     >
       <Text style={[styles.pitchLabel, on && styles.pitchLabelActive]}>Combine</Text>
+    </Pressable>
+  );
+}
+
+/** Below the 3D and Combine buttons (top 124 and 172). */
+const LAYER_TOGGLE_TOP = 220;
+const TOGGLE_STEP = 48;
+
+/** Switch for one optional layer (Phase 9): toilets, drinking fountains. */
+function LayerToggle({
+  toggle,
+  on,
+  top,
+  onToggle,
+}: {
+  toggle: NonNullable<AnyMapLayer['toggle']>;
+  on: boolean;
+  top: number;
+  onToggle: () => void;
+}) {
+  const styles = useStyles();
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityLabel={toggle.accessibilityLabel}
+      accessibilityHint="Shows or hides this layer on the map"
+      accessibilityState={{ checked: on }}
+      onPress={onToggle}
+      style={({ pressed }) => [
+        styles.pitchButton,
+        { top },
+        on && styles.pitchButtonActive,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Text style={[styles.pitchLabel, on && styles.pitchLabelActive]}>{toggle.label}</Text>
     </Pressable>
   );
 }
