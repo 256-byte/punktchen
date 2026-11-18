@@ -60,13 +60,14 @@ If something you are asked to do contradicts these documents, **stop and ask the
 │   ├── cmd/server/               # main: wires everything
 │   ├── internal/
 │   │   ├── config/               # env config
-│   │   ├── platform/             # db pool, logging, metrics, http server
+│   │   ├── platform/             # db pool, logging, metrics, http server, import log (meta.feed_imports)
 │   │   ├── layer/                # generic Provider/Feature types + registry
 │   │   ├── transit/
 │   │   │   ├── static/           # GTFS download + import + derived tables
 │   │   │   ├── realtime/         # GTFS-RT poller + parser
 │   │   │   ├── departures/       # schedule window + RT merge → Snapshot
 │   │   │   └── provider.go       # transit implementation of layer.Provider
+│   │   ├── amenities/            # toilet + drinking fountain layers (WFS import, ADR-0010)
 │   │   ├── geo/                  # geohash cells, scope (Berlin) filter
 │   │   └── api/                  # handlers, cache, etag (uses generated types)
 │   ├── db/

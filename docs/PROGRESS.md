@@ -5,7 +5,7 @@
 ## Current status
 
 - **Active phase:** Phase 9 — Amenities: public toilets and drinking fountains (added 2026-11-18; Phase 8 alerts on hold)
-- **Next task:** 9.2 WFS import
+- **Next task:** 9.3 scheduler
 - **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
@@ -71,7 +71,7 @@
 
 | 9 | 9.0 Data exploration | done | Facts in DATA_MODEL §7 #34; ADR-0010 accepted (user, 2026-11-18) |
 | 9 | 9.1 Migration + queries | done | `0002_amenities` (toilets, fountains, generated geom + GiST); sqlc replace (COPY) and nearby with the 3-within-2-km fill; DATA_MODEL §3.7 |
-| 9 | 9.2 WFS import | todo | |
+| 9 | 9.2 WFS import | done | `internal/amenities`: generic `Importer[R]`, SHA-256 skip, parse + mapping, sanity checks, one-transaction replace; `ImportLog` moved to `internal/platform/importlog`; fixtures `backend/testdata/amenities/` |
 | 9 | 9.3 Scheduler | todo | |
 | 9 | 9.4 API + providers | todo | |
 | 9 | 9.5 Mobile layers | todo | |
@@ -130,6 +130,16 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-18 — task 9.2
+- Done:
+  - `internal/platform/importlog`: `static.ImportLog` moved here as `importlog.Log` (exported `LastSuccessful`, `Start`, `RecordDownload`, `Skip`) so the GTFS and the amenity imports share the `meta.feed_imports` bookkeeping; `static` keeps its `StatusX` names as aliases.
+  - `internal/amenities`: `Dataset[R]` (source, URL, limits, `Parse`, `Replace`), `Toilets` / `Fountains`, generic `Importer[R].Run(ctx, force)`: download, SHA-256 skip, parse, sanity check (min rows, max 30 % drop), `DeleteX` + `InsertX` in one transaction, attempt closed as succeeded / skipped / failed. ARCHITECTURE §3.8.
+  - Mapping (`ParseToilets`, `ParseFountains`): kind (Pissoir → urinal), `eventOnly` (symbol or hours "bei Veranstaltungen", hours "Trauerfeier"), opening hours with stray empty lines dropped, `open24h`, ja/nein → bool (NULL when missing, error otherwise), season from "Betriebszeit: Mai bis Oktober" (German month names; unreadable → import fails, old rows stay), `out_of_service` from `einschraenkungen`.
+  - Fixtures: the recorded WFS answers of 2026-11-18 in `backend/testdata/amenities/` (290 KB, 116 KB; dl-de/zero-2-0) with a README.
+- Tests: `parse_test.go` (recorded answers: 525 toilets with 14 urinals, 16 event-only, 330 open 24h, 323 free, 170 card/app only, 367 accessible, 137 changing tables; 242 fountains all May–October, 8 out of service; field mapping of single rows; 11 rejected inputs; sanity check; `TestLiveWFS` against gdi.berlin.de with `PUNKTCHEN_LIVE_TESTS=1`: 525 / 242). `importer_test.go` (Docker, fake WFS): first import, unchanged → skipped, forced, smaller answer within the limit, then 500 / HTML / 38 % drop / too few rows → failed with the old 400 rows kept; fountains import + nearby at Alexanderplatz filled with the nearest at 633 m. All backend tests and golangci-lint pass.
+- New deps: none.
+- Next: 9.3 scheduler + metrics.
 
 ### 2026-11-18 — task 9.1
 - Done: migration `0002_amenities` (schema `amenities`, tables `toilets` and `fountains` with typed columns, `geom` generated from lat/lng, GiST indexes); `db/queries/amenities.sql`: `DeleteX` + `InsertX` (`:copyfrom`) for a one-transaction replace, `CountX`, `NearbyX` (all within the radius plus the nearest `min_results` within `max_m`, KNN `<->`, nearest first). DATA_MODEL §3.7.

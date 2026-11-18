@@ -28,6 +28,7 @@ import (
 	"github.com/256-byte/punktchen/backend/internal/config"
 	"github.com/256-byte/punktchen/backend/internal/layer"
 	"github.com/256-byte/punktchen/backend/internal/platform"
+	"github.com/256-byte/punktchen/backend/internal/platform/importlog"
 	"github.com/256-byte/punktchen/backend/internal/transit"
 	"github.com/256-byte/punktchen/backend/internal/transit/departures"
 	"github.com/256-byte/punktchen/backend/internal/transit/realtime"
@@ -92,7 +93,7 @@ func serve(ctx context.Context, log *slog.Logger, cfg config.Config) error {
 	// Static GTFS import (ARCHITECTURE §3.1): one scheduler per process; the
 	// advisory lock in Importer.Run guards against other processes.
 	importLog := log.With("component", "import")
-	il := static.NewImportLog(pool)
+	il := importlog.New(pool)
 	dl, err := static.NewDownloader(static.DownloaderConfig{URL: cfg.GTFSURL, UserAgent: userAgent()}, il, importLog)
 	if err != nil {
 		return err

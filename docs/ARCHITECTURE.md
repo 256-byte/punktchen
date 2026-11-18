@@ -152,6 +152,12 @@ type Provider interface {
   - Always HTTP 200 while the process runs; the body carries the status. The Docker healthcheck (`punktchen healthcheck`) is therefore a pure liveness check and does not restart the container during e.g. a long first import.
   - Rules: `down` if the database is unreachable or there is no live schedule (`gtfs` schema); `degraded` if the transit layer is not `ok` (task 4.4: departures not refreshed for 3 min, no realtime data yet, or the merged feed older than 2 min by `header.timestamp`), or if the schedule was not confirmed current (import `succeeded` or `skipped`) in the last 72 h; the body carries `scheduleCheckedAt`.
 
+### 3.8 `amenities` — toilet and fountain layers (ADR-0010)
+
+- **Import** (task 9.2, `internal/amenities`): one generic `Importer[R]` per `Dataset[R]` (`Toilets`, `Fountains`): GET the Geoportal Berlin WFS as GeoJSON in WGS84 (User-Agent with the project, gzip by net/http, 32 MB cap, 1 min timeout) → SHA-256 of the body (upstream sends no ETag / Last-Modified, DATA_MODEL §7 #34) → same hash as the last successful import → `skipped` (unless forced, e.g. empty table) → `Parse` (every feature needs an id and a point inside the scope bbox; optional fields map to NULL; unknown values such as a yes/no that is neither "ja" nor "nein" or a fountain without a readable season fail the import) → sanity check (at least 200 toilets / 100 fountains, at most 30 % fewer rows than the last successful import) → `DeleteX` + `InsertX` (COPY) in one transaction → `succeeded` with `{"rows": n}`. Any failure keeps the stored rows and closes the attempt as `failed`.
+- Attempts are logged through `internal/platform/importlog` (`meta.feed_imports`), shared with the static GTFS import.
+- Scheduler, metrics (9.3) and the `toilets` / `fountains` providers (9.4) follow.
+
 ## 4. Mobile architecture
 
 ### 4.1 Data flow

@@ -17,6 +17,7 @@ import (
 	"github.com/256-byte/punktchen/backend/db"
 	"github.com/256-byte/punktchen/backend/internal/config"
 	"github.com/256-byte/punktchen/backend/internal/platform"
+	"github.com/256-byte/punktchen/backend/internal/platform/importlog"
 	"github.com/256-byte/punktchen/backend/internal/platform/pgtest"
 )
 
@@ -78,7 +79,7 @@ func (f *fakeFeed) lastRequest() http.Header {
 type env struct {
 	t    *testing.T
 	pool *pgxpool.Pool
-	il   *ImportLog
+	il   *importlog.Log
 	feed *fakeFeed
 	dir  string
 	d    *Downloader
@@ -91,7 +92,7 @@ func newEnv(t *testing.T, pool *pgxpool.Pool, feed *fakeFeed, maxBytes int64) *e
 	srv := httptest.NewServer(feed)
 	t.Cleanup(srv.Close)
 	dir := t.TempDir()
-	il := NewImportLog(pool)
+	il := importlog.New(pool)
 	d, err := NewDownloader(DownloaderConfig{
 		Source: t.Name(), URL: srv.URL + "/gtfs.zip", UserAgent: "punktchen-test", Dir: dir, MaxBytes: maxBytes,
 	}, il, slog.New(slog.DiscardHandler))
@@ -362,7 +363,7 @@ func TestDownloaderLiveVBB(t *testing.T) {
 	if err := platform.Migrate(ctx, pool, db.Migrations, db.MigrationsDir, slog.New(slog.DiscardHandler)); err != nil {
 		t.Fatal(err)
 	}
-	il := NewImportLog(pool)
+	il := importlog.New(pool)
 	d, err := NewDownloader(DownloaderConfig{
 		URL: config.DefaultGTFSURL, UserAgent: "punktchen-test (+https://github.com/256-byte/punktchen)", Dir: t.TempDir(),
 	}, il, slog.New(slog.NewTextHandler(os.Stderr, nil)))

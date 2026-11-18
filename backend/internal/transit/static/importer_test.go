@@ -21,6 +21,7 @@ import (
 	"github.com/256-byte/punktchen/backend/gen/queries"
 	"github.com/256-byte/punktchen/backend/internal/layer"
 	"github.com/256-byte/punktchen/backend/internal/platform"
+	"github.com/256-byte/punktchen/backend/internal/platform/importlog"
 	"github.com/256-byte/punktchen/backend/internal/transit"
 	"github.com/256-byte/punktchen/backend/internal/transit/departures"
 )
@@ -52,7 +53,7 @@ func newImportEnv(t *testing.T, pool *pgxpool.Pool, files map[string]string) *im
 	srv := httptest.NewServer(feed)
 	t.Cleanup(srv.Close)
 	log := slog.New(slog.DiscardHandler)
-	il := NewImportLog(pool)
+	il := importlog.New(pool)
 	dl, err := NewDownloader(DownloaderConfig{URL: srv.URL, UserAgent: "punktchen-test", Dir: t.TempDir()}, il, log)
 	if err != nil {
 		t.Fatal(err)
@@ -442,7 +443,7 @@ func TestImportRealFeed(t *testing.T) {
 	srv := httptest.NewServer(feed)
 	t.Cleanup(srv.Close)
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	il := NewImportLog(pool)
+	il := importlog.New(pool)
 	dl, err := NewDownloader(DownloaderConfig{URL: srv.URL, UserAgent: "punktchen-test", Dir: t.TempDir()}, il, log)
 	if err != nil {
 		t.Fatal(err)
