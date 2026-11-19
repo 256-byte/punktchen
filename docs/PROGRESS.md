@@ -4,8 +4,8 @@
 
 ## Current status
 
-- **Active phase:** Phase 9 — Amenities: public toilets and drinking fountains (added 2026-11-18; Phase 8 alerts on hold)
-- **Next task:** check 9.5 on the iPhone; then Phase 9 is done
+- **Active phase:** Phase 10 — Map look: satellite 3D and snow (added 2026-11-19; Phase 8 alerts on hold)
+- **Next task:** 10.0 spike on the iPhone
 - **Blocked by:** nothing (the GitHub billing lock is gone; CI runs since 2026-11-10)
 
 ## Task status
@@ -74,8 +74,12 @@
 | 9 | 9.2 WFS import | done | `internal/amenities`: generic `Importer[R]`, SHA-256 skip, parse + mapping, sanity checks, one-transaction replace; `ImportLog` moved to `internal/platform/importlog`; fixtures `backend/testdata/amenities/` |
 | 9 | 9.3 Scheduler | done | `amenities.Scheduler`: startup when empty (forced), daily 04:15, retry 1 h; dev trigger starts GTFS + amenities; metrics; hash of `features` only (WFS `timeStamp`) |
 | 9 | 9.4 API + providers | done | `ToiletsLayer`, `FountainsLayer` in OpenAPI; `ToiletsProvider`, `FountainsProvider` (version + rows in one REPEATABLE READ tx); registered with transit; contract + ETag tests |
-| 9 | 9.5 Mobile layers | done | `toiletsLayer`, `fountainsLayer`: own icons, greyed when not usable now, below transit; sheets; "WC" / "Water" switches (registry `toggle`); one request for all layers; to check on the iPhone |
+| 9 | 9.5 Mobile layers | done | `toiletsLayer`, `fountainsLayer`: own icons, greyed when not usable now, below transit; sheets; "WC" / "Water" switches (registry `toggle`); one request for all layers; checked on the iPhone (user, 2026-11-18) |
 | 9 | 9.6 Docs | done | README: status, layers, architecture diagram, ADR table (links fixed, 0009 corrected, 0010 added), data licences |
+| 10 | 10.0 Spike on the iPhone | todo | |
+| 10 | 10.1 Map style switch | todo | |
+| 10 | 10.2 Snow overlay | todo | |
+| 10 | 10.3 Docs | todo | |
 
 Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the next phase when it becomes active.
 
@@ -111,6 +115,7 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 
 | 2026-11-18 | Phase 9 (toilets + drinking fountains from Berlin open data) added and runs before Phase 8; nextbike undecided; elevator status too detailed for now; other Berlin datasets (bike parking, playgrounds, chargers, trees, Wi-Fi, bathing spots) not now — user decisions after the open-data research | ADR-0010 |
 | 2026-11-18 | Sparse layers: features within the radius, filled up to the nearest 3 within 2 km; event-only toilets shown with a note; fountains out of season or out of service shown greyed with the reason — user decisions | ADR-0010 |
+| 2026-11-19 | Phase 10 (satellite 3D + snow) added: Apple flyover / Google satellite via `mapType`, snow as a screen-space layer above the map; no new data source, no backend change. Weather-driven snow and our own Berlin imagery/3D stay under "Later" — user decision | — (no architecture change) |
 
 ## Open questions
 
@@ -130,6 +135,16 @@ Status values: `todo` · `in progress` · `done` · `blocked`. Add rows for the 
 - Data facts found:
 - Next:
 -->
+
+### 2026-11-19 — map look research, Phase 10 drafted
+- Research (user question: snow on the 3D map, real imagery in 3D): Apple Maps / react-native-maps give no access to the 3D scene, so effects can only be a screen-space layer above the map. Apple's `satelliteFlyover` / `hybridFlyover` already show a photographic 3D Berlin (iOS only). Free Berlin sources: Geoportal DOP20 orthophotos (WMS/Atom, mostly dl-de/zero-2.0), LoD2 buildings (dl-de/zero-2.0), textured Berlin 3D mesh (OBJ, Business Location Center). MapLibre Native has no 3D terrain yet; Google Photorealistic 3D Tiles cost money past 1,000 requests/month and have no native RN path.
+- Done: Phase 10 draft in PLAN.md (10.0 spike, 10.1 map style switch, 10.2 snow overlay, 10.3 docs); weather-driven snow and our own imagery/3D under "Later".
+- User approved Phase 10 as drafted.
+- Next: 10.0.
+
+### 2026-11-18 — Phase 9 done
+- iPhone check of 9.5 (user): icons, greying, the WC / Water switches, the sheets and how icons and bubbles share the map — no issues. Phase 9 complete (PR #60).
+- Next: to be decided with the user (Phase 8 waits for the VBB API key application).
 
 ### 2026-11-18 — task 9.6
 - Done: README: status and intro mention toilets and drinking fountains, a "generic layers in practice" point, Geoportal Berlin in the architecture diagram (WFS → amenity importer → PostGIS, registry with three layers), ADR table: six broken links fixed (file names had changed), 0001 and 0009 descriptions corrected (0009 is React Native + Expo, not PostGIS), 0010 added; repository layout; data licences (dl-de/zero-2-0).

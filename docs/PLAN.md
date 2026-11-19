@@ -121,7 +121,21 @@ Goal: toilets and drinking fountains near the user on the map, from Berlin open 
 | 9.5 | Mobile: layer switches (toilets, fountains), icon markers in the overlap layout, detail sheet (hours, fee, payment, accessible, changing table; event-only note; fountain season / out-of-service greyed with the reason), light/dark | Jest tests for markers and sheets; checked on the iPhone |
 | 9.6 | Docs: README, ARCHITECTURE (§3.5, §4.4), DATA_MODEL §5 | Present |
 
+## Phase 10 — Map look: satellite 3D and snow (added 2026-11-19)
+
+Goal: a photographic 3D Berlin and a snow effect on the map, with no new data source and no backend change. Uses what the map SDKs already offer: Apple's flyover imagery on iOS (`mapType` `hybridFlyover`), Google's satellite imagery on Android. The snow is a screen-space particle layer above the map, not inside the 3D scene (neither Apple Maps nor react-native-maps lets us draw into it). No ADR needed: same map library, no new component on the backend. Weather-driven snow and our own Berlin imagery or 3D data are under "Later".
+
+| ID | Task | Acceptance criteria |
+|---|---|---|
+| 10.0 | **Spike on the iPhone.** `satelliteFlyover` vs. `hybridFlyover` in Berlin (coverage, labels, 3D at our pitch camera, frame rate, dark mode); marker legibility on photo imagery; Android equivalent (`satellite` / `hybrid`, no flyover). Snow prototype: Reanimated only vs. `@shopify/react-native-skia` (works in Expo Go SDK 58?), particle count vs. frame rate | Findings + chosen map type and renderer in the PROGRESS session log; a new dependency only with the measured reason |
+| 10.1 | Map style switch "Map / Satellite" next to "3D". `src/core`: pure `mapTypeFor(style, platform)`; choice kept across launches (AsyncStorage, like the persisted query cache); markers readable on imagery (border/shadow tokens, both themes); Apple/Google attribution stays visible | Vitest for the mapping; Jest: the switch sets the `mapType` prop and the choice survives a restart; iPhone: Brandenburger Tor and Alexanderplatz in 3D satellite, markers readable, taps work |
+| 10.2 | Snow overlay: switch "Snow" (default off). `src/core`: pure particle model (spawn, fall, drift, wrap; seeded RNG, fixed time step, density per screen area); renderer in `src/ui` with `pointerEvents="none"`; off with Reduce Motion; paused in the background and when the app is not focused | Vitest for the model (deterministic steps, density, wrap), core coverage stays ≥ 90 %; Jest: overlay does not catch touches, absent with Reduce Motion; iPhone: smooth while panning, marker taps and the sheet still work, no noticeable battery drain in 10 min |
+| 10.3 | Docs: README (screenshot satellite 3D + snow), ARCHITECTURE §4 map screen | Present |
+
 ## Later (not scheduled — needs user approval + ADR before starting)
+
+- **Weather-driven snow:** backend `weather` layer from DWD data via Bright Sky (free, open) — the app never calls a weather API itself (rule 6); snow on only when it snows at the map centre.
+- **Our own Berlin imagery / 3D:** Geoportal Berlin DOP20 orthophotos (dl-de/zero-2.0) as a tile overlay through our backend, LoD2 buildings or the textured Berlin 3D mesh (OBJ); would mean MapLibre or a 3D engine instead of Apple/Google maps.
 
 - **Phase 8 — Alerts layer:** research VBB Verkehrsmeldungen open data (format/terms) → first adapter → normalized `Alert` → de-dup across sources (HAFAS remarks, DB RIS) → ⚠︎ in UI.
 - Elevator status layer (BVG, DB FaSta).
